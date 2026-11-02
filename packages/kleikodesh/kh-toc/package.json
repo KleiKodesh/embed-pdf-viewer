@@ -1,0 +1,36 @@
+{
+  "name": "@kleikodesh/kh-toc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KitveiHakodesh table-of-contents saves: outline edits written as one incremental update that ends in a KH-TOC marker, so repeated saves replace their section instead of stacking.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/engine-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@embedpdf/engine": "workspace:*",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
+  },
+  "license": "MIT",
+  "sideEffects": false
+}
