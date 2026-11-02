@@ -132,11 +132,19 @@ export function inlineOutlineTargets(saved: Uint8Array, start: number): Uint8Arr
   return result;
 }
 
-/** The /Size of the file the section updates: its last trailer before `start`. */
+/** The /Size of the file the section updates: its last trailer, or 0. */
 function baseSizeOf(bytes: Uint8Array, start: number) {
-  const head = latin1(bytes, Math.max(0, start - 4096), start);
-  const all = [...head.matchAll(/\/Size\s+(\d+)/g)];
-  return all.length ? Number(all[all.length - 1][1]) : 0;
+  const tail = latin1(bytes, Math.max(0, start - 1024), start);
+  const at = [...tail.matchAll(/startxref\s+(\d+)/g)].pop();
+  if (!at) return 0;
+  const offset = Number(at[1]);
+  if (!(offset >= 0 && offset < start)) return 0;
+  // A cross-reference table's trailer follows the table; a stream's
+  // dictionary comes first.
+  const text = latin1(bytes, offset, start);
+  const dict = /^xref\s/.test(text) ? text.slice(text.indexOf('trailer')) : text.slice(0, 4096);
+  const size = /\/Size\s+(\d+)/.exec(dict);
+  return size ? Number(size[1]) : 0;
 }
 
 function latin1(bytes: Uint8Array, from = 0, to = bytes.length) {
