@@ -160,3 +160,28 @@ describe('readTocMarker', () => {
     expect(await appendTocMarker(original, original.length - 10)).toBe(original);
   });
 });
+
+describe('alsoApply', () => {
+  it('saves other edits in the same update, appended to the whole file without a marker', async () => {
+    const forms = new Uint8Array(await readFile(resolve(here, 'embedpdf-forms.pdf')));
+    const read = async (bytes: Uint8Array) => {
+      const doc = await engine.open({ kind: 'bytes', bytes: bytes.slice() } as never);
+      try {
+        return (await doc.forms.list()).fields;
+      } finally {
+        await doc.close();
+      }
+    };
+    const text = (await read(forms)).find((f) => f.family === 'text')!;
+    const saved = await saveOutlineEdits(engine, forms, null, {
+      alsoApply: async (doc) => {
+        await doc.forms.setValue(text.ref, { value: 'filled in' });
+      },
+    });
+
+    expect(prefixOf(saved, forms)).toBe(true);
+    expect(await readTocMarker(saved)).toBeNull();
+    const back = (await read(saved)).find((f) => f.name === text.name);
+    expect(back).toMatchObject({ value: 'filled in' });
+  });
+});

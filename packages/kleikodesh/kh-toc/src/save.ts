@@ -29,6 +29,12 @@ export interface EditedOutlineItem {
 export interface SaveOutlineOptions {
   /** The password the document was opened with. */
   password?: string;
+  /**
+   * Other edits for the same update, such as form field values. The update
+   * then holds more than the outline, so it is appended to the whole file and
+   * gets no KH-TOC marker: the next outline save keeps it.
+   */
+  alsoApply?: (doc: DocumentHandle) => Promise<void>;
 }
 
 /** The loaded outline's items, breadth first: the order `src` indexes. */
@@ -51,8 +57,8 @@ export function outlineBreadthFirst(items: readonly OutlineItem[]): OutlineItem[
 }
 
 /**
- * `file` with its outline replaced by `edited`, as one incremental update
- * that ends in a KH-TOC marker.
+ * `file` with its outline replaced by `edited` (left alone when `null`), as
+ * one incremental update that ends in a KH-TOC marker.
  *
  * When the file's last section is a proven KH-TOC section, the update is
  * written over the bytes before it instead of on top of it, so a file only
@@ -64,10 +70,10 @@ export function outlineBreadthFirst(items: readonly OutlineItem[]): OutlineItem[
 export async function saveOutlineEdits(
   engine: Engine,
   file: Uint8Array,
-  edited: readonly EditedOutlineItem[],
+  edited: readonly EditedOutlineItem[] | null,
   options: SaveOutlineOptions = {},
 ): Promise<Uint8Array> {
-  const marker = await readTocMarker(file);
+  const marker = options.alsoApply ? null : await readTocMarker(file);
   const base = marker ? file.subarray(0, marker.start) : file;
   const open = (bytes: Uint8Array) =>
     engine.open(
@@ -91,10 +97,12 @@ export async function saveOutlineEdits(
 
   const doc = await open(base);
   try {
-    await applyOutline(doc, edited, marker ? null : undefined, loaded);
+    if (edited) await applyOutline(doc, edited, marker ? null : undefined, loaded);
+    if (options.alsoApply) await options.alsoApply(doc);
     const saved = await doc.download({ mode: 'incremental' });
     if (!startsWith(saved, base)) return saved;
-    return await appendTocMarker(inlineOutlineTargets(saved, base.length), base.length);
+    const section = inlineOutlineTargets(saved, base.length);
+    return options.alsoApply ? section : await appendTocMarker(section, base.length);
   } finally {
     await doc.close();
   }
