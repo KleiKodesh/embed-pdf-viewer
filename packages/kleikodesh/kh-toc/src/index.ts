@@ -1,3 +1,4 @@
+export { inlineOutlineTargets } from './inline';
 export { appendTocMarker, readTocMarker, sha256Hex, type TocMarker } from './marker';
 export {
   outlineBreadthFirst,

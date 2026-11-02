@@ -117,6 +117,29 @@ describe('saveOutlineEdits', () => {
   });
 });
 
+describe('the outline section', () => {
+  it('writes targets inside the items, so it points into none of its own objects but the items', async () => {
+    const saved = await saveOutlineEdits(engine, original, [
+      ...asEdited(await outlineOf(original)),
+      { title: 'added', page: 2, items: [{ title: 'child', page: 3, items: [] }] },
+    ]);
+    const section = new TextDecoder('latin1').decode(saved.subarray(original.length));
+    const objects = new Map(
+      [...section.matchAll(/(\d+) 0 obj([\s\S]*?)endobj/g)].map((m) => [Number(m[1]), m[2]]),
+    );
+    for (const body of objects.values()) {
+      for (const ref of body.matchAll(/\/(?:A|Dest|D)\s+(\d+) 0 R/g)) {
+        expect(objects.has(Number(ref[1]))).toBe(false);
+      }
+    }
+    const back = await outlineOf(saved);
+    const added = back.find((i) => i.title === 'added')!;
+    const child = back.find((i) => i.title === 'child')!;
+    expect(added.target).toMatchObject({ kind: 'goto', destination: { kind: 'xyz' } });
+    expect(child.target).toMatchObject({ kind: 'goto', destination: { kind: 'xyz' } });
+  });
+});
+
 describe('readTocMarker', () => {
   it('rejects a marker whose section was changed after it was written', async () => {
     const saved = await saveOutlineEdits(engine, original, asEdited(await outlineOf(original)));

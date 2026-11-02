@@ -7,6 +7,7 @@ import type {
   PageRef,
 } from '@embedpdf/engine-core/public';
 
+import { inlineOutlineTargets } from './inline';
 import { appendTocMarker, readTocMarker } from './marker';
 
 /**
@@ -57,7 +58,8 @@ export function outlineBreadthFirst(items: readonly OutlineItem[]): OutlineItem[
  * written over the bytes before it instead of on top of it, so a file only
  * ever carries one outline section. Items that keep their `src` keep their
  * object, target and style (bold, italic, colour, open state); new items go
- * to their `page`.
+ * to their `page`. Targets are written inside the items' own dictionaries,
+ * so the section never points into objects only it defines.
  */
 export async function saveOutlineEdits(
   engine: Engine,
@@ -92,7 +94,7 @@ export async function saveOutlineEdits(
     await applyOutline(doc, edited, marker ? null : undefined, loaded);
     const saved = await doc.download({ mode: 'incremental' });
     if (!startsWith(saved, base)) return saved;
-    return await appendTocMarker(saved, base.length);
+    return await appendTocMarker(inlineOutlineTargets(saved, base.length), base.length);
   } finally {
     await doc.close();
   }
