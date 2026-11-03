@@ -1,0 +1,36 @@
+{
+  "name": "@kleikodesh/pdfjs-compat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PDF.js shapes over the EmbedPDF engine: PDF.js annotation editor values (annotationStorage) written as engine annotation creates, updates and deletes.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@embedpdf/engine-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@embedpdf/engine": "workspace:*",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
+  },
+  "license": "MIT",
+  "sideEffects": false
+}
