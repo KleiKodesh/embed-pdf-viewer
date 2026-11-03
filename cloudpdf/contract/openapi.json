@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CloudPDF Engine API",
-    "version": "3.0.0-next.19",
+    "version": "3.0.0-next.20",
     "description": "The backend-callable surface of the CloudPDF document engine: deployment and tenant administration plus the document operations (reads, annotations, forms, page operations, redaction, download). Interactive viewing goes through the CloudPDF viewer SDKs, whose session protocol is deliberately not part of this API. Generated from the @cloudpdf/contract operation registry — do not edit by hand.",
     "license": {
       "name": "Apache-2.0",
@@ -5848,6 +5848,83 @@
           }
         }
       },
+      "patch": {
+        "operationId": "tenants.update",
+        "x-fern-sdk-group-name": ["tenants"],
+        "x-fern-sdk-method-name": "update",
+        "x-docs-title": "Update tenant",
+        "summary": "Set the server modules a tenant may use: its whole features list.",
+        "description": "A feature names an installed module; any other id is a 400. A module route answers a tenant without its feature 403 FeatureNotEnabled, and one whose feature is stopped 402 FeatureStopped (details.feature, details.stopped). Other replicas apply a change within 30 seconds.",
+        "security": [
+          {
+            "apiToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantsUpdate200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantsUpdate400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantsUpdate404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "operationId": "tenants.delete",
         "x-fern-sdk-group-name": ["tenants"],
@@ -8860,6 +8937,22 @@
         "required": ["name", "code", "message"],
         "additionalProperties": false
       },
+      "TenantFeature": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+          },
+          "stopped": {
+            "type": "string",
+            "enum": ["cap"]
+          }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
       "PageRef": {
         "type": "object",
         "properties": {
@@ -10298,6 +10391,14 @@
                 "type": "string",
                 "nullable": true
               },
+              "structurePosition": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "nullable": true
+              },
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -10500,6 +10601,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -10552,6 +10654,14 @@
                 "type": "string",
                 "nullable": true
               },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
+                "nullable": true
+              },
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -10684,6 +10794,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -10736,6 +10847,14 @@
                 "type": "string",
                 "nullable": true
               },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
+                "nullable": true
+              },
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -10868,6 +10987,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -10918,6 +11038,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -11057,6 +11185,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -11108,6 +11237,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -11276,6 +11413,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -11332,6 +11470,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -11500,6 +11646,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -11556,6 +11703,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -11871,6 +12026,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -11931,6 +12087,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -12144,6 +12308,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -12204,6 +12369,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -12429,6 +12602,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -12491,6 +12665,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -12624,6 +12806,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -12672,6 +12855,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -12836,6 +13027,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -12891,6 +13083,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -13304,6 +13504,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -13369,6 +13570,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -13512,6 +13721,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -13564,6 +13774,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -13712,6 +13930,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -13765,6 +13984,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -13911,6 +14138,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -13963,6 +14191,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -14106,6 +14342,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -14160,6 +14397,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -14326,6 +14571,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -14383,6 +14629,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -14519,6 +14773,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -14568,6 +14823,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -14700,6 +14963,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -14787,6 +15051,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -14957,6 +15222,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15054,6 +15320,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15151,6 +15418,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15253,6 +15521,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15384,6 +15653,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15515,6 +15785,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15800,6 +16071,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15977,6 +16249,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16165,6 +16438,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16261,6 +16535,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16391,6 +16666,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16754,6 +17030,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16860,6 +17137,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16971,6 +17249,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17080,6 +17359,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17198,6 +17478,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17385,6 +17666,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17513,6 +17795,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17611,6 +17894,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17780,6 +18064,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17876,6 +18161,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17972,6 +18258,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18073,6 +18360,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18211,6 +18499,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18348,6 +18637,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18649,6 +18939,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18842,6 +19133,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19036,6 +19328,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19143,6 +19436,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19300,6 +19594,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19677,6 +19972,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19782,6 +20078,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19892,6 +20189,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -20000,6 +20298,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -20120,6 +20419,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -20248,6 +20548,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -22168,6 +22469,14 @@
             "type": "string",
             "nullable": true
           },
+          "structurePosition": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "nullable": true
+          },
           "nm": {
             "type": "string",
             "nullable": true
@@ -22433,6 +22742,7 @@
           "page",
           "hasAppearance",
           "appearanceState",
+          "structurePosition",
           "nm",
           "rect",
           "contents",
@@ -22488,6 +22798,7 @@
           "page": {},
           "hasAppearance": {},
           "appearanceState": {},
+          "structurePosition": {},
           "nm": {
             "type": "string",
             "nullable": true
@@ -25432,6 +25743,12 @@
                 "type": "string",
                 "enum": ["active", "suspended"]
               },
+              "features": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TenantFeature"
+                }
+              },
               "createdAt": {
                 "type": "number"
               }
@@ -25469,6 +25786,12 @@
                 "status": {
                   "type": "string",
                   "enum": ["active", "suspended"]
+                },
+                "features": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantFeature"
+                  }
                 },
                 "createdAt": {
                   "type": "number"
@@ -25508,6 +25831,12 @@
                 "type": "string",
                 "enum": ["active", "suspended"]
               },
+              "features": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TenantFeature"
+                }
+              },
               "createdAt": {
                 "type": "number"
               }
@@ -25520,6 +25849,62 @@
         "additionalProperties": false
       },
       "TenantsGet404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "TenantsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantFeature"
+            },
+            "maxItems": 64
+          }
+        },
+        "required": ["features"],
+        "additionalProperties": false
+      },
+      "TenantsUpdate200Response": {
+        "type": "object",
+        "properties": {
+          "tenant": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "autoProvisioned": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["active", "suspended"]
+              },
+              "features": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TenantFeature"
+                }
+              },
+              "createdAt": {
+                "type": "number"
+              }
+            },
+            "required": ["id", "name", "autoProvisioned", "createdAt"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["tenant"],
+        "additionalProperties": false
+      },
+      "TenantsUpdate400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "TenantsUpdate404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "TenantsDeleteResponse": {

@@ -32,7 +32,7 @@ const FEATURES = [
   {
     name: 'comments panel',
     open: { command: 'panel:comments' },
-    marker: 'demo.commentsReplyPlaceholder',
+    marker: 'comments.replyPlaceholder',
   },
   { name: 'stamps panel', open: { command: 'panel:stamps' }, marker: 'demo.stampsImportHint' },
   {
@@ -94,7 +94,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
   window.element = EmbedPDF.init({ target: '#viewer', src: '/sample.pdf', theme: 'light' });
   // When the document first shows: the frame its page count appears in.
   const watch = () => {
-    if (/Page 1 of \\d+/.test(window.element.shadowRoot?.textContent ?? '')) {
+    if (/1 \\/ \\d+/.test(window.element.shadowRoot?.textContent ?? '')) {
       window.shownAt = performance.now();
     } else requestAnimationFrame(watch);
   };

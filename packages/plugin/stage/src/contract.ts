@@ -19,6 +19,8 @@ import type {
   Camera,
   PageBox,
   PageFrame,
+  Padding,
+  PaddingSides,
   Point,
   ScrollMetrics,
   Size,
@@ -40,6 +42,8 @@ export type {
   Point,
   Direction,
   PageFrame,
+  Padding,
+  PaddingSides,
   ScrollMetrics,
   SpreadMode,
   SizingMode,
@@ -157,9 +161,11 @@ export interface StageSettings {
   /**
    * Breathing room (screen px) around the content — the one spacing concept.
    * Fit-modes inset by it, arrivals leave it as a gutter, and the clamp lets the
-   * camera reveal exactly this much beyond each content edge.
+   * camera reveal exactly this much beyond each content edge. A number is every
+   * side; `{ top, right, bottom, left }` gives each side its own, as room for a
+   * toolbar floating over one edge.
    */
-  padding: number;
+  padding: Padding;
   /**
    * Space between items — and between the halves of a spread. A number is world
    * units (scales with zoom — the canvas feel); `{ px }` is screen px (UI-stable
@@ -296,11 +302,14 @@ export interface ZoomBoxLook {
 
 /**
  * A change to the settings: any of them, each replacing the current value
- * whole. A `pageFrame` names only the sides it reserves (`{ bottom: 20 }`);
- * the sides it leaves out are 0. A `zoomBox` names only the colors it sets;
- * the ones it leaves out follow the accent.
+ * whole. A `pageFrame`, or a `padding` given by side, names only the sides it
+ * sets (`{ bottom: 20 }`); the sides it leaves out are 0. A `zoomBox` names
+ * only the colors it sets; the ones it leaves out follow the accent.
  */
-export interface StageSettingsPatch extends Partial<Omit<StageSettings, 'pageFrame' | 'zoomBox'>> {
+export interface StageSettingsPatch extends Partial<
+  Omit<StageSettings, 'padding' | 'pageFrame' | 'zoomBox'>
+> {
+  padding?: number | Partial<PaddingSides>;
   pageFrame?: Partial<PageFrame>;
   zoomBox?: Partial<ZoomBoxLook>;
 }
@@ -512,6 +521,13 @@ export interface StageCapability {
   getPageCount(): number;
   /** Pages of the current item (one page, or a spread / grid row). */
   listCurrentItemPages(): readonly PageInfo[];
+  /**
+   * The pages you're on: the current item's pages while the item fits across
+   * the view (a spread you see side by side, however tall), else the current
+   * page alone. What a page number names, and what `nextPage` and
+   * `previousPage` step past.
+   */
+  listCurrentPages(): readonly PageInfo[];
   /** Pages on screen, with their viewport rects and visible page-space rect. Reference-stable. */
   listVisiblePages(): readonly VisiblePage[];
   /** Is any part of the page (its ref or its index) on screen. False for a page that isn't in the document. */
@@ -580,12 +596,15 @@ export interface StageCapability {
   goToDestination(destination: PageDestination, options?: GoToDestinationOptions): void;
   goToFirstPage(options?: GoToOptions): void;
   goToLastPage(options?: GoToOptions): void;
-  /** Step forward / backward by the navigation unit (the item if it fits the viewport, else the page). */
+  /**
+   * Step past the pages you're on (`listCurrentPages`): forward to the page
+   * after them, back to the spread or page before them.
+   */
   nextPage(options?: GoToOptions): void;
   previousPage(options?: GoToOptions): void;
-  /** The cursor is before the last page. */
+  /** There's a page after the pages you're on. */
   canGoNext(): boolean;
-  /** The cursor is after the first page. */
+  /** There's a page before the pages you're on. */
   canGoPrevious(): boolean;
   /**
    * Bring a page, or a spot on it, into view: its `PageRef` or its display

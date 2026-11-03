@@ -175,6 +175,7 @@ export type {
   PageRenderImage,
   PageRenderLayers,
   PageRenderOptions,
+  RawPageRenderOptions,
   PageRenderRaster,
   PageRenderQuery,
   PageRenderTarget,
@@ -205,6 +206,7 @@ export {
 export type {
   AnnotationAppearanceMode,
   AnnotationAppearanceRenderOptions,
+  LocalAnnotationAppearanceRenderOptions,
   AnnotationAppearanceImageOptions,
   AnnotationAppearancesQuery,
   WidgetAppearancesQuery,
@@ -333,6 +335,7 @@ export type { AnnotationSubtype } from './annotation/subtype';
 export { familyOfSubtype } from './annotation/family';
 export type { AnnotationFamily } from './annotation/family';
 export type { AnnotationOrder, AnnotationOrderEntry } from './annotation/AnnotationOrder';
+export type { AnnotationAppearanceText } from './dto/AnnotationAppearanceText';
 
 // Binary payloads — zod-free.
 export type {
