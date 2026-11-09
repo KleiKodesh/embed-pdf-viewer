@@ -1,5 +1,7 @@
 export {
   AnnotationEditorType,
+  annotationIdOf,
+  annotationRefOf,
   applyAnnotationEdits,
   hexOf,
   type AppliedAnnotationEdits,

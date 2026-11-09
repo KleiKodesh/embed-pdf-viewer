@@ -69,7 +69,9 @@ async function open(bytes: Uint8Array) {
 
 async function annotationsOf(doc: DocumentHandle) {
   const page = (await doc.pages.list()).pages[0];
-  return (await doc.page(page.ref).annotations.list()).annotations.filter((a) => a.subtype !== 'popup');
+  return (await doc.page(page.ref).annotations.list()).annotations.filter(
+    (a) => a.subtype !== 'popup',
+  );
 }
 
 const created: PdfjsEditorValue[] = [
@@ -180,6 +182,8 @@ describe('applyAnnotationEdits', () => {
           color: [255, 0, 0],
           thickness: 4,
           opacity: 1,
+          // A first comment on an existing annotation gets its window.
+          popup: { contents: 'new comment', deleted: false },
         },
         {
           annotationType: T.FREETEXT,
@@ -196,7 +200,9 @@ describe('applyAnnotationEdits', () => {
       const result = await applyAnnotationEdits(again, edits);
       expect(result.skipped).toEqual([]);
       expect(result.updated).toHaveLength(3);
-      expect(result.deleted).toHaveLength(1);
+      // The deleted stamp, and the highlight's comment window.
+      expect(result.deleted).toHaveLength(2);
+      expect(result.created).toHaveLength(1);
       second = await again.download({ mode: 'incremental' } as never);
     } finally {
       await again.close();
@@ -209,6 +215,9 @@ describe('applyAnnotationEdits', () => {
       expect(read.map((a) => a.subtype)).toEqual(['highlight', 'ink', 'ink', 'free-text', 'stamp']);
       expect(read[0].color).toBe('#00ff00');
       expect(read[0].contents ?? null).toBeNull();
+      expect(read[0].popup ?? null).toBeNull();
+      expect(read[2].contents).toBe('new comment');
+      expect(read[2].popup).toBeTruthy();
       expect(read[2].color).toBe('#ff0000');
       expect(read[2].strokeWidth).toBe(4);
       expect(read[3].contents).toBe('changed');

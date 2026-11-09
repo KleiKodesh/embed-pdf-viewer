@@ -25,12 +25,18 @@ export const AnnotationEditorType = {
  */
 export interface PdfjsEditorValue {
   annotationType?: number;
-  pageIndex: number;
+  /** Absent on a comment set on an annotation without an editor: `page` says it then. */
+  pageIndex?: number;
+  /** The page view's page (`AnnotationElement.commentText` stores it instead of `pageIndex`). */
+  page?: { _pageIndex?: number; pageNumber?: number } | null;
   /** `[x1, y1, x2, y2]` where the annotation stands on the page. */
   rect?: number[];
   /** The view's rotation the editor was made in, in degrees counterclockwise. */
   rotation?: number;
-  /** `"<objectNumber>R"` of the annotation this edits or deletes; absent for a new one. */
+  /**
+   * The annotation this edits or deletes, as {@link annotationIdOf} names it
+   * (`"<objectNumber>R"`); absent for a new one.
+   */
   id?: string | null;
   deleted?: boolean;
   color?: number[] | null;
@@ -85,6 +91,41 @@ interface PageInfo {
   crop: PdfRect;
 }
 
+const BASE_PREFIX = 'annot_base';
+
+/**
+ * The PDF.js id of an engine annotation: `"<objectNumber>R"` like PDF.js, or
+ * `"annot_base<i>"` for one inline in the page's `/Annots` (PDF.js gives those
+ * an `annot_` id too), so every annotation can be named back.
+ */
+export function annotationIdOf(ref: AnnotationRef | null | undefined): string | null {
+  if (!ref) return null;
+  return ref.kind === 'objectNumber' ? `${ref.objectNumber}R` : `${BASE_PREFIX}${ref.baseIndex}`;
+}
+
+/** The engine ref an {@link annotationIdOf} id names on `page`; null for any other id. */
+export function annotationRefOf(
+  page: PageRef,
+  id: string | null | undefined,
+): AnnotationRef | null {
+  if (!id) return null;
+  const objectNumber = /^(\d+)R$/.exec(id);
+  if (objectNumber) return { kind: 'objectNumber', page, objectNumber: Number(objectNumber[1]) };
+  if (id.startsWith(BASE_PREFIX)) {
+    const rest = id.slice(BASE_PREFIX.length);
+    if (/^\d+$/.test(rest)) return { kind: 'baseIndex', page, baseIndex: Number(rest) };
+  }
+  return null;
+}
+
+function pageIndexOf(value: PdfjsEditorValue): number | undefined {
+  if (Number.isInteger(value.pageIndex)) return value.pageIndex;
+  const page = value.page;
+  if (Number.isInteger(page?._pageIndex)) return page!._pageIndex;
+  if (Number.isInteger(page?.pageNumber)) return page!.pageNumber! - 1;
+  return undefined;
+}
+
 /**
  * Writes PDF.js editor values into `doc`: a value with an `id` updates or
  * deletes that annotation, one without creates a new one. The engine draws
@@ -110,27 +151,81 @@ export async function applyAnnotationEdits(
     options.stampImage ??
     ((bitmapId: string) => (bitmaps.has(bitmapId) ? pngOfBitmap(bitmaps.get(bitmapId)) : null));
 
+  /** Each page's annotations by id, read once, before any write. */
+  const listed = new Map<
+    number,
+    Promise<Map<string, { popup: AnnotationRef | null; top: number | null }>>
+  >();
+  const existing = async (index: number, ref: AnnotationRef) => {
+    let byId = listed.get(index);
+    if (!byId) {
+      byId = doc
+        .page(pages[index].ref)
+        .annotations.list()
+        .then(
+          (read) =>
+            new Map(
+              read.annotations.map((a) => {
+                const at = a as { popup?: AnnotationRef | null; rect?: { y: number } };
+                return [
+                  annotationIdOf(a.ref) ?? '',
+                  { popup: at.popup ?? null, top: at.rect?.y ?? null },
+                ];
+              }),
+            ),
+        );
+      listed.set(index, byId);
+    }
+    return (await byId).get(annotationIdOf(ref) ?? '') ?? { popup: null, top: null };
+  };
+
   for (const value of list) {
-    const page = pages[value.pageIndex];
+    const pageIndex = pageIndexOf(value);
+    const page = pageIndex === undefined ? undefined : pages[pageIndex];
     if (!page) {
-      out.skipped.push({ value, reason: `no page ${value.pageIndex}` });
+      out.skipped.push({ value, reason: `no page ${String(pageIndex)}` });
       continue;
     }
-    const objectNumber = value.id ? Number.parseInt(String(value.id), 10) : NaN;
-    const ref: AnnotationRef | null = Number.isInteger(objectNumber)
-      ? { kind: 'objectNumber', page: page.ref, objectNumber }
-      : null;
+    const ref = annotationRefOf(page.ref, value.id == null ? null : String(value.id));
+    if (value.id && !ref) {
+      out.skipped.push({ value, reason: `unknown annotation id ${String(value.id)}` });
+      continue;
+    }
     const annotations = doc.page(page.ref).annotations;
     try {
       if (value.deleted) {
         if (!ref) continue;
+        // The annotation goes with its comment window (PDF.js deletes `popupRef` too).
+        const { popup } = await existing(pageIndex!, ref);
         await annotations.delete(ref);
         out.deleted.push(ref);
+        if (popup) {
+          await annotations.delete(popup).catch(() => undefined);
+          out.deleted.push(popup);
+        }
       } else if (ref) {
         const patch = patchOf(value, page);
-        if (Object.keys(patch).length === 0) continue;
-        await annotations.update(ref, patch as AnnotationPatch);
-        out.updated.push(ref);
+        const comment = commentOf(value);
+        const { popup, top } =
+          comment === undefined ? { popup: null, top: null } : await existing(pageIndex!, ref);
+        if (Object.keys(patch).length > 0) {
+          await annotations.update(ref, patch as AnnotationPatch);
+          out.updated.push(ref);
+        }
+        if (comment === null && popup) {
+          // A deleted comment: PDF.js drops `/Popup`, `/Contents`, `/RC` and the window.
+          await annotations.delete(popup);
+          out.deleted.push(popup);
+        } else if (comment != null && !popup) {
+          // A first comment gets its window, like a new annotation's (PopupAnnotation.createNewDict).
+          const made = await annotations.create({
+            subtype: 'popup',
+            rect: popupBoxOf(value, page.crop, top),
+            parent: ref,
+            open: false,
+          } as AnnotationDraft);
+          out.created.push(made.annotation.ref);
+        }
       } else {
         const made = await draftOf(value, page, stampImage);
         if ('reason' in made) {
@@ -145,11 +240,10 @@ export async function applyAnnotationEdits(
         );
         out.created.push(result.annotation.ref);
         // PopupAnnotation.createNewDict: a comment gets its window, linked both ways.
-        const popupBox = popupBoxOf(value, page.crop);
-        if (popupBox && commentOf(value)) {
+        if (commentOf(value)) {
           const popup = await annotations.create({
             subtype: 'popup',
-            rect: popupBox,
+            rect: popupBoxOf(value, page.crop, null),
             parent: result.annotation.ref,
             open: false,
           } as AnnotationDraft);
@@ -222,7 +316,8 @@ async function draftOf(
           fontSize: positive(value.fontSize, 10),
           // PDF.js writes no border (`/Border [0 0 0]`).
           strokeWidth: 0,
-          ...(value.color ? { fontColor: hexOf(value.color) } : {}),
+          // PDF.js's `/DA` color is the text's; the engine writes `/DA` from `color`.
+          ...(value.color ? { color: hexOf(value.color), fontColor: hexOf(value.color) } : {}),
           ...alignOf(value.value),
           richText: richTextOf(value.value),
         },
@@ -244,12 +339,11 @@ async function draftOf(
         appearance = await stampImage(value.bitmapId);
       }
       if (!appearance) return { reason: `no image for stamp ${value.bitmapId ?? ''}`.trim() };
-      // The alt text, as the image's description (`/Contents`) when there is no comment.
-      const alt = value.accessibilityData?.alt;
+      // PDF.js keeps the alt text in the structure tree (a /Figure with /Alt), which the
+      // engine can't write; as /Contents it would reopen as a comment, so it stays out.
       return {
         draft: {
           subtype: 'stamp',
-          ...(alt && comment == null ? { contents: alt } : {}),
           ...base,
           ...turnedBox(value.rect, value.rotation, page.crop),
           fit: 'fill',
@@ -279,31 +373,33 @@ function patchOf(value: PdfjsEditorValue, page: PageInfo): Record<string, unknow
     case AnnotationEditorType.FREETEXT:
       if (value.rect) Object.assign(patch, turnedBox(value.rect, value.rotation, page.crop));
       if (value.fontSize) patch.fontSize = value.fontSize;
-      if (value.color) patch.fontColor = hexOf(value.color);
-      if (value.value != null) Object.assign(patch, alignOf(value.value), { richText: richTextOf(value.value) });
+      if (value.color) patch.color = patch.fontColor = hexOf(value.color);
+      if (value.value != null)
+        Object.assign(patch, alignOf(value.value), { richText: richTextOf(value.value) });
       break;
     case AnnotationEditorType.STAMP:
     case AnnotationEditorType.SIGNATURE:
       if (value.rect) Object.assign(patch, turnedBox(value.rect, value.rotation, page.crop));
-      if (value.accessibilityData?.alt && comment === undefined) patch.contents = value.accessibilityData.alt;
       break;
   }
   return patch;
 }
 
 /**
- * Where a new comment's window goes: the rect PDF.js gives it, or beside the annotation's
- * top right corner. `null` when neither is known.
+ * Where a comment's window goes: the rect PDF.js gives it, else where
+ * `AnnotationEditor.addComment` puts one: 180×100 just right of the page, its
+ * top level with the annotation's (`existingTop`, page space, for one without
+ * a rect in the value).
  */
-function popupBoxOf(value: PdfjsEditorValue, crop: PdfRect) {
+function popupBoxOf(value: PdfjsEditorValue, crop: PdfRect, existingTop: number | null) {
   const r = value.popup?.rect;
   if (r && r.length === 4) {
     const topLeft = pointOf(Math.min(r[0], r[2]), Math.max(r[1], r[3]), crop);
     return { ...topLeft, width: Math.abs(r[2] - r[0]), height: Math.abs(r[3] - r[1]) };
   }
   const at = value.rect ?? boundsOf(value.quadPoints);
-  if (!at) return null;
-  return { ...pointOf(Math.max(at[0], at[2]), Math.max(at[1], at[3]), crop), width: 180, height: 120 };
+  const top = at ? pointOf(0, Math.max(at[1], at[3]), crop).y : (existingTop ?? 0);
+  return { x: crop.right - crop.left + 1, y: top, width: 180, height: 100 };
 }
 
 function boundsOf(quads: ArrayLike<number> | null | undefined): number[] | null {
@@ -408,8 +504,7 @@ function richTextOf(text: string) {
  * the free text editor shows it right-aligned, so it is saved right-aligned (`/Q 2`).
  */
 function isRtl(text: string): boolean {
-  const strong =
-    /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]|([֐-ࣿיִ-﷿ﹰ-﻿])/u.exec(text);
+  const strong = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]|([֐-ࣿיִ-﷿ﹰ-﻿])/u.exec(text);
   return !!strong?.[1];
 }
 
