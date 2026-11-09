@@ -69,7 +69,7 @@ async function open(bytes: Uint8Array) {
 
 async function annotationsOf(doc: DocumentHandle) {
   const page = (await doc.pages.list()).pages[0];
-  return (await doc.page(page.ref).annotations.list()).annotations;
+  return (await doc.page(page.ref).annotations.list()).annotations.filter((a) => a.subtype !== 'popup');
 }
 
 const created: PdfjsEditorValue[] = [
@@ -140,7 +140,8 @@ describe('applyAnnotationEdits', () => {
     try {
       const result = await applyAnnotationEdits(doc, created, { stampImage: () => png() });
       expect(result.skipped).toEqual([]);
-      expect(result.created).toHaveLength(6);
+      // Six annotations and the highlight's comment window.
+      expect(result.created).toHaveLength(7);
       first = await doc.download({ mode: 'incremental' } as never);
     } finally {
       await doc.close();
@@ -156,6 +157,8 @@ describe('applyAnnotationEdits', () => {
       const [highlight, freeHighlight, ink, text] = read as never as Record<string, unknown>[];
       expect(highlight.contents).toBe('הערה');
       expect(highlight.color).toBe('#ffff00');
+      expect(highlight.popup).toBeTruthy();
+      expect(text.textAlign).toBe('right');
       expect(freeHighlight.intent).toBe('ink-highlight');
       expect(ink.opacity).toBeCloseTo(0.5);
       expect(text.contents).toContain('שלום');

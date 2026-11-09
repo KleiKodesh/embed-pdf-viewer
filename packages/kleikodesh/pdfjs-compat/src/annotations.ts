@@ -144,6 +144,17 @@ export async function applyAnnotationEdits(
           } as never,
         );
         out.created.push(result.annotation.ref);
+        // PopupAnnotation.createNewDict: a comment gets its window, linked both ways.
+        const popupBox = popupBoxOf(value, page.crop);
+        if (popupBox && commentOf(value)) {
+          const popup = await annotations.create({
+            subtype: 'popup',
+            rect: popupBox,
+            parent: result.annotation.ref,
+            open: false,
+          } as AnnotationDraft);
+          out.created.push(popup.annotation.ref);
+        }
       }
     } catch (error) {
       out.skipped.push({ value, reason: error instanceof Error ? error.message : String(error) });
@@ -212,6 +223,7 @@ async function draftOf(
           // PDF.js writes no border (`/Border [0 0 0]`).
           strokeWidth: 0,
           ...(value.color ? { fontColor: hexOf(value.color) } : {}),
+          ...alignOf(value.value),
           richText: richTextOf(value.value),
         },
       };
@@ -232,9 +244,12 @@ async function draftOf(
         appearance = await stampImage(value.bitmapId);
       }
       if (!appearance) return { reason: `no image for stamp ${value.bitmapId ?? ''}`.trim() };
+      // The alt text, as the image's description (`/Contents`) when there is no comment.
+      const alt = value.accessibilityData?.alt;
       return {
         draft: {
           subtype: 'stamp',
+          ...(alt && comment == null ? { contents: alt } : {}),
           ...base,
           ...turnedBox(value.rect, value.rotation, page.crop),
           fit: 'fill',
@@ -265,14 +280,42 @@ function patchOf(value: PdfjsEditorValue, page: PageInfo): Record<string, unknow
       if (value.rect) Object.assign(patch, turnedBox(value.rect, value.rotation, page.crop));
       if (value.fontSize) patch.fontSize = value.fontSize;
       if (value.color) patch.fontColor = hexOf(value.color);
-      if (value.value != null) patch.richText = richTextOf(value.value);
+      if (value.value != null) Object.assign(patch, alignOf(value.value), { richText: richTextOf(value.value) });
       break;
     case AnnotationEditorType.STAMP:
     case AnnotationEditorType.SIGNATURE:
       if (value.rect) Object.assign(patch, turnedBox(value.rect, value.rotation, page.crop));
+      if (value.accessibilityData?.alt && comment === undefined) patch.contents = value.accessibilityData.alt;
       break;
   }
   return patch;
+}
+
+/**
+ * Where a new comment's window goes: the rect PDF.js gives it, or beside the annotation's
+ * top right corner. `null` when neither is known.
+ */
+function popupBoxOf(value: PdfjsEditorValue, crop: PdfRect) {
+  const r = value.popup?.rect;
+  if (r && r.length === 4) {
+    const topLeft = pointOf(Math.min(r[0], r[2]), Math.max(r[1], r[3]), crop);
+    return { ...topLeft, width: Math.abs(r[2] - r[0]), height: Math.abs(r[3] - r[1]) };
+  }
+  const at = value.rect ?? boundsOf(value.quadPoints);
+  if (!at) return null;
+  return { ...pointOf(Math.max(at[0], at[2]), Math.max(at[1], at[3]), crop), width: 180, height: 120 };
+}
+
+function boundsOf(quads: ArrayLike<number> | null | undefined): number[] | null {
+  if (!quads || quads.length < 8) return null;
+  let [x1, y1, x2, y2] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (let i = 0; i + 1 < quads.length; i += 2) {
+    x1 = Math.min(x1, quads[i]);
+    x2 = Math.max(x2, quads[i]);
+    y1 = Math.min(y1, quads[i + 1]);
+    y2 = Math.max(y2, quads[i + 1]);
+  }
+  return [x1, y1, x2, y2];
 }
 
 /** The comment a value sets: its text, `null` to remove it, `undefined` when it says nothing. */
@@ -356,7 +399,22 @@ function turnedBox(rect: number[], rotation: number | undefined, crop: PdfRect) 
 }
 
 function richTextOf(text: string) {
-  return { paragraphs: text.split('\n').map((line) => ({ runs: [{ text: line }] })) };
+  const body = isRtl(text) ? { body: { align: 'right', dir: 'rtl' } } : {};
+  return { ...body, paragraphs: text.split('\n').map((line) => ({ runs: [{ text: line }] })) };
+}
+
+/**
+ * Right-to-left text (its first strong character is Hebrew or Arabic, as `dir="auto"` decides):
+ * the free text editor shows it right-aligned, so it is saved right-aligned (`/Q 2`).
+ */
+function isRtl(text: string): boolean {
+  const strong =
+    /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]|([֐-ࣿיִ-﷿ﹰ-﻿])/u.exec(text);
+  return !!strong?.[1];
+}
+
+function alignOf(text: string): Record<string, unknown> {
+  return isRtl(text) ? { textAlign: 'right' } : {};
 }
 
 /** An `ImageBitmap` (or any canvas image source) as PNG bytes; null without `OffscreenCanvas`. */
