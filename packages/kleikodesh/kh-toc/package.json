@@ -2,7 +2,7 @@
   "name": "@kleikodesh/kh-toc",
   "version": "0.1.0",
   "private": true,
-  "description": "KitveiHakodesh table-of-contents saves: outline edits written as one incremental update that ends in a KH-TOC marker, so repeated saves replace their section instead of stacking.",
+  "description": "KitveiHakodesh table-of-contents saves: outline edits saved through the engine, merged into the file's last update section so repeated saves don't stack.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
