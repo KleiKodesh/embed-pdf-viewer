@@ -244,6 +244,7 @@ export type {
   ResolvedFontRun,
 } from './dto/DocumentFonts';
 export type {
+  FreeTextAlignInput,
   RichTextAlign,
   RichTextBody,
   RichTextDecoration,
@@ -261,6 +262,7 @@ export {
   DEFAULT_RICH_TEXT_BODY,
   richTextPlainText,
   richTextParagraphsFromPlainText,
+  textDirectionOf,
 } from './dto/RichText';
 
 export { EngineError, serializeError, deserializeError } from './errors/EngineError';
