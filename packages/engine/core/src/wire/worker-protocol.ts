@@ -31,6 +31,7 @@ import type {
   RawPageRenderOptions,
 } from '../dto/PageRender';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
+import type { PageTextObjectsSnapshot } from '../dto/PageTextObjectsSnapshot';
 import type { DocumentActionsSnapshot } from '../dto/PdfAction';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
@@ -1000,6 +1001,16 @@ export interface PagesGeometryWorkerRequest {
   page: PageRef;
 }
 
+/** A page's objects in content order, with marked content, fonts and glyphs. */
+export interface PagesTextObjectsWorkerRequest {
+  kind: 'pages.textObjects';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  page: PageRef;
+}
+
 /**
  * A search request as the worker runs it: the request plus `skip`, a trusted
  * absolute resume position (scan-order pages already searched). For callers
@@ -1658,6 +1669,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | PieceInfoApplicationsWorkerRequest
   | PieceInfoDeleteWorkerRequest
   | PagesTextWorkerRequest
+  | PagesTextObjectsWorkerRequest
   | PagesGeometryWorkerRequest
   | PagesRenderWorkerRequest<C>
   | PagesRenderEncodedWorkerRequest<C>
@@ -1927,6 +1939,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       result: PieceInfoDeleteResult;
     } & WritePayloadFacts)
   | { tag: 'pages.text'; snapshot: PageTextSnapshot }
+  | { tag: 'pages.textObjects'; snapshot: PageTextObjectsSnapshot }
   | { tag: 'pages.geometry'; page: PageRef; snapshot: PageGeometrySnapshot<C> }
   | {
       tag: 'pages.render';
