@@ -7,9 +7,6 @@ import type {
   PageRef,
 } from '@embedpdf/engine-core/public';
 
-import { inlineOutlineTargets } from './inline';
-import { appendTocMarker, readTocMarker } from './marker';
-
 /**
  * One row of an edited table of contents, as the viewer's outline editor
  * serializes it.
@@ -29,11 +26,7 @@ export interface EditedOutlineItem {
 export interface SaveOutlineOptions {
   /** The password the document was opened with. */
   password?: string;
-  /**
-   * Other edits for the same update, such as form field values. The update
-   * then holds more than the outline, so it is appended to the whole file and
-   * gets no KH-TOC marker: the next outline save keeps it.
-   */
+  /** Other edits for the same save, such as form field values. */
   alsoApply?: (doc: DocumentHandle) => Promise<void>;
 }
 
@@ -57,15 +50,15 @@ export function outlineBreadthFirst(items: readonly OutlineItem[]): OutlineItem[
 }
 
 /**
- * `file` with its outline replaced by `edited` (left alone when `null`), as
- * one incremental update that ends in a KH-TOC marker.
+ * `file` with its outline replaced by `edited` (left alone when `null`).
  *
- * When the file's last section is a proven KH-TOC section, the update is
- * written over the bytes before it instead of on top of it, so a file only
- * ever carries one outline section. Items that keep their `src` keep their
+ * The save merges into the file's last update section
+ * (`download({ mode: 'incremental', mergeLastUpdate: true })`): repeated
+ * saves keep one section and the bytes before it unchanged. A file without
+ * an update yet, or whose last section is signed, gets one appended section
+ * that later saves merge into. Items that keep their `src` keep their
  * object, target and style (bold, italic, colour, open state); new items go
- * to their `page`. Targets are written inside the items' own dictionaries,
- * so the section never points into objects only it defines.
+ * to their `page`.
  */
 export async function saveOutlineEdits(
   engine: Engine,
@@ -73,36 +66,14 @@ export async function saveOutlineEdits(
   edited: readonly EditedOutlineItem[] | null,
   options: SaveOutlineOptions = {},
 ): Promise<Uint8Array> {
-  const marker = options.alsoApply ? null : await readTocMarker(file);
-  const base = marker ? file.subarray(0, marker.start) : file;
-  const open = (bytes: Uint8Array) =>
-    engine.open(
-      { kind: 'bytes', bytes: bytes.slice() } as never,
-      options.password ? ({ password: options.password } as never) : undefined,
-    );
-
-  // `src` indexes the loaded file's outline. Over a marker section that is
-  // not the base's outline: its items are rebuilt from their loaded state.
-  let loaded: OutlineItem[];
-  if (marker) {
-    const full = await open(file);
-    try {
-      loaded = outlineBreadthFirst((await full.outline.get()).items);
-    } finally {
-      await full.close();
-    }
-  } else {
-    loaded = [];
-  }
-
-  const doc = await open(base);
+  const doc = await engine.open(
+    { kind: 'bytes', bytes: file.slice() } as never,
+    options.password ? ({ password: options.password } as never) : undefined,
+  );
   try {
-    if (edited) await applyOutline(doc, edited, marker ? null : undefined, loaded);
+    if (edited) await applyOutline(doc, edited, undefined, []);
     if (options.alsoApply) await options.alsoApply(doc);
-    const saved = await doc.download({ mode: 'incremental' });
-    if (!startsWith(saved, base)) return saved;
-    const section = inlineOutlineTargets(saved, base.length);
-    return options.alsoApply ? section : await appendTocMarker(section, base.length);
+    return await doc.download({ mode: 'incremental', mergeLastUpdate: true });
   } finally {
     await doc.close();
   }
@@ -211,10 +182,4 @@ async function applyOutline(
 
 function isWritable(target: NonNullable<OutlineItem['target']>) {
   return target.kind === 'goto' || target.kind === 'uri';
-}
-
-function startsWith(bytes: Uint8Array, prefix: Uint8Array) {
-  if (bytes.length < prefix.length) return false;
-  for (let i = 0; i < prefix.length; i++) if (bytes[i] !== prefix[i]) return false;
-  return true;
 }
