@@ -72,6 +72,7 @@ export const fr: Locale = {
         group: 'Défilement',
         vertical: 'Vertical',
         horizontal: 'Horizontal',
+        paged: 'Page par page',
       },
       rotate: {
         group: 'Faire pivoter',
@@ -115,6 +116,13 @@ export const fr: Locale = {
         copy: 'Copier',
         strip: 'Actions de sélection de texte',
       },
+      snapshot: {
+        tool: 'Prendre un instantané',
+        copy: 'Copier',
+        save: 'Enregistrer l’image',
+        clear: 'Effacer l’instantané',
+        strip: 'Actions de l’instantané',
+      },
       shapes: {
         rectangle: 'Rectangle',
         circle: 'Ellipse',
@@ -143,6 +151,11 @@ export const fr: Locale = {
       redact: {
         mark: 'Marquer pour biffage',
         applyAll: 'Appliquer les biffages',
+        apply: {
+          one: 'Appliquer le biffage',
+          many: 'Appliquer {count} de biffages',
+          other: 'Appliquer {count} biffages',
+        },
         clearAll: 'Effacer les marques',
       },
       undo: 'Annuler',
@@ -162,6 +175,7 @@ export const fr: Locale = {
         'doc-annotate-modify': 'La modification des annotations n’est pas autorisée',
         'doc-annotate-read': 'L’affichage des annotations n’est pas autorisé',
         'doc-attachments-modify': 'L’ajout de fichiers n’est pas autorisé',
+        'doc-content-copy': 'Les instantanés ne sont pas autorisés',
         'doc-download': 'Le téléchargement n’est pas autorisé',
         'doc-forms-modify': 'La modification des champs de formulaire n’est pas autorisée',
         'doc-outline-modify': 'La modification des signets n’est pas autorisée',
@@ -348,6 +362,7 @@ export const fr: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'Type',
         opacity: 'Opacité',
         stroke: 'Contour',
         fill: 'Remplissage',
@@ -496,7 +511,11 @@ export const fr: Locale = {
       lineEnd: 'Fin',
       empty:
         'Choisissez un outil de dessin ou sélectionnez une annotation pour modifier son style.',
-      selected: 'Sélection : {count}',
+      selected: {
+        one: '{count} sélectionnée',
+        many: '{count} sélectionnées',
+        other: '{count} sélectionnées',
+      },
       toolDefaults: 'Valeurs par défaut : {tool}',
       defaults: 'Valeurs par défaut',
       fontGroups: {
@@ -519,20 +538,6 @@ export const fr: Locale = {
         other: 'Impossible d’y écrire du nouveau texte',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Indicateurs (/F)',
-      print: 'Inclure à l’impression de la page',
-      hidden: 'Disparaît partout : écran, clics, impression',
-      noView: 'Masquée à l’écran, peut être imprimée',
-      toggleNoView: 'Afficher une annotation non affichée lorsqu’elle est sélectionnée',
-      readOnly: 'Visible mais non cliquable',
-      locked: 'Impossible de déplacer / redimensionner / supprimer / changer le style',
-      lockedContents: 'Texte non modifiable ; géométrie modifiable',
-      noZoom: 'Taille constante à l’écran (ancrée en haut à gauche)',
-      noRotate: 'Reste à l’endroit quand la page pivote',
-      invisible: 'Hérité : masquer les sous-types inconnus',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Chargement des pièces jointes…',
@@ -542,8 +547,7 @@ export const fr: Locale = {
       dropHint: 'Ou déposez des fichiers ici',
       adding: 'Ajout…',
       onPage: 'Page {page}',
-      count: '{count} fichier',
-      countPlural: '{count} fichiers',
+      count: { one: '{count} fichier', many: '{count} de fichiers', other: '{count} fichiers' },
     },
     outline: {
       filter: 'Filtrer les signets',
@@ -597,10 +601,13 @@ export const fr: Locale = {
       retry: 'Réessayer',
       empty: 'Aucun commentaire pour l’instant. Utilisez l’outil Note pour lancer une discussion.',
       emptyReadOnly: 'Aucun commentaire dans ce document.',
-      anonymous: 'Inconnu',
+      anonymous: 'Invité',
       page: 'Page {page}',
-      count: '{count} commentaire',
-      countPlural: '{count} commentaires',
+      count: {
+        one: '{count} commentaire',
+        many: '{count} de commentaires',
+        other: '{count} commentaires',
+      },
       reply: 'Répondre',
       replyPlaceholder: 'Répondre…',
       addPlaceholder: 'Ajouter un commentaire…',
@@ -627,7 +634,11 @@ export const fr: Locale = {
       searchWholeWord: 'Mot entier',
       searchRegex: 'Expression régulière',
       searchSearching: 'Recherche en cours…',
-      searchResults: 'Résultats trouvés : {count}',
+      searchResults: {
+        one: '{count} résultat trouvé',
+        many: '{count} de résultats trouvés',
+        other: '{count} résultats trouvés',
+      },
       searchNoResults: 'Aucun résultat',
       searchPrevious: 'Résultat précédent',
       searchNext: 'Résultat suivant',
@@ -643,10 +654,22 @@ export const fr: Locale = {
       redactionArea: 'Marque de zone',
       redactionText: 'Marque de texte',
       redactionRemove: 'Supprimer la marque',
-      redactConfirmTitle: 'Appliquer les biffages ?',
-      redactConfirmBody:
-        'Supprimer définitivement le contenu situé sous les marques de biffage ({count}). Cette opération est irréversible.',
-      redactConfirmCollateral: 'Autres annotations également supprimées : {count}.',
+      redactConfirmTitle: {
+        one: 'Appliquer le biffage ?',
+        many: 'Appliquer les biffages ?',
+        other: 'Appliquer les biffages ?',
+      },
+      redactConfirmBody: {
+        one: 'Supprimer définitivement le contenu situé sous {count} marque de biffage. Cette opération est irréversible.',
+        many: 'Supprimer définitivement le contenu situé sous {count} de marques de biffage. Cette opération est irréversible.',
+        other:
+          'Supprimer définitivement le contenu situé sous {count} marques de biffage. Cette opération est irréversible.',
+      },
+      redactConfirmCollateral: {
+        one: '{count} autre annotation sera également supprimée.',
+        many: '{count} d’autres annotations seront également supprimées.',
+        other: '{count} autres annotations seront également supprimées.',
+      },
       redactApply: 'Appliquer',
       redactApplying: 'Application…',
       formatLabel: 'Format',

@@ -19,7 +19,7 @@ import {
 import { localEngine } from '@embedpdf/engine';
 
 const links = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/links.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/links.pdf');
   return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -27,13 +27,12 @@ const links = async (): Promise<OpenInput> => {
 const script = (code: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script: code, next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 const GREETING = "app.alert('Hello, ' + identity.name + ' from ' + identity.corporation + '!');";

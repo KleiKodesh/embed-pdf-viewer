@@ -47,7 +47,7 @@ export function runAnnotationOrderConformance(
         const start = (await page.annotations.order()).entries.length;
         const a = (await page.annotations.create(square(20, 20))).annotation.ref;
         const { widgets } = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'order_text',
           widgets: [{ page: page.ref, rect: { x: 80, y: 20, width: 60, height: 20 } }],
         });

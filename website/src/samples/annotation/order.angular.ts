@@ -22,7 +22,7 @@ import {
 import { localEngine } from '@embedpdf/engine';
 
 const layout = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/layout.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/layout.pdf');
   return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -123,7 +123,7 @@ export class App {
       untracked(() => {
         const stack2 = this.annotation.list().find((each) => each.nm === 'stack-2');
         if (!stack2) return;
-        this.annotation.selection.set([stack2.ref]);
+        this.annotation.selection.select([stack2.ref]);
         stage.reveal(stack2.page, { rect: stack2.rect });
       });
     });

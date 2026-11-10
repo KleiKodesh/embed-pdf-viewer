@@ -12,12 +12,12 @@
  *   content-addressed by base sha; immutable; the resource comes before the
  *   sha so each family keeps its own CDN prefix):
  *     GET  …/layers/:layerName/versions                                   the list (no-store)
- *     GET  …/layers/:layerName/versions/signatures/:sha
- *     GET  …/layers/:layerName/versions/signatures/:sha/:fieldKey/contents
- *     GET  …/layers/:layerName/versions/signatures/:sha/:fieldKey/digest/:algorithm
+ *     GET  …/layers/:layerName/versions/signatures/:sha256
+ *     GET  …/layers/:layerName/versions/signatures/:sha256/:fieldKey/contents
+ *     GET  …/layers/:layerName/versions/signatures/:sha256/:fieldKey/digest/:algorithm
  *     GET  …/layers/:layerName/versions/analysis/:sha?since.signature=|since.revision=&until=&level=
- *     GET  …/layers/:layerName/versions/download/:sha
- *     GET  …/layers/:layerName/versions/revisions/:sha/:index
+ *     GET  …/layers/:layerName/versions/download/:sha256
+ *     GET  …/layers/:layerName/versions/revisions/:sha256/:index
  *
  * A version is not a layer session: version reads open the version's file
  * into a transient session. Another layer's versions are 404.
@@ -47,6 +47,7 @@ import {
   VersionAnalysisQuerySchema,
   analyzeInputFromQuery,
   encodePrepared,
+  type LayerVersions,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
@@ -54,6 +55,7 @@ import {
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   setImmutableCache,
   setNoStore,
   type SchemaLike,
@@ -67,6 +69,7 @@ import {
 } from '../app/jwt-plugin';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
+import { isoTime } from '../time';
 
 interface SignatureRouteDeps {
   service: DocumentService;
@@ -86,7 +89,7 @@ export async function registerSignatureRoutes(
     accessCtx: ReturnType<typeof requireLayerDocAccessOnly>,
     docId: string,
     layerName: string,
-  ) => service.getEffectivePdfBits(accessCtx, docId, layerName);
+  ) => service.getEffectivePermissionFlags(accessCtx, docId, layerName);
 
   const readSignatures = (
     ctx: OpenContext,
@@ -116,26 +119,34 @@ export async function registerSignatureRoutes(
     };
     rejectQueryParamsOnTokenUrl(req.query);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeDocToken, token, 'docVersion token');
-    const manifest = await service.getLayerManifest(ctx, docId, layerName);
-    if (requested !== manifest.docVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `signatures version ${requested} no longer current (current=${manifest.docVersion})`,
-      );
-    }
+    const snapshot = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName,
+      assertCurrent: async () => {
+        const manifest = await service.getLayerManifest(ctx, docId, layerName);
+        if (requested.docVersion === manifest.docVersion) return;
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `signatures version ${requested.docVersion} no longer current (current=${manifest.docVersion})`,
+        );
+      },
+      read: () => readSignatures(ctx, docId, layerName, abortSignalOf(reply)),
+      token: { kind: 'signatures', pin: requested.pin },
+    });
     setImmutableCache(reply);
-    return readSignatures(ctx, docId, layerName, abortSignalOf(reply));
+    return snapshot;
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/signatures', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', permissionFlags);
     setNoStore(reply);
     return readSignatures(ctx, docId, layerName, abortSignalOf(reply));
   });
@@ -148,18 +159,16 @@ export async function registerSignatureRoutes(
     };
     rejectQueryParamsOnTokenUrl(req.query);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures-analysis', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-signatures-analysis',
+      permissionFlags,
+    );
     const requested = parseTokenOrInvalidArg(decodeAnalysisToken, token, 'analysis token');
     requireServedPolicy(reply, requested.policyVersion);
-    const manifest = await service.getLayerManifest(ctx, docId, layerName);
-    if (requested.docVersion !== manifest.docVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `analysis version ${requested.docVersion} no longer current (current=${manifest.docVersion})`,
-      );
-    }
     const input: AnalyzeInput = {
       since: requested.since,
       until: 'working-copy',
@@ -170,15 +179,36 @@ export async function registerSignatureRoutes(
     };
     // No cache header until the worker has answered: an error response must
     // never carry the immutable header the success path earns.
-    const analysis = await analyzeLayer(ctx, docId, layerName, input, abortSignalOf(reply));
+    const analysis = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName,
+      assertCurrent: async () => {
+        const manifest = await service.getLayerManifest(ctx, docId, layerName);
+        if (requested.docVersion === manifest.docVersion) return;
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `analysis version ${requested.docVersion} no longer current (current=${manifest.docVersion})`,
+        );
+      },
+      read: () => analyzeLayer(ctx, docId, layerName, input, abortSignalOf(reply)),
+      token: { kind: 'analysis', pin: requested.pin },
+    });
     return finishAnalysisReply(reply, analysis);
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/signatures/analysis', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures-analysis', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-signatures-analysis',
+      permissionFlags,
+    );
     const query = parseOrInvalidArg(
       LayerAnalysisQuerySchema as unknown as SchemaLike<
         ReturnType<typeof LayerAnalysisQuerySchema.parse>
@@ -201,9 +231,9 @@ export async function registerSignatureRoutes(
   app.post('/v1/docs/:docId/layers/:layerName/signatures/prepare', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
     // Whether this field is the token's to sign (its group) is checked in the worker.
-    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', permissionFlags, null);
     // Appearance artwork is a page of a PDF: the stamp rule (sniffed, never declared).
     const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
     const parsed = parseOrInvalidArg(
@@ -214,7 +244,7 @@ export async function registerSignatureRoutes(
       'request body',
     );
     if (parsed.certify) {
-      requireLayerCapability(req, docId, layerName, 'doc.sign.certify', pdfBits);
+      requireLayerCapability(req, docId, layerName, 'doc.sign.certify', permissionFlags);
     }
     const { resources: named, ...rest } = parsed;
     const input: SignaturePrepareInput = { ...rest };
@@ -243,10 +273,10 @@ export async function registerSignatureRoutes(
         signingId: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
+      const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
       // Its field was checked when the signing was prepared; the signing id
       // goes only to whoever prepared it.
-      const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
+      const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', permissionFlags, null);
       const body = parseOrInvalidArg(
         SignatureCompleteBodySchema as unknown as SchemaLike<
           ReturnType<typeof SignatureCompleteBodySchema.parse>
@@ -276,8 +306,8 @@ export async function registerSignatureRoutes(
       signingId: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', permissionFlags, null);
     setNoStore(reply);
     return layerService.cancelSignature(ctx, { docId, layerName, signingId });
   });
@@ -294,8 +324,8 @@ export async function registerSignatureRoutes(
     resource: Parameters<typeof requireLayerResource>[3],
   ) => {
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    return requireLayerResource(req, docId, layerName, resource, pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    return requireLayerResource(req, docId, layerName, resource, permissionFlags);
   };
 
   app.get('/v1/docs/:docId/layers/:layerName/versions', async (req, reply) => {
@@ -303,18 +333,19 @@ export async function registerSignatureRoutes(
     const ctx = await versionCaller(req, docId, layerName, 'layer-versions');
     setNoStore(reply);
     const listed = await service.listVersions(ctx, docId, layerName);
-    return {
-      baseSha: listed.baseSha,
+    const versions: LayerVersions = {
+      baseSha256: listed.baseSha,
       versions: listed.versions.map((v) => ({
         sha256: v.sha256,
-        byteLength: v.byteLength,
+        sizeBytes: v.byteLength,
         number: v.number,
         parentSha256: v.parentSha256,
         producer: v.producerKind,
         signingId: v.producerRef,
-        createdAt: v.createdAt,
+        createdAt: isoTime(v.createdAt),
       })),
     };
+    return versions;
   });
 
   const versionSignatures = async (
@@ -344,11 +375,15 @@ export async function registerSignatureRoutes(
     return payload.snapshot;
   };
 
-  app.get('/v1/docs/:docId/layers/:layerName/versions/signatures/:sha', async (req, reply) => {
-    const { docId, layerName, sha } = req.params as {
+  app.get('/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256', async (req, reply) => {
+    const {
+      docId,
+      layerName,
+      sha256: sha,
+    } = req.params as {
       docId: string;
       layerName: string;
-      sha: string;
+      sha256: string;
     };
     const ctx = await versionCaller(req, docId, layerName, 'layer-version-signatures');
     const snapshot = await versionSignatures(
@@ -363,12 +398,17 @@ export async function registerSignatureRoutes(
   });
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/contents',
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256/:fieldKey/contents',
     async (req, reply) => {
-      const { docId, layerName, sha, fieldKey } = req.params as {
+      const {
+        docId,
+        layerName,
+        sha256: sha,
+        fieldKey,
+      } = req.params as {
         docId: string;
         layerName: string;
-        sha: string;
+        sha256: string;
         fieldKey: string;
       };
       const ctx = await versionCaller(req, docId, layerName, 'layer-version-signatures');
@@ -398,12 +438,18 @@ export async function registerSignatureRoutes(
   );
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/digest/:algorithm',
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256/:fieldKey/digest/:algorithm',
     async (req, reply) => {
-      const { docId, layerName, sha, fieldKey, algorithm } = req.params as {
+      const {
+        docId,
+        layerName,
+        sha256: sha,
+        fieldKey,
+        algorithm,
+      } = req.params as {
         docId: string;
         layerName: string;
-        sha: string;
+        sha256: string;
         fieldKey: string;
         algorithm: string;
       };
@@ -440,11 +486,15 @@ export async function registerSignatureRoutes(
     },
   );
 
-  app.get('/v1/docs/:docId/layers/:layerName/versions/analysis/:sha', async (req, reply) => {
-    const { docId, layerName, sha } = req.params as {
+  app.get('/v1/docs/:docId/layers/:layerName/versions/analysis/:sha256', async (req, reply) => {
+    const {
+      docId,
+      layerName,
+      sha256: sha,
+    } = req.params as {
       docId: string;
       layerName: string;
-      sha: string;
+      sha256: string;
     };
     const ctx = await versionCaller(req, docId, layerName, 'layer-version-analysis');
     const query = parseOrInvalidArg(
@@ -480,11 +530,15 @@ export async function registerSignatureRoutes(
     return finishAnalysisReply(reply, payload.analysis);
   });
 
-  app.get('/v1/docs/:docId/layers/:layerName/versions/download/:sha', async (req, reply) => {
-    const { docId, layerName, sha } = req.params as {
+  app.get('/v1/docs/:docId/layers/:layerName/versions/download/:sha256', async (req, reply) => {
+    const {
+      docId,
+      layerName,
+      sha256: sha,
+    } = req.params as {
       docId: string;
       layerName: string;
-      sha: string;
+      sha256: string;
     };
     const ctx = await versionCaller(req, docId, layerName, 'layer-version-download');
     const version = await service.requireVersion(ctx, docId, layerName, requireSha(sha));
@@ -493,12 +547,17 @@ export async function registerSignatureRoutes(
   });
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/versions/revisions/:sha/:index',
+    '/v1/docs/:docId/layers/:layerName/versions/revisions/:sha256/:index',
     async (req, reply) => {
-      const { docId, layerName, sha, index } = req.params as {
+      const {
+        docId,
+        layerName,
+        sha256: sha,
+        index,
+      } = req.params as {
         docId: string;
         layerName: string;
-        sha: string;
+        sha256: string;
         index: string;
       };
       const ctx = await versionCaller(req, docId, layerName, 'layer-version-revisions');

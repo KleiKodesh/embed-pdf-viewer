@@ -26,7 +26,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source sketch]
 const sketch = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/sketch.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/sketch.pdf');
   return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -63,7 +63,7 @@ export class Readout {
   });
 
   protected select() {
-    this.selection.set([this.annotation().ref]);
+    this.selection.select([this.annotation().ref]);
   }
 }
 

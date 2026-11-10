@@ -214,7 +214,7 @@ import { createEventLoopYield } from '../shared/yield';
  *  buffer (a fresh allocation, not a pooled `Buffer` slab view) — it is
  *  placed on the transfer manifest and moved zero-copy. */
 export interface WorkerEncodedImage {
-  contentType: string;
+  mimeType: string;
   bytes: Uint8Array;
 }
 
@@ -1089,7 +1089,7 @@ export class WorkerHost {
     const finalized = new CandidateFinalizer(this.runtime, this.baseDocuments).finalize({
       path: req.path,
       byteRange: req.byteRange,
-      contentsSize: req.contentsSize,
+      contentsSizeBytes: req.contentsSizeBytes,
       fieldObjectNumber: req.fieldObjectNumber,
       cms: new Uint8Array(req.cms),
       password: req.password ?? null,
@@ -1745,7 +1745,7 @@ export class WorkerHost {
     req: DocumentFontsProgramWorkerRequest,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const reader = new DocumentFontReader(this.runtime, this.requireSession(req), this.fonts);
-    const program = reader.program(req.displayHash, req.part === 'data');
+    const program = reader.program(req.displaySha256, req.part === 'data');
     // The bytes are a copy out of the runtime's memory: they transfer.
     const bytes = program.bytes
       ? (program.bytes.buffer.slice(
@@ -1817,10 +1817,9 @@ export class WorkerHost {
     signal: AbortSignal,
   ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
-    const viewports = await new MeasureReader(this.runtime, session).viewports(
+    const viewports = new MeasureReader(this.runtime, session).viewports(
       session.resolvePageRef(req.page).pageObjectNumber,
       signal,
-      this.slices,
     );
     return wirePack({ tag: 'measure.viewports', page: req.page, viewports });
   }
@@ -1840,6 +1839,7 @@ export class WorkerHost {
         tag: 'measure.setScale',
         result: {
           page: req.page,
+          layout: new PagesReader(this.runtime, session).read(signal),
           meta: { affectedPages: [], cacheDelta: null, ...session.writeStamp() },
         },
       },
@@ -2060,13 +2060,13 @@ export class WorkerHost {
     if (!encoder) {
       throw new EngineError(EngineErrorCode.NotImplemented, NO_ENCODER_MESSAGE);
     }
-    const { bytes, contentType } = await encoder.encode(raster, encode);
+    const { bytes, mimeType } = await encoder.encode(raster, encode);
     // The encoder is not abortable; honor a cancellation that arrived
     // while it ran by rejecting instead of resolving a dead job.
     if (signal.aborted) {
       throw new EngineError(EngineErrorCode.Aborted, 'aborted during image encode');
     }
-    return { contentType, width: raster.width, height: raster.height, bytes };
+    return { mimeType, width: raster.width, height: raster.height, bytes };
   }
 
   /** The encoded reply of a page render's raw one. */
@@ -2315,6 +2315,7 @@ export class WorkerHost {
       req.weight,
       req.italic,
       new Uint8Array(req.data),
+      req.builtIn ?? false,
     );
     return wirePack({
       tag: 'fonts.register',

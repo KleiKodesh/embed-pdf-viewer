@@ -14,11 +14,11 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin()];
 
 const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/forms.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/forms.pdf');
   return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-/** One field of each family, with `setValue()` in the shape each one takes. */
+/** One field of each kind, with `setValue()` in the shape each one takes. */
 async function fillIn(form: FormCapability) {
   await form.setValue(toFieldRef('name'), { value: 'Ada Lovelace' }); // text
   await form.setValue(toFieldRef('updates'), { checked: true }); // checkbox

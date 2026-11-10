@@ -108,17 +108,17 @@ export function CommentsPanel() {
   }, [selectedThreadKey]);
 
   /** Press a card's check or menu: the card's annotation is what they act on. */
-  const pick = (view: CommentThreadView) => anno.selection.set([view.root.ref]);
+  const pick = (view: CommentThreadView) => anno.selection.select([view.root.ref]);
 
   /** Click a card: select the annotation and fly the camera to it. */
   const goTo = (view: CommentThreadView) => {
-    anno.selection.set([view.root.ref]);
+    anno.selection.select([view.root.ref]);
     if (view.pageIndex < 0) return;
     // Anchor values are viewport fractions (0–1), not percentages:
     // the annotation lands a third down the viewport, the find-bar feel.
     stage?.reveal(view.pageIndex, {
       rect: view.root.rect,
-      anchor: { x: 'center', y: 0.35 },
+      align: { x: 'center', y: 0.35 },
       behavior: 'smooth',
     });
   };
@@ -167,9 +167,7 @@ export function CommentsPanel() {
                   </h3>
                   {count > 0 && (
                     <p className="text-fg-muted text-xs">
-                      {t(count === 1 ? 'comments.count' : 'comments.countPlural', {
-                        params: { count: String(count) },
-                      })}
+                      {t('comments.count', { params: { count } })}
                     </p>
                   )}
                 </div>

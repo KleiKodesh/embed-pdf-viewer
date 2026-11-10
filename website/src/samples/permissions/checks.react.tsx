@@ -33,7 +33,7 @@ const plugins = [
 ];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -80,7 +80,7 @@ function Controls() {
     if (search.canSearch()) void search.search({ text });
   }, [search, text]);
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    if (cover) selection.select({ page: cover, start: 28, count: 9 });
   }, [selection, cover]);
 
   const copy = async () => {

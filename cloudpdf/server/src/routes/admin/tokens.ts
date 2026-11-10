@@ -24,6 +24,8 @@ import { isVisitorLayerName, VISITOR_LAYER_PREFIX } from '../../auth/visitor-han
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
 import type { FoldersRepo } from '../../db/repos/folders.repo';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
+import { errorBody } from '../_helpers';
+import { isoTime } from '../../time';
 
 export interface AdminTokensRoutesDeps {
   /** Present only when revocation is enabled — gates the revoke route. */
@@ -70,9 +72,7 @@ export async function registerAdminTokensRoutes(
         const { tenantId } = req.params as { tenantId: string };
         const parsed = AdminTokenIssueRequestSchema.safeParse(req.body);
         if (!parsed.success) {
-          return reply
-            .code(400)
-            .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+          return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
         }
         const body = parsed.data;
 
@@ -91,9 +91,7 @@ export async function registerAdminTokensRoutes(
             validateTenantScope(body.scope);
             deps.permissions.assertGrantable(body.scope, ['document', 'tenant']);
           } catch (err) {
-            return reply.code(400).send({
-              error: { code: 'InvalidArg', message: (err as Error).message },
-            });
+            return reply.code(400).send(errorBody('InvalidArg', (err as Error).message));
           }
         }
 
@@ -102,29 +100,29 @@ export async function registerAdminTokensRoutes(
             validateScopeArray(body.scope);
             deps.permissions.assertGrantable(body.scope);
           } catch (err) {
-            return reply.code(400).send({
-              error: { code: 'InvalidArg', message: (err as Error).message },
-            });
+            return reply.code(400).send(errorBody('InvalidArg', (err as Error).message));
           }
           requireHeldScope(req, body.scope);
           if (body.layerName !== undefined && isVisitorLayerName(body.layerName)) {
-            return reply.code(400).send({
-              error: {
-                code: 'InvalidArg',
-                message: `layerName: names starting with "${VISITOR_LAYER_PREFIX}" are for grant visitors' own layers`,
-              },
-            });
+            return reply
+              .code(400)
+              .send(
+                errorBody(
+                  'InvalidArg',
+                  `layerName: names starting with "${VISITOR_LAYER_PREFIX}" are for grant visitors' own layers`,
+                ),
+              );
           }
           const doc = await deps.documents.findById(body.docId);
           if (!doc) {
-            return reply.code(404).send({
-              error: { code: 'NotFound', message: `document does not exist: ${body.docId}` },
-            });
+            return reply
+              .code(404)
+              .send(errorBody('NotFound', `document does not exist: ${body.docId}`));
           }
           if (doc.tenantId !== tenantId) {
-            return reply.code(403).send({
-              error: { code: 'Forbidden', message: 'document does not belong to this tenant' },
-            });
+            return reply
+              .code(403)
+              .send(errorBody('Forbidden', 'document does not belong to this tenant'));
           }
         }
 
@@ -135,7 +133,7 @@ export async function registerAdminTokensRoutes(
         if (uploadFolderId !== null) await deps.folders.requireOwned(uploadFolderId, tenantId);
 
         const jti = randomUUID();
-        const expiresAt = Math.floor(Date.now() / 1000) + body.expiresIn;
+        const expiresAt = Math.floor(Date.now() / 1000) + body.expiresInSeconds;
 
         const token =
           body.kind === 'doc'
@@ -147,7 +145,7 @@ export async function registerAdminTokensRoutes(
                 ...(body.origins ? { origins: body.origins } : {}),
                 scope: body.scope,
                 jti,
-                ttlSeconds: body.expiresIn,
+                ttlSeconds: body.expiresInSeconds,
                 extras: identityExtras(body),
               })
             : body.kind === 'upload'
@@ -162,14 +160,14 @@ export async function registerAdminTokensRoutes(
                   },
                   ...(body.origins ? { origins: body.origins } : {}),
                   jti,
-                  ttlSeconds: body.expiresIn,
+                  ttlSeconds: body.expiresInSeconds,
                 })
               : sign({
                   sub: body.sub,
                   tenant_id: tenantId,
                   scope: body.scope,
                   jti,
-                  ttlSeconds: body.expiresIn,
+                  ttlSeconds: body.expiresInSeconds,
                 });
 
         await deps.securityEvents.append({
@@ -183,7 +181,7 @@ export async function registerAdminTokensRoutes(
           expiresAt: expiresAt * 1000,
         });
 
-        return reply.send({ token, jti, expiresAt });
+        return reply.send({ token, jti, expiresAt: isoTime(expiresAt * 1000) });
       },
     });
   }
@@ -198,22 +196,22 @@ export async function registerAdminTokensRoutes(
         const { tenantId, jti } = req.params as { tenantId: string; jti: string };
         const ctx = requireTenantAccess(req, tenantId, op.scope);
         if (!jti || jti.length > 256) {
-          return reply.code(400).send({ error: { code: 'BadInput', message: 'invalid jti' } });
+          return reply.code(400).send(errorBody('InvalidArg', 'invalid jti'));
         }
         const parsed = AdminTokenRevokeRequestSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
-          return reply
-            .code(400)
-            .send({ error: { code: 'BadInput', message: 'invalid revoke body' } });
+          return reply.code(400).send(errorBody('InvalidArg', 'invalid revoke body'));
         }
-        const defaultExpiresAt = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-        const expiresAtSeconds = parsed.data.expiresAtSeconds ?? defaultExpiresAt;
+        const expiresAt =
+          parsed.data.expiresAt !== undefined
+            ? Date.parse(parsed.data.expiresAt)
+            : Date.now() + 30 * 24 * 60 * 60 * 1000;
 
         await guard.revoke({
           jti,
           tenantId: ctx.tenantId,
           reason: parsed.data.reason,
-          expiresAt: expiresAtSeconds * 1000,
+          expiresAt,
         });
         await deps.securityEvents.append({
           tenantId,
@@ -223,7 +221,7 @@ export async function registerAdminTokensRoutes(
           actor: ctx.sub,
           via: ctx.via,
           ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
-          expiresAt: expiresAtSeconds * 1000,
+          expiresAt,
         });
         return reply.code(204).send();
       },

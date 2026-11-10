@@ -46,7 +46,6 @@ import { useT } from '@embedpdf/react/i18n';
 import { observeOutsidePress } from '@embedpdf/web';
 import { Icon } from './icons';
 import { useConfiguredFonts } from '../config-context';
-import { AnnotationFlagsSection } from './annotation-flags';
 import { useLabel } from './labels';
 import { TooltipButton, WithTooltip } from './tooltip';
 
@@ -125,6 +124,16 @@ const borderFields = (border: Border): FieldValues => ({
 /** The option of a choice with this value, for its label. */
 const optionOf = (options: readonly AnnotationOption[], value: string) =>
   options.find((option) => option.value === value);
+
+/** Each kind a selection can become, by its tool's icon. */
+const KIND_ICON: Readonly<Record<string, string>> = {
+  highlight: 'highlight',
+  underline: 'underline',
+  squiggly: 'squiggly',
+  strikeout: 'strikethrough',
+  square: 'square',
+  circle: 'circle',
+};
 
 // ── layout primitives ────────────────────────────────────────────────────────
 function Field({
@@ -477,8 +486,9 @@ interface FontOption {
 /**
  * Every font a text box, a form field or a redaction label can be written in, as the fonts
  * plugin lists them: the document's, the engine's (yours on a local engine, the server's on the
- * cloud), then the standard fonts the property offers. A font that can't be chosen shows greyed,
- * with why; the box's own font shows even then.
+ * cloud), then the standard fonts the property offers. A font that can't be chosen isn't
+ * offered, and neither is a fallback font the engine comes with: it fills in characters on its
+ * own. The box's own font shows whatever it is, greyed with why when it can't be chosen.
  */
 function FontFamilySelect({
   value,
@@ -517,7 +527,12 @@ function FontFamilySelect({
     };
   };
   const listed = (source: Font['source']) =>
-    (list?.fonts ?? []).filter((font) => font.source === source).map(fontOption);
+    (list?.fonts ?? [])
+      .filter(
+        (font) =>
+          font.source === source && ((font.canChoose && !font.builtIn) || font.name === value),
+      )
+      .map(fontOption);
   const groups: { readonly title: string; readonly options: readonly FontOption[] }[] = [
     { title: t('stylePanel.fontGroups.document'), options: listed('document') },
     {
@@ -676,6 +691,7 @@ function Toggle({
   return (
     <TooltipButton
       label={title}
+      aria-pressed={active}
       onClick={onClick}
       onMouseDown={keepFocus ? (event) => event.preventDefault() : undefined}
       className={`flex h-9 w-9 items-center justify-center rounded border transition-colors ${
@@ -757,23 +773,13 @@ function FieldControl({
   switch (spec.key) {
     case 'color':
     case 'fontColor':
-      return (
-        <Field label={label(spec)} mixed={mixed}>
-          <SwatchGrid
-            value={value as string}
-            onSelect={(color) => onChange({ [spec.key]: color })}
-          />
-        </Field>
-      );
     case 'interiorColor':
       return (
         <Field label={label(spec)} mixed={mixed}>
           <SwatchGrid
             value={value as string | null}
-            allowTransparent
-            onSelect={(color) =>
-              onChange({ interiorColor: color === 'transparent' ? null : color })
-            }
+            allowTransparent={spec.allowsNone}
+            onSelect={(color) => onChange({ [spec.key]: color === 'transparent' ? null : color })}
           />
         </Field>
       );
@@ -871,6 +877,25 @@ function FieldControl({
           />
         </Field>
       );
+    // The kind the selection becomes: one of its sibling kinds, as the same
+    // annotation (the plugin offers only kinds it can become).
+    case 'subtype':
+      return (
+        <Field label={label(spec)} mixed={mixed}>
+          <div className="flex gap-2">
+            {spec.options.map((option) => (
+              <Toggle
+                key={option.value}
+                title={label(option)}
+                active={!mixed && value === option.value}
+                onClick={() => onChange({ subtype: option.value })}
+              >
+                <Icon name={KIND_ICON[option.value] ?? 'palette'} size={18} />
+              </Toggle>
+            ))}
+          </div>
+        </Field>
+      );
     case 'textAlign': {
       const alignIcon: Record<TextAlign, string> = {
         left: 'alignLeft',
@@ -966,7 +991,7 @@ export function AnnotationStylePanel() {
 
   const hasSel = selection.properties.length > 0;
   const { properties, values, mixed } = hasSel ? selection : tool;
-  // The flags have their own section below, and a redaction's label its own.
+  // The flags aren't styles, and a redaction's label has its own section below.
   const fields = properties.filter(
     (property) => property.control !== 'flag' && property.control !== 'text',
   );
@@ -988,9 +1013,8 @@ export function AnnotationStylePanel() {
     });
   };
 
-  // A selection with no editable fields (e.g. a stamp, or a locked annotation —
-  // its style is frozen) still shows its flags: that's how you unlock it.
-  if (fields.length === 0 && selected.length === 0) return <EmptyState />;
+  // Nothing to edit: no tool with styles, or a selection whose style is frozen (locked).
+  if (fields.length === 0) return <EmptyState />;
 
   const context = hasSel
     ? t('stylePanel.selected', { params: { count: selected.length } })
@@ -1026,8 +1050,6 @@ export function AnnotationStylePanel() {
       {/* Redaction label (`/OverlayText` + `/Repeat`) — kind content, not a
           style field, so it writes through the redaction plugin's updateLabel. */}
       <RedactionLabelSection />
-      {/* `/F` flags for whatever is selected — the live flags test surface. */}
-      <AnnotationFlagsSection />
     </div>
   );
 }

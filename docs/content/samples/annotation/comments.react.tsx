@@ -30,7 +30,7 @@ const plugins = [
 
 // [!doc-source proposal]
 const proposal = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/proposal.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/proposal.pdf');
   return { kind: 'bytes', id: 'proposal', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -44,7 +44,7 @@ function Thread({ thread }: { thread: CommentThreadView }) {
 
   function show() {
     stage.reveal(thread.page, { rect: thread.root.rect });
-    annotation.selection.set([thread.root.ref]); // and select it
+    annotation.selection.select([thread.root.ref]); // and select it
   }
 
   return (

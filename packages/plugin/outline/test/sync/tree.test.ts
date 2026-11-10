@@ -51,8 +51,14 @@ const OUTLINE = treeOf({
 });
 
 const titles = (tree: OutlineTree | null) => (tree ? itemsOf(tree).map((each) => each.title) : []);
-const origin: EventOrigin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
-const meta = { affectedPages: [], cacheDelta: null, opId: 'op', undoable: true, changed: [] };
+const origin: EventOrigin = {
+  kind: 'remote',
+  sessionId: 'them',
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+};
+const meta = { affectedPages: [], cacheDelta: null, opId: 'op', undoable: true, changedRefs: [] };
 
 describe('foldOutline', () => {
   it('applies a create with its parent order', () => {
@@ -75,7 +81,7 @@ describe('foldOutline', () => {
         { parent: A, children: [] },
         { parent: null, children: [A, B, C, A1] },
       ],
-      meta: { ...meta, changed: [A1] },
+      meta: { ...meta, changedRefs: [A1] },
     }) as OutlineTree;
     expect(titles(next)).toEqual(['A', 'B', 'C', 'C1', 'A1']);
     expect(next.items[String(A1.objectNumber)]!.parent).toBeNull();
@@ -87,7 +93,7 @@ describe('foldOutline', () => {
       type: 'outline.deleted',
       origin,
       deleted: [C, C1],
-      meta: { ...meta, changed: [C, C1] },
+      meta: { ...meta, changedRefs: [C, C1] },
     }) as OutlineTree;
     expect(titles(next)).toEqual(['A', 'A1', 'B']);
     expect(next.items[String(C1.objectNumber)]).toBeUndefined();
@@ -223,7 +229,7 @@ describe('undoOf', () => {
       items: [
         item(A, 'A', null, {
           target: { kind: 'javascript' },
-          action: { root: null, incomplete: false, warningFlags: 0, warnings: [] },
+          action: { root: null, incomplete: false, warnings: [] },
         }),
       ],
       incomplete: false,

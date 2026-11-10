@@ -20,10 +20,10 @@ import {
   type ResourceStatus,
   type SettingsApi,
 } from '@embedpdf/core';
-import type { PageTransform } from '@embedpdf/core-geometry';
-import type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
+import type { Rotation, PageTransform, Rect } from '@embedpdf/core-geometry';
+import type { FullPageSettings, PageViewDemand, TilesSettings } from './paint-plan';
 
-export type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
+export type { FullPageSettings, PageViewDemand, TilesSettings } from './paint-plan';
 export { samePageViewDemand } from './paint-plan';
 
 // ── settings ────────────────────────────────────────────────────────────────
@@ -42,18 +42,18 @@ export type RenderFormat = NonNullable<PageImageOptions['format']>;
  */
 export interface RenderSettings {
   /** Base plane: the pixel budget + render points. */
-  readonly fullPage: FullPageOptions;
+  readonly fullPage: FullPageSettings;
   /** Tile plane strategy; `false` disables the plane entirely. */
-  readonly tiles: TilesOptions | false;
+  readonly tiles: TilesSettings | false;
   /**
-   * Encode format for both planes. Unset → engine default (png local, the
+   * Encode format for both planes. `null` → engine default (png local, the
    * deployment's format on cloud). `'bmp'` is the local fast path — no
    * compression, no encoder-worker round trip; under a lattice it conforms
    * to `policy.formats`.
    */
-  readonly format: RenderFormat | undefined;
-  /** WebP quality from 0 (smallest) to 1 (best); PNG and BMP ignore it. */
-  readonly quality: number | undefined;
+  readonly format: RenderFormat | null;
+  /** WebP quality from 0 (smallest) to 1 (best); PNG and BMP ignore it. `null` → the engine's. */
+  readonly quality: number | null;
   /**
    * How long a page waits for its first picture before its state turns `slow`, in milliseconds:
    * the moment to show a loading indicator ({@link PictureState}). `0` turns it on at once.
@@ -61,7 +61,36 @@ export interface RenderSettings {
   readonly slowAfterMs: number;
   /** Diagnostic logging of tile scheduling and fetch outcomes (console `debug`). */
   readonly debug: boolean;
+  /** The `snapshot` tool: how big its pictures are, and how its box looks. */
+  readonly snapshot: SnapshotSettings;
 }
+
+/** The snapshot tool's settings: see {@link RenderSettings.snapshot}. */
+export interface SnapshotSettings {
+  /**
+   * A snapshot's pixels per point: 2 is 144 DPI. A picture that would pass
+   * {@link SNAPSHOT_MAX_PIXELS}, or the deployment's budget, is made smaller to fit.
+   */
+  readonly scale: number;
+  /**
+   * The look of the box you drag, one value: a change replaces it whole, and a
+   * color it leaves out is `null` again. A color left `null` follows the
+   * viewer's accent (the fill at 8%); CSS `--epdf-snapshot-box-fill` and
+   * `--epdf-snapshot-box-stroke` win over both.
+   */
+  readonly box: SnapshotBoxLook;
+}
+
+/** The colors of the snapshot tool's box: see {@link SnapshotSettings.box}. */
+export interface SnapshotBoxLook {
+  /** Inside the box; `null` is the viewer's accent at 8%. */
+  readonly fill: string | null;
+  /** Its dashed edge; `null` is the viewer's accent. */
+  readonly stroke: string | null;
+}
+
+/** The most pixels a snapshot's picture has: 16 million, safe within a phone's memory. */
+export const SNAPSHOT_MAX_PIXELS = 16_000_000;
 
 /** What the render settings are when the app registers none. */
 export const RENDER_DEFAULTS: RenderSettings = {
@@ -70,14 +99,15 @@ export const RENDER_DEFAULTS: RenderSettings = {
     size: 512,
     quantize: 'exact',
     maxScale: 128,
-    bleed: 1,
+    bleedPx: 1,
     prefetch: { margin: 0.5, velocityBias: true },
     settleMs: 150,
   },
-  format: undefined,
-  quality: undefined,
+  format: null,
+  quality: null,
   slowAfterMs: 400,
   debug: false,
+  snapshot: { scale: 2, box: { fill: null, stroke: null } },
 };
 
 /** What `renderPlugin(config)` takes: any of the settings, merged over the defaults. */
@@ -102,17 +132,25 @@ export interface PageLayerOptions {
 }
 
 /**
- * An encoded page image: `source` is bytes or a URL, `format`/`contentType`
+ * An encoded page image: `source` is bytes or a URL, `format`/`mimeType`
  * say what they are, `width`/`height` its pixel size, and
  * `objectUrl()` mints a revocable object URL for an `<img>`.
  */
 export type PageImage = PageImageHandle;
 
 export interface RenderPageOptions extends OperationOptions, PageLayerOptions {
-  /** Exact output width in device pixels (height keeps the page's aspect). */
+  /** Exact output width in device pixels (height keeps the aspect of what is drawn). */
   width?: number;
   /** Device pixels per PDF point; ignored when `width` is given. Default 1. */
   scale?: number;
+  /**
+   * Draw only this part of the page, in page space: from the page's top-left,
+   * y down, in points. `width` and `scale` then size the part. Cut at the
+   * page's edge; a rect that misses the page is refused (`invalid-input`).
+   */
+  rect?: Rect;
+  /** Turn the picture clockwise. Default 0: the page as stored. */
+  rotation?: Rotation;
   /** Per-call encode overrides; default to the plugin's strategy. */
   format?: RenderFormat;
   quality?: number;
@@ -124,7 +162,8 @@ export interface RenderThumbnailOptions extends OperationOptions, PageLayerOptio
   quality?: number;
 }
 
-export interface RenderPagesOptions extends RenderPageOptions {
+/** A batch renders whole pages: the options of {@link RenderPageOptions} but a `rect`. */
+export interface RenderPagesOptions extends Omit<RenderPageOptions, 'rect'> {
   /** Renders in flight at once (default 4). */
   concurrency?: number;
 }
@@ -166,6 +205,33 @@ export interface RenderInvalidatedEvent {
    * invalidation through {@link RenderCapability.invalidate}.
    */
   readonly origin: EventOrigin | null;
+}
+
+// ── snapshots ───────────────────────────────────────────────────────────────
+
+/** The tool that takes snapshots: drag a box on a page, or click for the whole page. */
+export const SNAPSHOT_TOOL = 'snapshot';
+
+/**
+ * Part of a page taken as a picture with the {@link SNAPSHOT_TOOL}: held
+ * until another is taken, the tool changes or it is let go
+ * ({@link RenderCapability.clearSnapshot}).
+ */
+export interface Snapshot {
+  /** The page it was taken on. */
+  readonly page: PageRef;
+  /** The box, in page space: from the page's top-left, y down, in points. */
+  readonly rect: Rect;
+  /**
+   * Its picture, as PNG, turned as the page was shown. Rejects when it can't be
+   * rendered, and with `operation-cancelled` once the snapshot is let go first.
+   */
+  readonly image: Promise<PageImage>;
+}
+
+/** A snapshot was taken, or let go (`snapshot: null`). */
+export interface SnapshotChangedEvent {
+  readonly snapshot: Snapshot | null;
 }
 
 // ── whether a page's picture is on screen ───────────────────────────────────
@@ -267,8 +333,10 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
    * Render one page, by its ref or its index, at the requested size. The
    * size is honoured exactly (nothing is snapped to the viewer's render
    * points); the shared raster cache serves the call when it already holds a
-   * matching image. Rejects `permission-denied` without `doc.render`,
-   * `not-found` for a page that is not in this document,
+   * matching image. A part of the page (`rect`) or a turned picture is
+   * rendered for this call alone, outside the cache. Rejects
+   * `permission-denied` without `doc.render`, `not-found` for a page that is
+   * not in this document, `invalid-input` for a `rect` that misses the page,
    * `operation-cancelled` when `signal` fires.
    */
   renderPage(page: PageRef | number, options?: RenderPageOptions): Promise<PageImage>;
@@ -327,6 +395,18 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
   handOverPictures<Host>(painter: PicturePainter<Host>): () => void;
   /** The plugin painting the pictures now, or `null` while this one does. */
   getPicturePainter(): PicturePainter | null;
+  /**
+   * May this session take snapshots? It needs `doc.render` and
+   * `doc.content.copy`, which a PDF that forbids copying leaves out. Without
+   * them the {@link SNAPSHOT_TOOL} draws no box.
+   */
+  canSnapshot(): boolean;
+  /** The snapshot held now, or `null`: the same object while it is held. */
+  getSnapshot(): Snapshot | null;
+  /** Let the snapshot go; its picture, if still rendering, stops. */
+  clearSnapshot(): void;
+  /** A snapshot was taken, or let go. */
+  readonly onSnapshotChanged: EventHook<SnapshotChangedEvent>;
 }
 
 export { RenderToken } from './token';

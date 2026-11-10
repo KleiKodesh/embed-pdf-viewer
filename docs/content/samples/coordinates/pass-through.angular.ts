@@ -15,7 +15,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -44,7 +44,7 @@ const welcome = async (): Promise<OpenInput> => {
               <button
                 type="button"
                 class="hit"
-                (click)="stage.reveal(hit.page, { rect: bounds, anchor: { y: 0.35 } })"
+                (click)="stage.reveal(hit.page, { rect: bounds, align: { y: 0.35 } })"
               >
                 <span class="where">page {{ hit.pageIndex + 1 }}</span>
                 <code class="rect">x {{ round(bounds.x) }}, y {{ round(bounds.y) }}</code>

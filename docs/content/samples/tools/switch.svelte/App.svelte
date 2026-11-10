@@ -1,6 +1,6 @@
 <script lang="ts" module>
   import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
-  import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { RenderLayer, SnapshotLayer, renderPlugin } from '@embedpdf/svelte/render';
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
   import { SelectionLayer, selectionPlugin } from '@embedpdf/svelte/selection';
@@ -20,7 +20,7 @@
 
   // [!doc-source welcome]
   const welcome = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/welcome.pdf');
+    const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
     return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
@@ -35,6 +35,7 @@
     <Stage class="stage">
       <RenderLayer />
       <SelectionLayer />
+      <SnapshotLayer />
     </Stage>
   </DocumentGate>
 </Viewer>

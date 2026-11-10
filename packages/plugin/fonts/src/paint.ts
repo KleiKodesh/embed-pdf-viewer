@@ -7,7 +7,11 @@
  * once it's mounted (`ctx.measurer`).
  */
 import type { HostTextMeasurer } from '@embedpdf/core';
-import type { MountableFontProgram } from '@embedpdf/core-fonts';
+import {
+  fontProgramFamily,
+  standardFontOfProgramFamily,
+  type MountableFontProgram,
+} from '@embedpdf/core-fonts';
 import {
   coversGrapheme,
   defaultPaintFonts,
@@ -35,10 +39,10 @@ export interface PaintFontSources {
   /** Load the document's font list, which {@link programOf} and {@link standardOf} read. */
   readonly loadList: () => Promise<void>;
   readonly resolve: (request: FontResolveRequest) => Promise<FontResolution>;
-  readonly getProgram: (displayHash: string) => Promise<FontProgramInfo>;
+  readonly getProgram: (displaySha256: string) => Promise<FontProgramInfo>;
   /** A program as a browser mounts it, in `style`, else in the style of the font it belongs to. */
   readonly programOf: (
-    displayHash: string,
+    displaySha256: string,
     style?: { weight: number; italic: boolean },
   ) => MountableFontProgram;
   /** The standard font a font whose program a browser can't get is drawn in. */
@@ -89,12 +93,18 @@ export function createPaintFonts(sources: PaintFontSources) {
     return programPaintFont(info, program, (text, rtl) => measure.width(program, text, rtl));
   };
 
+  /** A fallback: the standard font the list ends with is drawn as the engine writes it, through its encoding. */
+  const fallbackFont = async (measure: HostTextMeasurer, hash: string): Promise<PaintFont> => {
+    const standard = standardFontOfProgramFamily(fontProgramFamily(hash));
+    return standard ? standardPaintFont(standard) : programFont(measure, hash);
+  };
+
   /** The fonts a box in `font` draws with: its style's fallbacks, whatever its text. */
   const find = async (measure: HostTextMeasurer, font: FontName): Promise<PaintFonts> => {
     await sources.loadList();
     const resolution = await sources.resolve({ runs: [{ text: ' ', fontFamily: font }] });
     const run = resolution.runs[0]!;
-    const fallbacks = Promise.all(run.fallbacks.map((hash) => programFont(measure, hash)));
+    const fallbacks = Promise.all(run.fallbacks.map((hash) => fallbackFont(measure, hash)));
     const face = isStandardFontName(run.font)
       ? standardPaintFont(run.font)
       : run.program

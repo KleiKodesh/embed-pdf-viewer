@@ -64,7 +64,12 @@ export const en: Locale = {
       print: 'Print',
       fullscreen: 'Full Screen',
       spread: { group: 'Page Layout', none: 'Single Page', odd: 'Two Page', even: 'Cover Page' },
-      scroll: { group: 'Scrolling', vertical: 'Vertical', horizontal: 'Horizontal' },
+      scroll: {
+        group: 'Scrolling',
+        vertical: 'Vertical',
+        horizontal: 'Horizontal',
+        paged: 'Page by page',
+      },
       rotate: {
         group: 'Rotate',
         clockwise: 'Rotate Clockwise',
@@ -107,6 +112,13 @@ export const en: Locale = {
         copy: 'Copy',
         strip: 'Text selection actions',
       },
+      snapshot: {
+        tool: 'Take a Snapshot',
+        copy: 'Copy',
+        save: 'Save Image',
+        clear: 'Clear Snapshot',
+        strip: 'Snapshot actions',
+      },
       shapes: {
         rectangle: 'Rectangle',
         circle: 'Circle',
@@ -135,6 +147,7 @@ export const en: Locale = {
       redact: {
         mark: 'Mark for Redaction',
         applyAll: 'Apply Redactions',
+        apply: { one: 'Apply Redaction', other: 'Apply {count} Redactions' },
         clearAll: 'Clear Marks',
       },
       undo: 'Undo',
@@ -156,6 +169,7 @@ export const en: Locale = {
         'doc-annotate-modify': "Changing annotations isn't allowed",
         'doc-annotate-read': "Viewing annotations isn't allowed",
         'doc-attachments-modify': 'Adding files isn’t allowed',
+        'doc-content-copy': "Taking snapshots isn't allowed",
         'doc-download': "Downloading isn't allowed",
         'doc-forms-modify': "Editing form fields isn't allowed",
         'doc-outline-modify': 'Changing the outline isn’t allowed',
@@ -270,7 +284,7 @@ export const en: Locale = {
       cancel: 'Cancel',
       close: 'Close without saving',
     },
-    // The View only label in the main bar, while nothing can change the document.
+    // The View only label, where the layout puts it, while nothing can change the document.
     viewOnly: {
       label: 'View only',
       turnedOff: 'The tools that change this document are turned off',
@@ -352,6 +366,7 @@ export const en: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'Type',
         opacity: 'Opacity',
         stroke: 'Stroke',
         fill: 'Fill',
@@ -499,7 +514,7 @@ export const en: Locale = {
       lineStart: 'Start',
       lineEnd: 'End',
       empty: 'Pick a draw tool or select an annotation to edit its style.',
-      selected: '{count} selected',
+      selected: { one: '{count} selected', other: '{count} selected' },
       toolDefaults: '{tool} defaults',
       defaults: 'Defaults',
       // The font picker's groups, a font's style after its family's name, and why a font can't be
@@ -524,20 +539,6 @@ export const en: Locale = {
         other: 'New text can’t be written in it',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Flags (/F)',
-      print: 'Include when the page is printed',
-      hidden: 'Gone everywhere: screen, clicks, print',
-      noView: 'Hidden on screen, may still print',
-      toggleNoView: 'Reveal a no-view annotation while selected',
-      readOnly: 'Visible but not clickable',
-      locked: 'No move / resize / delete / restyle',
-      lockedContents: 'Text cannot change; geometry can',
-      noZoom: 'Screen-constant size (anchored top-left)',
-      noRotate: 'Stays upright when the page rotates',
-      invisible: 'Legacy: hide unknown subtypes',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Loading attachments…',
@@ -547,8 +548,7 @@ export const en: Locale = {
       dropHint: 'Or drop files here',
       adding: 'Adding…',
       onPage: 'Page {page}',
-      count: '{count} file',
-      countPlural: '{count} files',
+      count: { one: '{count} file', other: '{count} files' },
     },
     outline: {
       filter: 'Filter outline',
@@ -603,10 +603,9 @@ export const en: Locale = {
       retry: 'Retry',
       empty: 'No comments yet. Use the note tool to start a thread.',
       emptyReadOnly: 'No comments on this document.',
-      anonymous: 'Unknown',
+      anonymous: 'Guest',
       page: 'Page {page}',
-      count: '{count} comment',
-      countPlural: '{count} comments',
+      count: { one: '{count} comment', other: '{count} comments' },
       reply: 'Reply',
       replyPlaceholder: 'Reply…',
       addPlaceholder: 'Add a comment…',
@@ -633,7 +632,7 @@ export const en: Locale = {
       searchWholeWord: 'Whole word',
       searchRegex: 'Regular expression',
       searchSearching: 'Searching…',
-      searchResults: '{count} results found',
+      searchResults: { one: '{count} result found', other: '{count} results found' },
       searchNoResults: 'No results',
       searchPrevious: 'Previous result',
       searchNext: 'Next result',
@@ -648,10 +647,16 @@ export const en: Locale = {
       redactionArea: 'Area mark',
       redactionText: 'Text mark',
       redactionRemove: 'Remove mark',
-      redactConfirmTitle: 'Apply redactions?',
-      redactConfirmBody:
-        'Permanently remove the content under {count} redaction marks. This cannot be undone.',
-      redactConfirmCollateral: '{count} other annotations will also be removed.',
+      redactConfirmTitle: { one: 'Apply redaction?', other: 'Apply redactions?' },
+      redactConfirmBody: {
+        one: 'Permanently remove the content under {count} redaction mark. This cannot be undone.',
+        other:
+          'Permanently remove the content under {count} redaction marks. This cannot be undone.',
+      },
+      redactConfirmCollateral: {
+        one: '{count} other annotation will also be removed.',
+        other: '{count} other annotations will also be removed.',
+      },
       redactApply: 'Apply',
       redactApplying: 'Applying…',
       formatLabel: 'Format',

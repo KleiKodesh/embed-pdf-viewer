@@ -40,7 +40,7 @@ for (const font of fonts) {
 | `source`     | The fonts                                                                                     | Their `name`                       |
 | :----------- | :-------------------------------------------------------------------------------------------- | :--------------------------------- |
 | `'standard'` | The 14 standard PDF fonts. They only cover Latin text.                                        | `'helvetica'`, `'times-bold'`, …   |
-| `'engine'`   | The engine's fonts: the ones you [register](#register-a-font) locally, your server's on the cloud. | the `key` they were given          |
+| `'engine'`   | The engine's fonts: the ones you [register](#register-a-font) locally, your server's on the cloud, and the Hebrew and Arabic fallback fonts the engine comes with. | the `key` they were given          |
 | `'document'` | Fonts the PDF already has.                                                                    | its PostScript name, such as `'MinionPro-Regular'`; without one, its family and style, such as `'Inter,Medium'` |
 
 A PDF can hold one font several times: each editor that wrote text in it may have added its own
@@ -56,6 +56,7 @@ font.
 | :--------------- | :------------------------------------------------------------------------------------------- |
 | `name`           | What you pass as `fontFamily`.                                                               |
 | `source`         | `'standard'`, `'engine'` or `'document'`.                                                    |
+| `builtIn`        | Whether the engine comes with it: the standard fonts, and its own fallback fonts. `false` for the fonts you add and the document's. |
 | `familyName`     | The family, such as `'Minion Pro'`.                                                          |
 | `weight`         | `100` to `900`.                                                                              |
 | `italic`         | Whether it's an italic.                                                                      |
@@ -66,7 +67,9 @@ font.
 
 Next to `fonts`, the list has `fallbacks`, the names of the fonts that
 [fill in missing characters](#text-in-any-language) in the order they were added, and
-`lastResort`, the program that draws a box for a character no font has.
+`lastResort`, the program that draws a box for a character no font has. The fallback fonts the
+engine comes with (`builtIn` engine fonts) fill in whichever font a box names, so a font picker can
+leave them out, as the viewer's does.
 
 The list changes when a write adds a font to the document, and, on the local engine, when you
 register fonts. Each change raises the document event `fonts.changed`:
@@ -169,7 +172,11 @@ The engine picks a font for each character:
 
 - the font you named, when it has the character;
 - otherwise the first fallback font that has it. Yours come before the ones the engine comes with;
-  among each, the closest in style (weight, then italic) first, then the order they were added in.
+  among each, the closest in style (weight, then italic) first, then the order they were added in;
+- otherwise the standard font that stands in for the font you named, in its weight and italic:
+  Times for a Times New Roman, Courier for a Courier New, Helvetica for any other. So Latin is
+  never lost, even in a font that has none: "Hello" in Noto Sans Hebrew is written in Helvetica,
+  in a bold font in Helvetica Bold.
 
 It then lays the text out the way the language needs: Hebrew and Arabic right to left, mixed
 with numbers and Latin words in the right order; Arabic letters joined, Devanagari letters
@@ -271,7 +278,7 @@ Each run you send comes back with the font the engine will use for it:
 | `italic`      | Whether it's an italic.                                                                            |
 | `substituted` | `true` when it isn't the font you asked for.                                                       |
 | `program`     | The font file the engine will use, by hash; `null` when a browser can't get one.                   |
-| `fallbacks`   | The fallback fonts' files, by hash, in the order the engine tries them for this run's style.      |
+| `fallbacks`   | The files of the fonts that fill in what the run's font lacks, by hash, in the order the engine tries them: the fallback fonts for this run's style, then the standard font that stands in for its font. |
 
 `missingCharacters` lists the characters no font has, which the engine will draw as boxes.
 
@@ -284,7 +291,7 @@ in the same order, ending with the last-resort font that draws the boxes:
 ```ts
 const { lastResort } = await doc.fonts.list();
 const [run] = runs;
-const hashes = [run.program, ...run.fallbacks, lastResort.displayHash].filter((hash) => hash !== null);
+const hashes = [run.program, ...run.fallbacks, lastResort.displaySha256].filter((hash) => hash !== null);
 
 for (const hash of hashes) {
   const face = new FontFace(`font-${hash}`, await doc.fonts.downloadProgram(hash));
@@ -305,8 +312,8 @@ A font's file is its program. `programs` on each font, and `getProgram(hash)`, d
 
 | Field                 | What it is                                                                                                         |
 | :-------------------- | :----------------------------------------------------------------------------------------------------------------- |
-| `displayHash`         | SHA-256 of the file a browser loads. You download and name programs by it.                                         |
-| `sourceHash`          | SHA-256 of the file the engine lays text out with and puts in the PDF; `null` when the document doesn't hold one.  |
+| `displaySha256`       | SHA-256 of the file a browser loads. You download and name programs by it.                                         |
+| `sourceSha256`        | SHA-256 of the file the engine lays text out with and puts in the PDF; `null` when the document doesn't hold one.  |
 | `embedded`            | `'whole'`, `'subset'`, or `'none'` when the PDF only names the font.                                               |
 | `format`              | `'truetype'`, `'opentype'`, `'cff'`, `'type1'` or `'type3'`; `null` when nothing is embedded.                      |
 | `embeddingPermission` | What the font's licence says: `'installable'`, `'editable'` or `'preview-and-print'`; `null` when it says nothing. |
@@ -410,11 +417,11 @@ them exactly as the engine draws them.
 
 PDFs, forms especially, often carry their fonts as Type 1 or CFF, which browsers can't load. For
 those the engine builds a program a browser can load, with the same letters, the same widths and
-the same characters, and `displayHash` names it. That's why a program has two hashes: they're the
+the same characters, and `displaySha256` names it. That's why a program has two hashes: they're the
 same for a TrueType or OpenType font and differ for these.
 
 Two of a PDF's fonts can read one such file with other widths or character codes. Each gets a
-program of its own, so the font lists the file twice under one `sourceHash`, and `resolve()` gives a
+program of its own, so the font lists the file twice under one `sourceSha256`, and `resolve()` gives a
 box the program its own font reads.
 
 ### A hash is not a permission

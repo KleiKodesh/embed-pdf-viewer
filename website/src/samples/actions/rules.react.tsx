@@ -25,11 +25,11 @@ const plugins = [
 ];
 
 const links = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/links.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/links.pdf');
   return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// A link to a website, as a PDF carries it: what getActionTree() reads from a link.
+// A link to a website, as a PDF carries it: what readActionTree() reads from a link.
 const websiteLink: PdfActionTree = {
   root: {
     type: 'uri',
@@ -39,7 +39,6 @@ const websiteLink: PdfActionTree = {
     next: [],
   },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 };
 
@@ -47,14 +46,14 @@ const websiteLink: PdfActionTree = {
 const STARTS: ReadonlyArray<{ label: string; context: ActionContext }> = [
   {
     label: 'A click',
-    context: { origin: 'user', source: { kind: 'api' }, event: { scope: 'activate' } },
+    context: { origin: 'user', source: { kind: 'api' }, event: { type: 'activate' } },
   },
   {
     label: 'The pointer over it',
     context: {
       origin: 'hover',
       source: { kind: 'api' },
-      event: { scope: 'annotation', name: 'cursorEnter' },
+      event: { type: 'annotation', event: 'cursorEnter' },
     },
   },
   {
@@ -62,7 +61,7 @@ const STARTS: ReadonlyArray<{ label: string; context: ActionContext }> = [
     context: {
       origin: 'lifecycle',
       source: { kind: 'api' },
-      event: { scope: 'document', name: 'open' },
+      event: { type: 'document', event: 'open' },
     },
   },
 ];

@@ -40,20 +40,23 @@ export class FormsClient {
     public list(
         request: CloudPDF.doc.ListFormsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFormsList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFormsListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.doc.ListFormsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFormsList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsListResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -73,13 +76,16 @@ export class FormsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocFormsList200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocFormsListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -120,14 +126,14 @@ export class FormsClient {
     public reorderCalculations(
         request: CloudPDF.doc.DocFormsReorderCalculationsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFormsReorderCalculations200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFormsReorderCalculationsResponse> {
         return core.HttpResponsePromise.fromPromise(this.__reorderCalculations(request, requestOptions));
     }
 
     private async __reorderCalculations(
         request: CloudPDF.doc.DocFormsReorderCalculationsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFormsReorderCalculations200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsReorderCalculationsResponse>> {
         const {
             docId,
             layerName,
@@ -139,7 +145,11 @@ export class FormsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "Idempotency-Key": idempotencyKey,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -163,7 +173,7 @@ export class FormsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocFormsReorderCalculations200Response,
+                data: _response.body as CloudPDF.DocFormsReorderCalculationsResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -171,9 +181,15 @@ export class FormsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -213,14 +229,14 @@ export class FormsClient {
     public setValue(
         request: CloudPDF.doc.SetValueFormsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFormsSetValue200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFormsSetValueResponse> {
         return core.HttpResponsePromise.fromPromise(this.__setValue(request, requestOptions));
     }
 
     private async __setValue(
         request: CloudPDF.doc.SetValueFormsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFormsSetValue200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsSetValueResponse>> {
         const {
             docId,
             layerName,
@@ -233,7 +249,11 @@ export class FormsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "Idempotency-Key": idempotencyKey,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -256,15 +276,21 @@ export class FormsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocFormsSetValue200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocFormsSetValueResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -300,14 +326,14 @@ export class FormsClient {
     public reset(
         request: CloudPDF.doc.DocFormsResetRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFormsReset200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFormsResetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__reset(request, requestOptions));
     }
 
     private async __reset(
         request: CloudPDF.doc.DocFormsResetRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFormsReset200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsResetResponse>> {
         const {
             docId,
             layerName,
@@ -319,7 +345,11 @@ export class FormsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "Idempotency-Key": idempotencyKey,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -342,15 +372,21 @@ export class FormsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocFormsReset200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocFormsResetResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -382,25 +418,25 @@ export class FormsClient {
      *         docId: "docId",
      *         layerName: "layerName",
      *         pageKey: "pageKey",
-     *         annotKey: "annotKey"
+     *         annotationKey: "annotationKey"
      *     })
      */
     public deleteWidget(
         request: CloudPDF.doc.DeleteWidgetFormsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFormsDeleteWidget200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFormsDeleteWidgetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__deleteWidget(request, requestOptions));
     }
 
     private async __deleteWidget(
         request: CloudPDF.doc.DeleteWidgetFormsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFormsDeleteWidget200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsDeleteWidgetResponse>> {
         const {
             docId,
             layerName,
             pageKey,
-            annotKey,
+            annotationKey,
             "X-Document-Password": documentPassword,
             "Idempotency-Key": idempotencyKey,
         } = request;
@@ -408,7 +444,11 @@ export class FormsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "Idempotency-Key": idempotencyKey,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -416,7 +456,7 @@ export class FormsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/${core.url.encodePathParam(annotKey)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/${core.url.encodePathParam(annotationKey)}`,
             ),
             method: "DELETE",
             headers: _headers,
@@ -429,7 +469,7 @@ export class FormsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocFormsDeleteWidget200Response,
+                data: _response.body as CloudPDF.DocFormsDeleteWidgetResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -437,9 +477,15 @@ export class FormsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -453,7 +499,7 @@ export class FormsClient {
             _response.error,
             _response.rawResponse,
             "DELETE",
-            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotKey}",
+            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotationKey}",
         );
     }
 
@@ -471,26 +517,26 @@ export class FormsClient {
      *         docId: "docId",
      *         layerName: "layerName",
      *         pageKey: "pageKey",
-     *         annotKey: "annotKey",
+     *         annotationKey: "annotationKey",
      *         patch: {}
      *     })
      */
     public updateWidget(
         request: CloudPDF.doc.DocFormsUpdateWidgetRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFormsUpdateWidget200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFormsUpdateWidgetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__updateWidget(request, requestOptions));
     }
 
     private async __updateWidget(
         request: CloudPDF.doc.DocFormsUpdateWidgetRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFormsUpdateWidget200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsUpdateWidgetResponse>> {
         const {
             docId,
             layerName,
             pageKey,
-            annotKey,
+            annotationKey,
             "X-Document-Password": documentPassword,
             "Idempotency-Key": idempotencyKey,
             ..._body
@@ -499,7 +545,11 @@ export class FormsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "Idempotency-Key": idempotencyKey,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -507,7 +557,7 @@ export class FormsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/${core.url.encodePathParam(annotKey)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/${core.url.encodePathParam(annotationKey)}`,
             ),
             method: "PATCH",
             headers: _headers,
@@ -523,7 +573,7 @@ export class FormsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocFormsUpdateWidget200Response,
+                data: _response.body as CloudPDF.DocFormsUpdateWidgetResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -531,9 +581,15 @@ export class FormsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -547,7 +603,7 @@ export class FormsClient {
             _response.error,
             _response.rawResponse,
             "PATCH",
-            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotKey}",
+            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotationKey}",
         );
     }
 
@@ -579,14 +635,14 @@ export class FormsClient {
     public reorderWidgets(
         request: CloudPDF.doc.DocFormsReorderWidgetsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFormsReorderWidgets200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFormsReorderWidgetsResponse> {
         return core.HttpResponsePromise.fromPromise(this.__reorderWidgets(request, requestOptions));
     }
 
     private async __reorderWidgets(
         request: CloudPDF.doc.DocFormsReorderWidgetsRequest,
         requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFormsReorderWidgets200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsReorderWidgetsResponse>> {
         const {
             docId,
             layerName,
@@ -599,7 +655,11 @@ export class FormsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "Idempotency-Key": idempotencyKey,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -623,7 +683,7 @@ export class FormsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocFormsReorderWidgets200Response,
+                data: _response.body as CloudPDF.DocFormsReorderWidgetsResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -631,9 +691,15 @@ export class FormsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

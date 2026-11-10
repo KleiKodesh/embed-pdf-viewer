@@ -2,12 +2,12 @@
   import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-svelte';
 
   // [!doc-source welcome]
-  const welcome = '/pdfs/welcome.pdf';
+  const welcome = 'https://www.embedpdf.com/pdfs/welcome.pdf';
   // [!/doc-source]
 
   const config: ViewerConfig = {
     theme: { accent: '#7c3aed' },
-    disable: ['forms', 'redaction'],
+    features: { measurement: true, forms: false },
     icons: {
       send: ['M10 14L21 3', 'M21 3l-6.5 18a.5.5 0 0 1-1 0L10 14l-7-3.5a.5.5 0 0 1 0-1L21 3z'],
     },

@@ -56,6 +56,7 @@ export {
   reorderBackOf,
   restoredPagesOf,
   rotateBackOf,
+  scaleBackOf,
   type PageList,
   type PredictablePageOp,
   type RestoredPage,
@@ -91,6 +92,7 @@ export type {
 export {
   actionWriteOf,
   decodeSubmitFormFlags,
+  encodeSubmitFormFlags,
   fieldScriptOf,
   isFieldScript,
   needsScriptRight,
@@ -263,7 +265,7 @@ export {
 
 export { EngineError, serializeError, deserializeError } from './errors/EngineError';
 export type { SerializedEngineError, EngineErrorOptions } from './errors/EngineError';
-export { EngineErrorCode } from './errors/EngineErrorCode';
+export { EngineErrorCode, isEngineErrorCode } from './errors/EngineErrorCode';
 
 export { isValidPageObjectNumber } from './identity/PageObjectNumber';
 export type { PageObjectNumber } from './identity/PageObjectNumber';
@@ -292,10 +294,6 @@ export { encodeAnnotKey, decodeAnnotKey } from './identity/AnnotationRef';
 export { colorOf, rgbOf, sameColor } from './annotation/color';
 export type {
   Color,
-  Point,
-  Rect,
-  Size,
-  Rotation,
   LineEnding,
   LineEndings,
   AnnotationFlags,
@@ -336,6 +334,7 @@ export { familyOfSubtype } from './annotation/family';
 export type { AnnotationFamily } from './annotation/family';
 export type { AnnotationOrder, AnnotationOrderEntry } from './annotation/AnnotationOrder';
 export type { AnnotationAppearanceText } from './dto/AnnotationAppearanceText';
+export { canChangeKind, fieldTheKindCannotHold, siblingKindsOf } from './annotation/siblings';
 
 // Binary payloads — zod-free.
 export type {
@@ -618,6 +617,7 @@ export {
   fontNameForFace,
   isStandardFontName,
   standardFamilyOf,
+  standardFontForFace,
   STANDARD_FACES,
   type DescribeFont,
   type FaceRequest,
@@ -640,21 +640,21 @@ export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
 export { formWidget, toFieldRef } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {
-  FormFieldFamily,
+  FormFieldKind,
   FormFieldOrigin,
   ToggleFieldWidget,
   FormFieldWidget,
   FormFieldOption,
   FormFieldBase,
-  TextFieldDTO,
-  CheckboxFieldDTO,
-  RadioFieldDTO,
-  ComboBoxFieldDTO,
-  ListBoxFieldDTO,
-  PushButtonFieldDTO,
-  SignatureFieldDTO,
-  UnknownFieldDTO,
-  FormFieldDTO,
+  TextField,
+  CheckboxField,
+  RadioField,
+  ComboBoxField,
+  ListBoxField,
+  PushButtonField,
+  SignatureField,
+  UnknownField,
+  FormField,
 } from './forms/field';
 export type { FormValueEntry } from './forms/value-entry';
 export type {
@@ -663,6 +663,7 @@ export type {
   WidgetStylePatchFields,
   WidgetAppearance,
 } from './annotation/kinds/widget.shared';
+export { WIDGET_STYLE_NAMES } from './annotation/kinds/widget/styleNames';
 export type { FormKind, FormSnapshot } from './forms/snapshot';
 export type {
   WidgetPlacement,
@@ -735,7 +736,7 @@ export type {
   SignatureCompleteInput,
   SignatureCompleteResult,
   SignatureCoverage,
-  SignatureDTO,
+  Signature,
   SignatureKind,
   SignaturePrepareInput,
   SignaturePrepared,
@@ -851,14 +852,18 @@ export { createPdfTextLayout } from './text/layout';
 export type { PdfTextSegment, TextLayout } from './text/layout';
 export type { PageTextRange, TextRange } from './text/TextRange';
 export {
+  PAGE_TEXT_VERSION,
   boundaryTextOffset,
   charBoundaryAtTextOffset,
   charMapViolation,
   charRangeForTextOffsets,
+  isNoncharacter,
   sliceText,
+  toPageText,
 } from './text/charmap';
 export type { CharBoundaryBias, CharMapAnchor } from './text/charmap';
-export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
+export { LINE_BREAKS_VERSION, toLineBreaks } from './text/lineBreaks';
+export { canonicalSearchQuery } from './search/canonicalQuery';
 
 export type { PageReorderInput } from './mutation/PageReorderInput';
 export type { PageReorderResult } from './mutation/PageReorderResult';
@@ -962,9 +967,9 @@ export type {
   ParsedScope,
   ParsedVirtual,
   ParsedWildcard,
-  PdfBits,
+  PdfPermissionFlags,
 } from './auth/scope';
-export { PDF_BITS, decodePdfBits } from './auth/scope';
+export { PDF_BITS, permissionFlagsOf } from './auth/scope';
 export {
   CORE_NAMESPACES,
   isPluginId,

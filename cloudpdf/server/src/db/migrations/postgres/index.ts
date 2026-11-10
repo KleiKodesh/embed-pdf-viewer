@@ -98,6 +98,12 @@ import down049 from './049_fonts_version.down.sql';
 import sql049 from './049_fonts_version.sql';
 import down050 from './050_tenant_features.down.sql';
 import sql050 from './050_tenant_features.sql';
+import down051 from './051_tenant_usage_days.down.sql';
+import sql051 from './051_tenant_usage_days.sql';
+import down052 from './052_contents_version.down.sql';
+import sql052 from './052_contents_version.sql';
+import down053 from './053_viewports_version.down.sql';
+import sql053 from './053_viewports_version.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -261,5 +267,23 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
     name: '050_tenant_features.sql',
     sql: sql050,
     down: down050,
+  },
+  {
+    version: '051',
+    name: '051_tenant_usage_days.sql',
+    sql: sql051,
+    down: down051,
+  },
+  {
+    version: '052',
+    name: '052_contents_version.sql',
+    sql: sql052,
+    down: down052,
+  },
+  {
+    version: '053',
+    name: '053_viewports_version.sql',
+    sql: sql053,
+    down: down053,
   },
 ];

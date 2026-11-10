@@ -69,8 +69,9 @@ export interface PageAnnotationsService {
    * `appearance`, a file attachment its `file`; a resource the kind doesn't
    * take is refused), and the object number it gets (`objectNumber`, taken
    * from `doc.objectNumbers`), which makes its ref known before the engine
-   * answers. Without a number the engine picks the next free one. Without
-   * an `nm` in the data the annotation gets a fresh UUIDv7 `/NM`.
+   * answers. Without a number the engine picks the next free one. Data that
+   * leaves `nm` out gets a fresh UUIDv7 `/NM`; `nm: null` writes none, as a
+   * file from a tool that names nothing reads.
    *
    * A number this session doesn't hold, or one an object already has, is
    * refused with `ObjectNumberUnavailable`.
@@ -81,7 +82,9 @@ export interface PageAnnotationsService {
   ): AbortablePromise<AnnotationCreateResult>;
   /**
    * Change the fields `patch` names; the others stay. A resource replaces
-   * what it is for: a stamp's drawing, an attached file's bytes.
+   * what it is for: a stamp's drawing, an attached file's bytes. A new `nm`
+   * renames the annotation in place, refused with `InvalidArg` when another
+   * annotation on the page has it; `nm: null` removes its name.
    */
   update(
     ref: AnnotationRef,

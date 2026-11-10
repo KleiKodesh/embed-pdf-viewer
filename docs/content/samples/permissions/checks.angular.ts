@@ -30,7 +30,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -101,7 +101,9 @@ export class Controls {
     });
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
-      if (cover) untracked(() => this.selection.select({ page: cover, start: 28, count: 30 }));
+      // [!doc-range welcome firstWord]
+      if (cover) untracked(() => this.selection.select({ page: cover, start: 28, count: 9 }));
+      // [!/doc-range]
     });
   }
 

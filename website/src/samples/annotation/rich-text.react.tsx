@@ -26,7 +26,7 @@ const plugins = [
 ];
 
 const notice = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/notice.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/notice.pdf');
   return { kind: 'bytes', id: 'notice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -42,7 +42,7 @@ function SelectRichText() {
     done.current = true;
     const richText = annotation.list().find((each) => each.nm === 'rich-text');
     if (!richText) return;
-    annotation.selection.set([richText.ref]);
+    annotation.selection.select([richText.ref]);
     stage.reveal(richText.page, { rect: richText.rect });
   }, [annotation, stage, ready]);
 

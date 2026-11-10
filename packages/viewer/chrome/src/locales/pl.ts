@@ -71,6 +71,7 @@ export const pl: Locale = {
         group: 'Przewijanie',
         vertical: 'Pionowe',
         horizontal: 'Poziome',
+        paged: 'Strona po stronie',
       },
       rotate: {
         group: 'Obróć',
@@ -114,6 +115,13 @@ export const pl: Locale = {
         copy: 'Kopiuj',
         strip: 'Akcje zaznaczonego tekstu',
       },
+      snapshot: {
+        tool: 'Wykonaj migawkę',
+        copy: 'Kopiuj',
+        save: 'Zapisz obraz',
+        clear: 'Usuń migawkę',
+        strip: 'Akcje migawki',
+      },
       shapes: {
         rectangle: 'Prostokąt',
         circle: 'Okrąg',
@@ -142,6 +150,12 @@ export const pl: Locale = {
       redact: {
         mark: 'Oznacz do zaczernienia',
         applyAll: 'Zastosuj zaczernienia',
+        apply: {
+          one: 'Zastosuj zaczernienie',
+          few: 'Zastosuj {count} zaczernienia',
+          many: 'Zastosuj {count} zaczernień',
+          other: 'Zastosuj {count} zaczernienia',
+        },
         clearAll: 'Wyczyść oznaczenia',
       },
       undo: 'Cofnij',
@@ -161,6 +175,7 @@ export const pl: Locale = {
         'doc-annotate-modify': 'Zmienianie adnotacji jest niedozwolone',
         'doc-annotate-read': 'Wyświetlanie adnotacji jest niedozwolone',
         'doc-attachments-modify': 'Dodawanie plików jest niedozwolone',
+        'doc-content-copy': 'Migawki są niedozwolone',
         'doc-download': 'Pobieranie jest niedozwolone',
         'doc-forms-modify': 'Edytowanie pól formularza jest niedozwolone',
         'doc-outline-modify': 'Zmienianie zakładek jest niedozwolone',
@@ -346,6 +361,7 @@ export const pl: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'Typ',
         opacity: 'Krycie',
         stroke: 'Obrys',
         fill: 'Wypełnienie',
@@ -493,7 +509,12 @@ export const pl: Locale = {
       lineStart: 'Początek',
       lineEnd: 'Koniec',
       empty: 'Wybierz narzędzie rysowania lub zaznacz adnotację, aby edytować jej styl.',
-      selected: 'Zaznaczone: {count}',
+      selected: {
+        one: '{count} zaznaczona',
+        few: '{count} zaznaczone',
+        many: '{count} zaznaczonych',
+        other: '{count} zaznaczonej',
+      },
       toolDefaults: 'Ustawienia domyślne: {tool}',
       defaults: 'Ustawienia domyślne',
       fontGroups: {
@@ -516,20 +537,6 @@ export const pl: Locale = {
         other: 'Nie można nią pisać nowego tekstu',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Flagi (/F)',
-      print: 'Uwzględniaj podczas drukowania strony',
-      hidden: 'Niewidoczna nigdzie: ekran, kliknięcia, wydruk',
-      noView: 'Ukryta na ekranie, ale może zostać wydrukowana',
-      toggleNoView: 'Pokazuj niewyświetlaną adnotację, gdy jest zaznaczona',
-      readOnly: 'Widoczna, ale nie reaguje na kliknięcia',
-      locked: 'Bez przenoszenia / zmiany rozmiaru / usuwania / zmiany stylu',
-      lockedContents: 'Tekst nie może się zmienić; geometria tak',
-      noZoom: 'Stały rozmiar na ekranie (zakotwiczona w lewym górnym rogu)',
-      noRotate: 'Pozostaje pionowo, gdy strona się obraca',
-      invisible: 'Przestarzała: ukrywa nieznane podtypy',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Wczytywanie załączników…',
@@ -539,8 +546,12 @@ export const pl: Locale = {
       dropHint: 'Lub upuść pliki tutaj',
       adding: 'Dodawanie…',
       onPage: 'Strona {page}',
-      count: '{count} plik',
-      countPlural: 'Pliki: {count}',
+      count: {
+        one: '{count} plik',
+        few: '{count} pliki',
+        many: '{count} plików',
+        other: '{count} pliku',
+      },
     },
     outline: {
       filter: 'Filtruj zakładki',
@@ -594,10 +605,14 @@ export const pl: Locale = {
       retry: 'Ponów próbę',
       empty: 'Brak komentarzy. Użyj narzędzia notatki, aby rozpocząć wątek.',
       emptyReadOnly: 'Ten dokument nie ma komentarzy.',
-      anonymous: 'Nieznany',
+      anonymous: 'Gość',
       page: 'Strona {page}',
-      count: 'Komentarze: {count}',
-      countPlural: 'Komentarze: {count}',
+      count: {
+        one: '{count} komentarz',
+        few: '{count} komentarze',
+        many: '{count} komentarzy',
+        other: '{count} komentarza',
+      },
       reply: 'Odpowiedz',
       replyPlaceholder: 'Odpowiedz…',
       addPlaceholder: 'Dodaj komentarz…',
@@ -624,7 +639,12 @@ export const pl: Locale = {
       searchWholeWord: 'Całe wyrazy',
       searchRegex: 'Wyrażenie regularne',
       searchSearching: 'Wyszukiwanie…',
-      searchResults: 'Znalezione wyniki: {count}',
+      searchResults: {
+        one: 'Znaleziono {count} wynik',
+        few: 'Znaleziono {count} wyniki',
+        many: 'Znaleziono {count} wyników',
+        other: 'Znaleziono {count} wyniku',
+      },
       searchNoResults: 'Brak wyników',
       searchPrevious: 'Poprzedni wynik',
       searchNext: 'Następny wynik',
@@ -640,10 +660,25 @@ export const pl: Locale = {
       redactionArea: 'Oznaczenie obszaru',
       redactionText: 'Oznaczenie tekstu',
       redactionRemove: 'Usuń oznaczenie',
-      redactConfirmTitle: 'Zastosować zaczernienia?',
-      redactConfirmBody:
-        'Zawartość pod oznaczeniami do zaczernienia (liczba: {count}) zostanie trwale usunięta. Tej operacji nie można cofnąć.',
-      redactConfirmCollateral: 'Zostaną również usunięte inne adnotacje (liczba: {count}).',
+      redactConfirmTitle: {
+        one: 'Zastosować zaczernienie?',
+        few: 'Zastosować zaczernienia?',
+        many: 'Zastosować zaczernienia?',
+        other: 'Zastosować zaczernienia?',
+      },
+      redactConfirmBody: {
+        one: 'Zawartość pod {count} oznaczeniem do zaczernienia zostanie trwale usunięta. Tej operacji nie można cofnąć.',
+        few: 'Zawartość pod {count} oznaczeniami do zaczernienia zostanie trwale usunięta. Tej operacji nie można cofnąć.',
+        many: 'Zawartość pod {count} oznaczeniami do zaczernienia zostanie trwale usunięta. Tej operacji nie można cofnąć.',
+        other:
+          'Zawartość pod {count} oznaczenia do zaczernienia zostanie trwale usunięta. Tej operacji nie można cofnąć.',
+      },
+      redactConfirmCollateral: {
+        one: 'Zostanie również usunięta {count} inna adnotacja.',
+        few: 'Zostaną również usunięte {count} inne adnotacje.',
+        many: 'Zostanie również usuniętych {count} innych adnotacji.',
+        other: 'Zostanie również usunięte {count} innej adnotacji.',
+      },
       redactApply: 'Zastosuj',
       redactApplying: 'Stosowanie…',
       formatLabel: 'Format',

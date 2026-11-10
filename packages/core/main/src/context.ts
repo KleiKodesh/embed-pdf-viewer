@@ -309,6 +309,7 @@ export function createPluginContext(
     notify: () => {
       if (lease.live) store.notify();
     },
+    storeChangeCount: store.changeCount,
     watch: (select, handler, isEqual = Object.is) => {
       let previous = select();
       const unsubscribe = store.subscribe(() => {
@@ -369,7 +370,7 @@ export function createPluginContext(
     events: {
       source<T>(): EventHookSource<T> {
         const hook = createEventHook<T>(services.report);
-        scope.defer(() => hook.dispose());
+        scope.defer(() => hook.destroy());
         return hook;
       },
     },

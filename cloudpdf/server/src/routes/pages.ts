@@ -29,6 +29,7 @@ import {
   pagePictureQuerySchema,
   unflatten,
   type ManifestPage,
+  type TokenPin,
   type PageRenderFamilySpec,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -45,10 +46,10 @@ import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
 import {
-  assertServerFonts,
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   resolvePageKeyParam,
   resolvePageRefToNumber,
   setImmutableCache,
@@ -94,7 +95,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
-      requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
+      requested: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
     });
   });
 
@@ -125,7 +126,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
-      requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
+      requested: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
     });
   });
 
@@ -193,15 +194,19 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-text', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-text', permissionFlags);
       return readPageText({
         documentService,
         reply,
         signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
-        requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
+        requested: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
       });
     },
   );
@@ -213,8 +218,12 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       pageKey: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-page-text', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-page-text', permissionFlags);
     return readPageText({
       documentService,
       reply,
@@ -234,15 +243,25 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-geometry', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-page-geometry',
+        permissionFlags,
+      );
       return readPageGeometry({
         documentService,
         reply,
         signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
-        requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
+        requested: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
       });
     },
   );
@@ -254,8 +273,12 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       pageKey: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-page-geometry', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-page-geometry', permissionFlags);
     return readPageGeometry({
       documentService,
       reply,
@@ -278,8 +301,12 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         pageKey: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, spec.layerResource, pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, spec.layerResource, permissionFlags);
       return renderPageImage({
         documentService,
         imageEncoder,
@@ -309,7 +336,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       pageKey: string;
     };
     const access = requireLayerDocAccessOnly(req, docId, layerName);
-    const bits = await documentService.getEffectivePdfBits(access, docId, layerName);
+    const bits = await documentService.getEffectivePermissionFlags(access, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.open', bits);
     setNoStore(reply);
     const viewports = await documentService.readPageViewports(
@@ -328,7 +355,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       pageKey: string;
     };
     const access = requireLayerDocAccessOnly(req, docId, layerName);
-    const bits = await documentService.getEffectivePdfBits(access, docId, layerName);
+    const bits = await documentService.getEffectivePermissionFlags(access, docId, layerName);
     const protection = await documentService.getProtection(access, docId, layerName);
     const ctx = requireLayerCapability(
       req,
@@ -356,14 +383,18 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       layerName: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.pages.assemble',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     const body = parseOrInvalidArg<PageNameInput>(
@@ -382,14 +413,18 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       layerName: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.pages.assemble',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     const body = parseOrInvalidArg<PageRemoveNameInput>(
@@ -412,7 +447,11 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       layerName: string;
     };
     const ctx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(ctx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      ctx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(ctx, docId, layerName);
     const body = parseOrInvalidArg<PageExtractInput>(
       PageExtractInputSchema as unknown as SchemaLike<PageExtractInput>,
@@ -425,7 +464,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     // `doc.download.flattened`, and paints only what the caller may read.
     // The same check as the local engine's (`resolvePageExtract`).
     const holds = (capability: DocCapability) =>
-      holdsCapability(ctx, capability, pdfBits, protection);
+      holdsCapability(ctx, capability, permissionFlags, protection);
     const flatten = resolvePageExtract(body, {
       download: holds('doc.download'),
       downloadFlattened: holds('doc.download.flattened'),
@@ -449,20 +488,31 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
   app.post('/v1/docs/:docId/layers/:layerName/pages/flatten', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.pages.modify',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     // Flatten deletes page annotations as it paints them, so page-content
     // authority alone is insufficient. This deliberately excludes collab-
     // scoped annotation writers from the bulk page endpoint.
-    requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits, protection);
+    requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.annotate.modify',
+      permissionFlags,
+      protection,
+    );
     const raw = (req.body ?? {}) as { pages?: unknown; usage?: unknown };
     const body = parseOrInvalidArg<PageFlattenInput>(
       PageFlattenInputSchema as unknown as SchemaLike<PageFlattenInput>,
@@ -536,19 +586,42 @@ async function renderPageImage(input: {
     'render format',
   );
 
-  // A versioned request carries every pin of its family; each must be current.
-  for (const pin of input.picture.pins) {
-    const requested = parsedQuery[pin];
-    if (requested === undefined || requested === page.cache[pin]) continue;
+  // A versioned request carries every pin of its family; each must be current,
+  // and so must the base the store files the picture under.
+  const assertPinsCurrent = (current: { page: ManifestPage; baseSha: string }) => {
+    for (const pin of input.picture.pins) {
+      const requested = parsedQuery[pin];
+      if (requested === undefined || requested === current.page.cache[pin]) continue;
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `render ${pin} ${requested} no longer current (current=${current.page.cache[pin]}) for page ${input.pageObjectNumber}`,
+      );
+    }
+    if (current.baseSha !== baseSha) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `render of base ${baseSha} no longer current (current=${current.baseSha}) for page ${input.pageObjectNumber}`,
+      );
+    }
+  };
+  const token = parsedQuery.pin && { kind: 'render' as const, pin: parsedQuery.pin };
+  const pinned = token !== undefined;
+  try {
+    assertPinsCurrent({ page, baseSha });
+  } catch (err) {
     setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `render ${pin} ${requested} no longer current (current=${page.cache[pin]}) for page ${input.pageObjectNumber}`,
-    );
+    throw err;
   }
-  // ...and the server's fonts it was drawn with: fallback fonts draw page
-  // text, so another server's fonts are another picture.
-  await assertServerFonts(input.documentService, parsedQuery.serverFonts, input.reply);
+  const atPins = <T>(read: () => Promise<T>): Promise<T> =>
+    readAtPins({
+      documentService: input.documentService,
+      reply: input.reply,
+      docId: input.scope.docId,
+      layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
+      assertCurrent: async () => assertPinsCurrent(await resolvePageAndManifestForRead(input)),
+      read,
+      token,
+    });
 
   // ── The derived-artifact plane ───────────────────────────────────────
   // Lattice renders are durable: URL space == artifact space at canonical
@@ -557,10 +630,15 @@ async function renderPageImage(input: {
   // through to the legacy compute-only path below. A print picture has one
   // size per page and tier, and a thumbnail one per page, both off the
   // lattice: they are never classified, so never stored or refused here, and
-  // their versioned URLs are still cached.
+  // their versioned URLs are still cached. A request that names another
+  // engine value than this server's is answered uncached (see readAtPins),
+  // so it never reaches the store either.
   const derived = input.derivedRenders;
+  const ownEngine =
+    token !== undefined &&
+    token.pin.engine === (await input.documentService.engineValues.of('render'));
   const classification =
-    input.picture.print === null && !input.picture.thumbnail
+    ownEngine && input.picture.print === null && !input.picture.thumbnail
       ? derived?.classify({
           imageOptions,
           format,
@@ -685,20 +763,29 @@ async function renderPageImage(input: {
             classification.canonicalToken,
             input.picture.family,
           );
-    const artifact = await derived.getOrRender(
-      key,
-      async (signal) => {
-        if (input.encodeInEngine) {
-          const image = await renderEncoded(signal);
-          return { bytes: image.bytes, contentType: image.contentType };
-        }
-        return input.imageEncoder.encodeToBuffer(await renderRaster(signal), {
-          format,
-          quality: imageOptions.quality,
-        });
-      },
-      input.signal,
-    );
+    // The pins are checked inside the render, before the store keeps it.
+    // Callers that joined the render share its refusal.
+    const artifact = await derived
+      .getOrRender(
+        key,
+        (signal) =>
+          atPins(async () => {
+            if (input.encodeInEngine) {
+              const image = await renderEncoded(signal);
+              return { bytes: image.bytes, contentType: image.mimeType };
+            }
+            const image = await input.imageEncoder.encodeToBuffer(await renderRaster(signal), {
+              format,
+              quality: imageOptions.quality,
+            });
+            return { bytes: image.bytes, contentType: image.mimeType };
+          }),
+        input.signal,
+      )
+      .catch((err: unknown) => {
+        if (EngineError.is(err, EngineErrorCode.NotFound)) setNoStore(input.reply);
+        throw err;
+      });
     setImmutableCache(input.reply);
     input.reply.type(artifact.contentType);
     return input.reply.send(Buffer.from(artifact.bytes));
@@ -707,24 +794,20 @@ async function renderPageImage(input: {
   // Compute-only path (off-lattice or unpinned): unchanged contract —
   // body plus the advisory dimension headers.
   if (input.encodeInEngine) {
-    const image = await renderEncoded(input.signal);
-    parsedQuery.contentVersion === undefined
-      ? setNoStore(input.reply)
-      : setImmutableCache(input.reply);
-    input.reply.type(image.contentType);
+    const image = await atPins(() => renderEncoded(input.signal));
+    pinned ? setImmutableCache(input.reply) : setNoStore(input.reply);
+    input.reply.type(image.mimeType);
     input.reply.header('X-EmbedPDF-Image-Width', String(image.width));
     input.reply.header('X-EmbedPDF-Image-Height', String(image.height));
     return input.reply.send(Buffer.from(image.bytes));
   }
-  const raster = await renderRaster(input.signal);
+  const raster = await atPins(() => renderRaster(input.signal));
   const encoded = input.imageEncoder.encode(raster, {
     format,
     quality: imageOptions.quality,
   });
-  parsedQuery.contentVersion === undefined
-    ? setNoStore(input.reply)
-    : setImmutableCache(input.reply);
-  input.reply.type(encoded.contentType);
+  pinned ? setImmutableCache(input.reply) : setNoStore(input.reply);
+  input.reply.type(encoded.mimeType);
   input.reply.header('X-EmbedPDF-Image-Width', String(raster.width));
   input.reply.header('X-EmbedPDF-Image-Height', String(raster.height));
   return input.reply.send(encoded.stream);
@@ -736,60 +819,72 @@ async function readPageText(input: {
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;
-  requestedVersion?: number;
+  requested?: { contentVersion: number; pin: TokenPin };
 }) {
-  const page = await resolvePageForRead(input);
-  if (
-    input.requestedVersion !== undefined &&
-    input.requestedVersion !== page.cache.contentVersion
-  ) {
-    setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `${input.scope.kind === 'layer' ? 'layer ' : ''}text version ${
-        input.requestedVersion
-      } no longer current (current=${page.cache.contentVersion}) for page ${
-        input.pageObjectNumber
-      }`,
+  const assertCurrent = async () => {
+    const page = await resolvePageForRead(input);
+    if (
+      input.requested !== undefined &&
+      input.requested.contentVersion !== page.cache.contentVersion
+    ) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `${input.scope.kind === 'layer' ? 'layer ' : ''}text version ${
+          input.requested.contentVersion
+        } no longer current (current=${page.cache.contentVersion}) for page ${
+          input.pageObjectNumber
+        }`,
+      );
+    }
+  };
+  const read = async () => {
+    if (input.scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(
+        input.scope.ctx,
+        input.scope.docId,
+        input.scope.layerName,
+      );
+    }
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'pages.text' as const,
+        effect: 'read' as const,
+        jobId,
+        docId: input.scope.docId,
+        ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
+        page: toPageRef(input.pageObjectNumber),
+      });
+    const scope = input.scope;
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
     );
-  }
+    if (result.tag !== 'pages.text') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected ${input.scope.kind === 'layer' ? 'layer ' : ''}pages.text payload: ${result.tag}`,
+      );
+    }
+    return result.snapshot;
+  };
+  const snapshot = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: input.scope.docId,
+    layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
+    assertCurrent,
+    read,
+    token: input.requested && { kind: 'text', pin: input.requested.pin },
+  });
 
-  if (input.scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(
-      input.scope.ctx,
-      input.scope.docId,
-      input.scope.layerName,
-    );
-  }
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'pages.text' as const,
-      effect: 'read' as const,
-      jobId,
-      docId: input.scope.docId,
-      ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-      page: toPageRef(input.pageObjectNumber),
-    });
-  const scope = input.scope;
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    scope.kind === 'layer' ? scope.layerName : undefined,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'pages.text') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected ${input.scope.kind === 'layer' ? 'layer ' : ''}pages.text payload: ${result.tag}`,
-    );
-  }
-
-  input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
+  input.requested === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
   // The text body is immutable and keyed by contentVersion. Annotation
   // liveness (revision / weak-state) changes on a different cadence, so it
   // is intentionally not baked in here; it lives on annotation reads.
-  return result.snapshot;
+  return snapshot;
 }
 
 async function readPageGeometry(input: {
@@ -798,60 +893,72 @@ async function readPageGeometry(input: {
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;
-  requestedVersion?: number;
+  requested?: { contentVersion: number; pin: TokenPin };
 }) {
-  const page = await resolvePageForRead(input);
-  if (
-    input.requestedVersion !== undefined &&
-    input.requestedVersion !== page.cache.contentVersion
-  ) {
-    setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `${input.scope.kind === 'layer' ? 'layer ' : ''}geometry version ${
-        input.requestedVersion
-      } no longer current (current=${page.cache.contentVersion}) for page ${
-        input.pageObjectNumber
-      }`,
+  const assertCurrent = async () => {
+    const page = await resolvePageForRead(input);
+    if (
+      input.requested !== undefined &&
+      input.requested.contentVersion !== page.cache.contentVersion
+    ) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `${input.scope.kind === 'layer' ? 'layer ' : ''}geometry version ${
+          input.requested.contentVersion
+        } no longer current (current=${page.cache.contentVersion}) for page ${
+          input.pageObjectNumber
+        }`,
+      );
+    }
+  };
+  const read = async () => {
+    if (input.scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(
+        input.scope.ctx,
+        input.scope.docId,
+        input.scope.layerName,
+      );
+    }
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'pages.geometry' as const,
+        effect: 'read' as const,
+        jobId,
+        docId: input.scope.docId,
+        ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
+        page: toPageRef(input.pageObjectNumber),
+      });
+    const scope = input.scope;
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
     );
-  }
+    if (result.tag !== 'pages.geometry') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected ${
+          input.scope.kind === 'layer' ? 'layer ' : ''
+        }pages.geometry payload: ${result.tag}`,
+      );
+    }
+    return result.snapshot;
+  };
+  const snapshot = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: input.scope.docId,
+    layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
+    assertCurrent,
+    read,
+    token: input.requested && { kind: 'geometry', pin: input.requested.pin },
+  });
 
-  if (input.scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(
-      input.scope.ctx,
-      input.scope.docId,
-      input.scope.layerName,
-    );
-  }
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'pages.geometry' as const,
-      effect: 'read' as const,
-      jobId,
-      docId: input.scope.docId,
-      ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-      page: toPageRef(input.pageObjectNumber),
-    });
-  const scope = input.scope;
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    scope.kind === 'layer' ? scope.layerName : undefined,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'pages.geometry') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected ${
-        input.scope.kind === 'layer' ? 'layer ' : ''
-      }pages.geometry payload: ${result.tag}`,
-    );
-  }
-
-  input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
+  input.requested === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
   // See readPageText: geometry is content-cached; liveness is not baked in.
-  return result.snapshot;
+  return snapshot;
 }
 
 async function resolvePageForRead(input: {
@@ -878,7 +985,7 @@ async function resolvePageAndManifestForRead(input: {
       : await input.documentService.getManifest(input.scope.ctx, input.scope.docId);
   const page = manifest.pages.find((p) => p.page.objectNumber === input.pageObjectNumber);
   if (page) {
-    return { page, baseSha: manifest.baseSha };
+    return { page, baseSha: manifest.baseSha256 };
   }
   throw new EngineError(
     EngineErrorCode.NotFound,

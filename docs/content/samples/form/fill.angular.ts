@@ -15,12 +15,12 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source forms]
 const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/forms.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/forms.pdf');
   return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-/** One field of each family, with `setValue()` in the shape each one takes. */
+/** One field of each kind, with `setValue()` in the shape each one takes. */
 async function fillIn(form: EpdfForm) {
   await form.setValue(toFieldRef('name'), { value: 'Ada Lovelace' }); // text
   await form.setValue(toFieldRef('updates'), { checked: true }); // checkbox

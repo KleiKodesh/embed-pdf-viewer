@@ -17,7 +17,7 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), attachmentPlugin()];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -28,7 +28,7 @@ const sizeOf = (bytes: number | null) =>
 // The files the document carries: attach some, save one, remove one.
 function Files() {
   const attachment = useAttachment();
-  const { files, canAdd, canDownload } = useAttachmentState();
+  const { files, canCreate, canDownload } = useAttachmentState();
 
   const save = async (file: AttachedFile) => {
     const { bytes, name, mimeType } = await attachment.download(file);
@@ -39,17 +39,17 @@ function Files() {
     <aside className="files">
       <header className="files-header">
         <h3 className="files-title">Files</h3>
-        <label className="button primary" data-disabled={!canAdd || undefined}>
+        <label className="button primary" data-disabled={!canCreate || undefined}>
           Attach
           <input
             type="file"
             multiple
             hidden
-            disabled={!canAdd}
+            disabled={!canCreate}
             onChange={(event) => {
               const picked = Array.from(event.currentTarget.files ?? []);
               event.currentTarget.value = '';
-              if (picked.length > 0) void attachment.add(picked.map((data) => ({ data })));
+              if (picked.length > 0) void attachment.create(picked.map((data) => ({ data })));
             }}
           />
         </label>
@@ -59,7 +59,11 @@ function Files() {
       ) : (
         <ul className="list">
           {files.map((file) => (
-            <li key={file.id} className="row" data-pending={attachment.isPending(file) || undefined}>
+            <li
+              key={file.id}
+              className="row"
+              data-pending={attachment.isPending(file) || undefined}
+            >
               <button
                 type="button"
                 className="row-name"
@@ -67,14 +71,14 @@ function Files() {
                 onClick={() => save(file)}
               >
                 <bdi>{displayNameOf(file)}</bdi>
-                <span className="row-size">{sizeOf(file.size)}</span>
+                <span className="row-size">{sizeOf(file.sizeBytes)}</span>
               </button>
               <button
                 type="button"
                 className="row-remove"
                 aria-label={`Remove ${displayNameOf(file)}`}
-                disabled={!attachment.canRemove(file)}
-                onClick={() => attachment.remove(file)}
+                disabled={!attachment.canDelete(file)}
+                onClick={() => attachment.delete(file)}
               >
                 ×
               </button>

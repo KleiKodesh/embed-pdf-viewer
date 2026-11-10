@@ -68,13 +68,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
       end: [
         {
           id: 'panels',
-          items: [
-            // The View only label: it shows only while nothing can change the document, and
-            // draws its icon alone when there's no room.
-            { custom: 'view-only', variants: ['label', 'icon'] },
-            'panel:search',
-            'panel:comments',
-          ],
+          items: ['panel:search', 'panel:comments'],
           importance: 5,
         },
       ],
@@ -214,6 +208,11 @@ export const DEFAULT_LAYOUT: LayoutData = {
         },
       ],
     },
+    // Under the box the snapshot tool holds: copy it, or save it as a PNG.
+    snapshot: {
+      place: { at: 'snapshot' },
+      center: [{ id: 'snapshot', items: ['snapshot:copy', 'snapshot:save'], importance: 4 }],
+    },
     annotation: {
       place: { at: 'annotation' },
       center: [
@@ -232,8 +231,8 @@ export const DEFAULT_LAYOUT: LayoutData = {
           ],
           importance: 4,
         },
-        // Its own group, so a line sets delete apart.
-        { id: 'danger', items: ['annotation:delete'], importance: 5 },
+        // Its own group, so a line sets apart what removes: applying a redaction, and delete.
+        { id: 'danger', items: ['annotation:apply-redaction', 'annotation:delete'], importance: 5 },
       ],
     },
 
@@ -279,7 +278,10 @@ export const DEFAULT_LAYOUT: LayoutData = {
   },
 
   menus: {
-    document: [['document:open', 'document:download', 'document:print'], ['view:fullscreen']],
+    document: [
+      ['document:open', 'document:download', 'document:print', 'tool:snapshot'],
+      ['view:fullscreen'],
+    ],
     view: [
       {
         titleKey: 'commands.spread.group',
@@ -287,7 +289,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
       },
       {
         titleKey: 'commands.scroll.group',
-        items: ['view:scroll-vertical', 'view:scroll-horizontal'],
+        items: ['view:scroll-vertical', 'view:scroll-horizontal', 'view:scroll-paged'],
       },
       {
         titleKey: 'commands.rotate.group',

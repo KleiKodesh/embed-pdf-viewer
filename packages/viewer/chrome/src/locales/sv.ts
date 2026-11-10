@@ -72,6 +72,7 @@ export const sv: Locale = {
         group: 'Rullning',
         vertical: 'Vertikal',
         horizontal: 'Horisontell',
+        paged: 'Sida för sida',
       },
       rotate: {
         group: 'Rotera',
@@ -115,6 +116,13 @@ export const sv: Locale = {
         copy: 'Kopiera',
         strip: 'Åtgärder för markerad text',
       },
+      snapshot: {
+        tool: 'Ta en ögonblicksbild',
+        copy: 'Kopiera',
+        save: 'Spara bild',
+        clear: 'Rensa ögonblicksbild',
+        strip: 'Åtgärder för ögonblicksbild',
+      },
       shapes: {
         rectangle: 'Rektangel',
         circle: 'Ellips',
@@ -143,6 +151,7 @@ export const sv: Locale = {
       redact: {
         mark: 'Markera för maskering',
         applyAll: 'Tillämpa maskeringar',
+        apply: { one: 'Tillämpa maskering', other: 'Tillämpa {count} maskeringar' },
         clearAll: 'Rensa markeringar',
       },
       undo: 'Ångra',
@@ -162,6 +171,7 @@ export const sv: Locale = {
         'doc-annotate-modify': 'Du får inte ändra kommentarer',
         'doc-annotate-read': 'Du får inte visa kommentarer',
         'doc-attachments-modify': 'Du får inte lägga till filer',
+        'doc-content-copy': 'Du får inte ta ögonblicksbilder',
         'doc-download': 'Du får inte ladda ned',
         'doc-forms-modify': 'Du får inte redigera formulärfält',
         'doc-outline-modify': 'Du får inte ändra bokmärkena',
@@ -347,6 +357,7 @@ export const sv: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'Typ',
         opacity: 'Opacitet',
         stroke: 'Linje',
         fill: 'Fyllning',
@@ -494,7 +505,7 @@ export const sv: Locale = {
       lineStart: 'Början',
       lineEnd: 'Slut',
       empty: 'Välj ett ritverktyg eller markera en kommentar för att redigera dess stil.',
-      selected: '{count} valda',
+      selected: { one: '{count} vald', other: '{count} valda' },
       toolDefaults: 'Standardvärden för {tool}',
       defaults: 'Standardvärden',
       fontGroups: {
@@ -517,20 +528,6 @@ export const sv: Locale = {
         other: 'Ny text kan inte skrivas med det',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Flaggor (/F)',
-      print: 'Ta med när sidan skrivs ut',
-      hidden: 'Borta överallt: skärm, klick, utskrift',
-      noView: 'Dold på skärmen, kan ändå skrivas ut',
-      toggleNoView: 'Visa en kommentar med ingen visning medan den är markerad',
-      readOnly: 'Synlig men inte klickbar',
-      locked: 'Ingen flytt / storleksändring / borttagning / stiländring',
-      lockedContents: 'Texten kan inte ändras; geometrin kan',
-      noZoom: 'Konstant storlek på skärmen (förankrad uppe till vänster)',
-      noRotate: 'Förblir upprätt när sidan roteras',
-      invisible: 'Äldre: dölj okända undertyper',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Läser in bilagor…',
@@ -540,8 +537,7 @@ export const sv: Locale = {
       dropHint: 'Eller släpp filer här',
       adding: 'Lägger till…',
       onPage: 'Sida {page}',
-      count: '{count} fil',
-      countPlural: '{count} filer',
+      count: { one: '{count} fil', other: '{count} filer' },
     },
     outline: {
       filter: 'Filtrera bokmärken',
@@ -595,10 +591,9 @@ export const sv: Locale = {
       retry: 'Försök igen',
       empty: 'Inga kommentarer än. Använd anteckningsverktyget för att starta en tråd.',
       emptyReadOnly: 'Inga kommentarer i det här dokumentet.',
-      anonymous: 'Okänd',
+      anonymous: 'Gäst',
       page: 'Sida {page}',
-      count: '{count} kommentar',
-      countPlural: '{count} kommentarer',
+      count: { one: '{count} kommentar', other: '{count} kommentarer' },
       reply: 'Svara',
       replyPlaceholder: 'Svara…',
       addPlaceholder: 'Lägg till en kommentar…',
@@ -625,7 +620,7 @@ export const sv: Locale = {
       searchWholeWord: 'Hela ord',
       searchRegex: 'Reguljärt uttryck',
       searchSearching: 'Söker…',
-      searchResults: '{count} resultat hittades',
+      searchResults: { one: '{count} resultat hittades', other: '{count} resultat hittades' },
       searchNoResults: 'Inga resultat',
       searchPrevious: 'Föregående resultat',
       searchNext: 'Nästa resultat',
@@ -641,10 +636,16 @@ export const sv: Locale = {
       redactionArea: 'Områdesmarkering',
       redactionText: 'Textmarkering',
       redactionRemove: 'Ta bort markering',
-      redactConfirmTitle: 'Tillämpa maskeringar?',
-      redactConfirmBody:
-        'Ta bort innehållet under {count} maskeringsmarkeringar permanent. Det går inte att ångra.',
-      redactConfirmCollateral: '{count} andra kommentarer tas också bort.',
+      redactConfirmTitle: { one: 'Tillämpa maskering?', other: 'Tillämpa maskeringar?' },
+      redactConfirmBody: {
+        one: 'Ta bort innehållet under {count} maskeringsmarkering permanent. Det går inte att ångra.',
+        other:
+          'Ta bort innehållet under {count} maskeringsmarkeringar permanent. Det går inte att ångra.',
+      },
+      redactConfirmCollateral: {
+        one: '{count} annan kommentar tas också bort.',
+        other: '{count} andra kommentarer tas också bort.',
+      },
       redactApply: 'Tillämpa',
       redactApplying: 'Tillämpar…',
       formatLabel: 'Format',

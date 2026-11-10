@@ -16,7 +16,7 @@ import { Toolbar } from '@embedpdf/react/toolbar';
 import type {
   BarSchema,
   CollapsedGroupView,
-  CustomSlotCtx,
+  CustomSlotContext,
   GroupDisclosureView,
   OverflowMenuView,
 } from '@embedpdf/react/toolbar';
@@ -115,7 +115,8 @@ export function CommandButton({
 
   // Buttons carry no caret — a menu command is a plain icon button; the
   // `menu:` declaration still drives aria-haspopup and the anchored popover.
-  // A menu command is active while its menu is open at this button: it says it's expanded.
+  // A toggle says whether it's pressed. A menu command is active while its menu is open at this
+  // button: it says it's expanded.
   const draw = (active: boolean) => (
     <>
       <button
@@ -123,7 +124,7 @@ export function CommandButton({
         type="button"
         onClick={run}
         disabled={!cmd.enabled}
-        aria-pressed={cmd.menu ? undefined : active || undefined}
+        aria-pressed={cmd.pressable ? active : undefined}
         aria-haspopup={cmd.menu ? 'menu' : undefined}
         aria-expanded={cmd.menu ? active : undefined}
         aria-label={cmd.label}
@@ -500,7 +501,7 @@ export function AppToolbar({
       .filter((item) => !Object.prototype.hasOwnProperty.call(builtIn, item.slot))
       .map((item) => [
         item.slot,
-        (variant: string, ctx: CustomSlotCtx) =>
+        (variant: string, ctx: CustomSlotContext) =>
           ctx.layer === 'measure' ? null : (
             <ItemSocket
               id={item.slot}

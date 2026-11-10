@@ -216,6 +216,19 @@ its document only when the reader does something. On the cloud site every reader
 stored document, and a change made on load would pile up with each visit. The documents are built
 from HTML by `docs/content/pdfs/` (see its README).
 
+Docs code gives a document by its full URL, `https://www.embedpdf.com/pdfs/<folder>.pdf`, never
+`/pdfs/…`: a reader pastes the code into their own page, where a site-relative URL opens nothing.
+Where code stands for the reader's own file, it opens the welcome's URL. cloudpdf.com's copy gets
+its own site's URL (`DOCUMENT_SITES` in `documents.mjs`), and the sync fails on a `/pdfs/` URL or a
+file the site doesn't serve. Only code whose point needs a file we don't serve keeps a made-up
+path: a file behind a sign-in, one with a password, versions of one file, a path on a server.
+
+Code that selects a document's characters by index, such as "Documents" on the welcome's cover,
+names them in a `// [!doc-range <key> <name>]` block around the line that holds the range. Each
+site's welcome names its own brand, so the same word starts at another index on each: the block
+holds embedpdf.com's range, and the sync gives cloudpdf.com's copy its own, both from the
+document's `ranges` in `documents.mjs`. The PDF build fails when a range no longer reads its text.
+
 A document never instructs, everything it shows works in every example that opens it, and the
 example's hint says what to try (the README has the three rules). So an example that shows text
 turns on text selection, and comments go only in a document whose examples can show them.

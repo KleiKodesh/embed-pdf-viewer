@@ -9,7 +9,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -35,13 +35,13 @@ const welcome = async (): Promise<OpenInput> => {
         <aside class="files">
           <header class="files-header">
             <h3 class="files-title">Files</h3>
-            <label class="button primary" [attr.data-disabled]="!attachment.canAdd() || null">
+            <label class="button primary" [attr.data-disabled]="!attachment.canCreate() || null">
               Attach
               <input
                 type="file"
                 multiple
                 hidden
-                [disabled]="!attachment.canAdd()"
+                [disabled]="!attachment.canCreate()"
                 (change)="attach($event)"
               />
             </label>
@@ -59,14 +59,14 @@ const welcome = async (): Promise<OpenInput> => {
                     (click)="save(file)"
                   >
                     <bdi>{{ nameOf(file) }}</bdi>
-                    <span class="row-size">{{ sizeOf(file.size) }}</span>
+                    <span class="row-size">{{ sizeOf(file.sizeBytes) }}</span>
                   </button>
                   <button
                     type="button"
                     class="row-remove"
                     [attr.aria-label]="'Remove ' + nameOf(file)"
-                    [disabled]="!attachment.canRemove(file)"
-                    (click)="attachment.remove(file)"
+                    [disabled]="!attachment.canDelete(file)"
+                    (click)="attachment.delete(file)"
                   >
                     ×
                   </button>
@@ -105,6 +105,6 @@ export class App {
     const input = event.target as HTMLInputElement;
     const picked = Array.from(input.files ?? []);
     input.value = '';
-    if (picked.length > 0) void this.attachment.add(picked.map((data) => ({ data })));
+    if (picked.length > 0) void this.attachment.create(picked.map((data) => ({ data })));
   }
 }

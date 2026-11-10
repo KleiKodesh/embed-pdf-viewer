@@ -1,6 +1,7 @@
 import { EngineError } from '../../errors/EngineError';
 import { EngineErrorCode } from '../../errors/EngineErrorCode';
 import {
+  DEFAULT_RICH_TEXT_BODY,
   richTextParagraphsFromPlainText,
   richTextPlainText,
   type RichTextBody,
@@ -87,8 +88,9 @@ function styleOfBody(
  * A free text's text lives in its rich text: `contents` is its plain
  * projection, and the font, size, text color and alignment are its body.
  *
- * - New `richText` brings its `contents`; a partial body merges over the
- *   current one.
+ * - New `richText` brings its `contents`. A body it gives is replaced whole
+ *   (what that body leaves out takes the default, never the current value);
+ *   one without a body keeps the current body, as on a comment.
  * - New `contents` becomes body-style paragraphs, one per line break (run
  *   formatting goes: a plain-text writer can't keep what it can't see).
  * - A new font, size, text color or alignment moves the body.
@@ -112,7 +114,10 @@ export function freeTextFollows(
   const changes = bodyWithStyle({}, text, describe);
   const textChanged = text.richText !== undefined || text.contents !== undefined;
   if (!textChanged && Object.keys(changes).length === 0) return text;
-  const body = { ...current.richText.body, ...text.richText?.body, ...changes };
+  const base = text.richText?.body
+    ? { ...DEFAULT_RICH_TEXT_BODY, ...text.richText.body }
+    : current.richText.body;
+  const body = { ...base, ...changes };
   const paragraphs =
     text.richText?.paragraphs ??
     (text.contents !== undefined
@@ -123,7 +128,7 @@ export function freeTextFollows(
     ...text,
     ...styleOfBody(body, current, text),
     richText,
-    // The engine writes `/Contents` from the rich text: a line break reads back as `\r`.
+    // The engine writes `/Contents` from the rich text; `contents` is its plain projection.
     ...(textChanged ? { contents: richTextPlainText(richText) } : {}),
   };
 }
@@ -173,6 +178,6 @@ export function freeTextDraftFollows(
     body: bodyWithStyle(draft.richText?.body ?? {}, draft, describe),
     paragraphs: draft.richText?.paragraphs ?? richTextParagraphsFromPlainText(draft.contents ?? ''),
   };
-  // The engine writes `/Contents` from the rich text: a line break reads back as `\r`.
+  // The engine writes `/Contents` from the rich text; `contents` is its plain projection.
   return { ...draft, intent, richText, contents: richTextPlainText(richText) };
 }

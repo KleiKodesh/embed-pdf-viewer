@@ -25,7 +25,7 @@ every font, with where it comes from:
 | `source`     | The fonts                                                                       |
 | :----------- | :------------------------------------------------------------------------------ |
 | `'standard'` | The 14 standard PDF fonts, drawn the same everywhere. They only cover Latin text. |
-| `'engine'`   | The engine's own fonts: the ones you register locally, your server's on the cloud. |
+| `'engine'`   | The engine's own fonts: the ones you register locally, your server's on the cloud, and the fallback fonts it comes with (`builtIn`). |
 | `'document'` | The fonts the PDF already has.                                                  |
 
 A font's `name` is what `fontFamily` takes. `canChoose` says whether new text can be written in it,
@@ -58,7 +58,8 @@ lives:
 
 Draw with `font-synthesis: none`, so the browser never fakes a bold or an italic the engine won't
 draw. The CSS names the engine's own programs, then the same fallback fonts the engine fills
-missing characters from, in its order, then a font that draws a character no font has as a box,
+missing characters from, in its order, then the standard font that stands in for the font (so
+Latin a font lacks shows in Helvetica), then a font that draws a character no font has as a box,
 as the engine writes it. Until the browser has every program, it names the system's closest fonts
 instead, and the CSS changes when they arrive.
 
@@ -82,7 +83,7 @@ Everything `useFonts()` gives you.
 | `ensureLoaded()`                | Reads the document's fonts unless they're loaded or loading. Resolves once they're there.                    |
 | `refresh()`                     | Reads them again. Rarely needed: the list keeps up by itself.                                                 |
 | `resolve(request)`              | The fonts a write would draw each run in, without writing. [Your own editor](#your-own-editor)                |
-| `getProgram(displayHash)`       | A font file's facts: the characters it covers and its line metrics.                                          |
+| `readProgram(displaySha256)`    | A font file's facts: the characters it covers and its line metrics.                                          |
 | `getFontCss(font)`              | The CSS text in a font is drawn with, and the programs it names. [Draw text in a font](#draw-text-in-a-font) |
 | `getFaceCss(face)`              | The same for a face, as rich text names one: `{ family, weight, italic }`.                                    |
 | `getRunCss(run)`                | The same for a run as `resolve()` answered it.                                                               |
@@ -90,7 +91,7 @@ Everything `useFonts()` gives you.
 | `getPaintFontsEpoch()`          | A number that moves when any of the answers above may change: ask again when it does.                        |
 | `getFaceOfCssFamily(cssFamily)` | The face a program's CSS family stands for, to read back text the browser drew itself.                       |
 
-`resolve()` and `getProgram()` also take a `signal` in their options, to cancel them.
+`resolve()` and `readProgram()` also take a `signal` in their options, to cancel them.
 
 ## State
 

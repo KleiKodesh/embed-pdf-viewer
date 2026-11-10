@@ -18,7 +18,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -109,7 +109,7 @@ const bar: BarSchema = {
               [title]="command.label"
               [attr.aria-label]="command.label"
               [disabled]="!command.enabled"
-              [attr.aria-pressed]="command.active"
+              [attr.aria-pressed]="command.pressable ? command.active : null"
               (click)="run()"
             >
               <span class="icon" aria-hidden="true">

@@ -19,7 +19,7 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationP
 
 // [!doc-source layout]
 const layout = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/layout.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/layout.pdf');
   return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -36,7 +36,7 @@ function SelectShapes() {
     done.current = true;
     const found = annotation.list().filter((each) => each.nm === 'square' || each.nm === 'circle');
     if (found.length === 0) return;
-    annotation.selection.set(found.map((each) => each.ref));
+    annotation.selection.select(found.map((each) => each.ref));
     stage.reveal(found[0].page, { rect: found[0].rect });
   }, [annotation, stage, ready]);
 

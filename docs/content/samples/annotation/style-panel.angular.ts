@@ -25,7 +25,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source layout]
 const layout = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/layout.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/layout.pdf');
   return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -46,7 +46,7 @@ const layout = async (): Promise<OpenInput> => {
             [value]="stringValue() ?? '#ffffff'"
             (input)="update(picker.value)"
           />
-          @if (property.key === 'interiorColor') {
+          @if (property.allowsNone) {
             <button type="button" class="link" (click)="update(null)">
               {{ value() === null ? 'none' : 'remove' }}
             </button>
@@ -278,7 +278,7 @@ export class App {
       untracked(() => {
         const square = this.annotation.list().find((each) => each.nm === 'square');
         if (!square) return;
-        this.annotation.selection.set([square.ref]);
+        this.annotation.selection.select([square.ref]);
         stage.reveal(square.page, { rect: square.rect });
       });
     });

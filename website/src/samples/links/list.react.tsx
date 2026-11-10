@@ -16,7 +16,7 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), actionsPlugin(), linkPlugin()];
 
 const links = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/links.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/links.pdf');
   return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -39,7 +39,7 @@ function LinkList() {
   // Every way of following a link ends up here: a click, a key, or code.
   useLinkEvent(
     (link) => link.onActivated,
-    ({ target, activation }) => setLast(`${target.kind} → ${activation.outcome}`),
+    ({ target, activation }) => setLast(`${target.kind} → ${activation.status}`),
   );
 
   return (

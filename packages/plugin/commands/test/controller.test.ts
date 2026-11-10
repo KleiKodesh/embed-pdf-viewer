@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   COMMANDS_DEFAULTS,
   type CommandContext,
-  type CommandDef,
+  type CommandDefinition,
   type CommandFamily,
   type CommandsConfig,
 } from '../src/contract';
@@ -28,7 +28,8 @@ function harness<AppState>(config: CommandsConfig<AppState> = {}) {
   return { ctx, commands };
 }
 
-const capabilityWith = (definition: CommandDef) => harness({ commands: [definition] }).commands;
+const capabilityWith = (definition: CommandDefinition) =>
+  harness({ commands: [definition] }).commands;
 
 describe('resolution carries iconAccent', () => {
   it('lands a derived accent on the resolved command', () => {
@@ -94,8 +95,8 @@ describe('enabled, active and visible', () => {
 describe('registry', () => {
   it('rejects a duplicate id unless replaced, and a remover owns only its registration', () => {
     const { commands } = harness();
-    const first: CommandDef = { id: 'zoom:in', label: 'first' };
-    const second: CommandDef = { id: 'zoom:in', label: 'second' };
+    const first: CommandDefinition = { id: 'zoom:in', label: 'first' };
+    const second: CommandDefinition = { id: 'zoom:in', label: 'second' };
     const removeFirst = commands.registerCommand(first);
     expect(() => commands.registerCommand(second)).toThrow(
       expect.objectContaining({ code: 'conflict' }),
@@ -151,6 +152,43 @@ describe('registry', () => {
     expect(hidden).not.toBe(resolved);
     expect(hidden).toMatchObject({ enabled: false, visible: false });
     expect(commands.listCommands()).not.toBe(listed);
+  });
+});
+
+describe('asking a command', () => {
+  it('asks its derivations once per store change, however many readers ask', () => {
+    const enabled = vi.fn(() => true);
+    const label = vi.fn(() => ({ count: 2 }));
+    const { ctx, commands } = harness({
+      commands: [{ id: 'acme:send', label: 'Send ({count})', enabled, labelParams: label }],
+    });
+    const resolved = commands.resolveCommand('acme:send');
+    expect(commands.resolveCommand('acme:send')).toBe(resolved);
+    expect(commands.listCommands()).toEqual([resolved]);
+    expect(enabled).toHaveBeenCalledTimes(1);
+    expect(label).toHaveBeenCalledTimes(1);
+
+    ctx.notify();
+    expect(commands.resolveCommand('acme:send')).toBe(resolved); // asked again, answered the same
+    expect(enabled).toHaveBeenCalledTimes(2);
+    expect(label).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs by what the command answers at that moment, not as of the last store change', async () => {
+    // The app's own state, changed in place: the viewer hears nothing of it.
+    let ready = false;
+    const run = vi.fn();
+    const { commands } = harness({
+      commands: [{ id: 'acme:send', label: 'Send', enabled: () => ready, run }],
+    });
+    expect(commands.resolveCommand('acme:send')?.enabled).toBe(false);
+    ready = true;
+    expect(commands.resolveCommand('acme:send')?.enabled).toBe(false);
+    expect(commands.canExecute('acme:send')).toBe(true);
+    await expect(commands.execute('acme:send')).resolves.toEqual({ status: 'executed' });
+    expect(run).toHaveBeenCalledTimes(1);
+    // The run woke the readers, so they ask again.
+    expect(commands.resolveCommand('acme:send')?.enabled).toBe(true);
   });
 });
 
@@ -212,7 +250,7 @@ describe("your app's state", () => {
   }
 
   /** A command over an app's checklist: enabled once all four are done, active once approved. */
-  const approve: CommandDef<Review> = {
+  const approve: CommandDefinition<Review> = {
     id: 'acme:approve',
     label: 'Approve',
     enabled: ({ appState }) => appState.done.length === 4,
@@ -297,6 +335,26 @@ describe('what a command opens', () => {
       ['outline', { exclusive: undefined, focus: undefined }],
     ]);
   });
+
+  it('is a toggle when it has an active of its own or opens a panel, never for a menu or dialog', () => {
+    const commands = harness({
+      commands: [
+        { id: 'tool:pan', label: 'Pan', active: () => false },
+        { id: 'panel:search', label: 'Search', panel: 'search' },
+        { id: 'zoom:in', label: 'Zoom in', run: () => undefined },
+        { id: 'menu:zoom', label: 'Zoom', menu: 'zoom-menu' },
+        { id: 'menu:more', label: 'More', menu: 'more-menu', active: () => true },
+        { id: 'dialog:print', label: 'Print', modal: 'print' },
+      ],
+    }).commands;
+    const pressable = (id: string) => commands.resolveCommand(id)?.pressable;
+    expect(pressable('tool:pan')).toBe(true);
+    expect(pressable('panel:search')).toBe(true);
+    expect(pressable('zoom:in')).toBe(false);
+    expect(pressable('menu:zoom')).toBe(false);
+    expect(pressable('menu:more')).toBe(false);
+    expect(pressable('dialog:print')).toBe(false);
+  });
 });
 
 describe('category gating', () => {
@@ -343,7 +401,7 @@ describe('turning features off', () => {
 });
 
 describe('turning single commands off', () => {
-  const definitions: CommandDef[] = [
+  const definitions: CommandDefinition[] = [
     { id: 'tool:highlight', label: 'Highlight', categories: ['annotations.highlight'] },
     { id: 'tool:underline', label: 'Underline', categories: ['annotations.markup'] },
   ];
@@ -373,7 +431,7 @@ describe('turning single commands off', () => {
   it('turns commands off and on through the setting, live', () => {
     const { ctx, commands } = harness({ commands: definitions });
     const changed: string[][] = [];
-    commands.onSettingsChanged((event) => changed.push([...event.changed]));
+    commands.onSettingsChanged((event) => changed.push([...event.changedKeys]));
     const wake = vi.fn();
     ctx.subscribe(wake);
 
@@ -402,12 +460,11 @@ describe('turning single commands off', () => {
 describe('locked settings', () => {
   /** The controller with an i18n stand-in that knows `strings`. */
   function harnessWith(config: CommandsConfig, strings: Record<string, string> = {}) {
-    const i18n = {
-      t: (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
-        const text = strings[key] ?? options?.fallback ?? key;
-        return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
-      },
+    const t = (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
+      const text = strings[key] ?? options?.fallback ?? key;
+      return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
     };
+    const i18n = { t, getTranslator: () => t };
     const ctx = createTestContext({
       id: 'commands',
       settings: { defaults: COMMANDS_DEFAULTS, registered: config },
@@ -420,7 +477,7 @@ describe('locked settings', () => {
   // A spread setting the test holds or lets go, as the Stage's getLock() would answer.
   let held: { by: string; reasonKey?: string } | null = null;
   let spread = 'none';
-  const choice = (id: string, value: string): CommandDef => ({
+  const choice = (id: string, value: string): CommandDefinition => ({
     id,
     label: id === 'view:single-page' ? 'Single page' : 'Two pages',
     run: () => {
@@ -519,12 +576,11 @@ describe('permissions', () => {
     security: ReturnType<typeof securityWithout> | null,
     strings: Record<string, string> = {},
   ) {
-    const i18n = {
-      t: (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
-        const text = strings[key] ?? options?.fallback ?? key;
-        return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
-      },
+    const t = (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
+      const text = strings[key] ?? options?.fallback ?? key;
+      return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
     };
+    const i18n = { t, getTranslator: () => t };
     const ctx = createTestContext({
       id: 'commands',
       settings: { defaults: COMMANDS_DEFAULTS, registered: config },
@@ -534,8 +590,16 @@ describe('permissions', () => {
     return ctx.connect(createCommandsController(ctx));
   }
 
-  const print: CommandDef = { id: 'document:print', label: 'Print', requires: ['doc.print'] };
-  const note: CommandDef = { id: 'tool:note', label: 'Note', requires: ['annotations:create'] };
+  const print: CommandDefinition = {
+    id: 'document:print',
+    label: 'Print',
+    requires: ['doc.print'],
+  };
+  const note: CommandDefinition = {
+    id: 'tool:note',
+    label: 'Note',
+    requires: ['annotations:create'],
+  };
 
   it('hides a command whose permission the scope leaves out, and refuses it', async () => {
     const commands = harnessWith({ commands: [print, note] }, securityWithout('doc.print'));
@@ -605,6 +669,11 @@ describe('permissions', () => {
           { id: 'acme:save', label: 'Save', shortcut: 'Mod+S', categories: ['acme.saving'] },
           { id: 'acme:send', label: 'Send', shortcut: 'Mod+E', categories: ['acme'] },
           { id: 'acme:mail', label: 'Mail', shortcut: 'Mod+E' },
+          { id: 'acme:cancel', label: 'Cancel', shortcut: 'Mod+K', enabled: () => false },
+          { id: 'acme:close', label: 'Close', shortcut: 'Mod+K', visible: () => false },
+          { id: 'acme:dismiss', label: 'Dismiss', shortcut: 'Mod+K' },
+          { id: 'acme:undo', label: 'Undo', shortcut: 'Mod+J', enabled: () => false },
+          { id: 'acme:redo', label: 'Redo', shortcut: 'Mod+J', enabled: () => false },
         ],
         disabledCategories: ['acme'],
       },
@@ -629,7 +698,17 @@ describe('permissions', () => {
       commandId: 'acme:mail',
       refusal: null,
     });
-    expect(commands.matchStroke(stroke('k'), options)).toBeNull();
+    // Of commands that share keys, the one that can run now wins, wherever it is in the list.
+    expect(commands.matchStroke(stroke('k'), options)).toEqual({
+      commandId: 'acme:dismiss',
+      refusal: null,
+    });
+    // When none can run now, the first one still takes the key, which keeps its default.
+    expect(commands.matchStroke(stroke('j'), options)).toEqual({
+      commandId: 'acme:undo',
+      refusal: null,
+    });
+    expect(commands.matchStroke(stroke('l'), options)).toBeNull();
   });
 
   it('matches a key typed in a text field only for a command that runs from text fields', () => {
@@ -663,20 +742,20 @@ describe('permissions', () => {
 
   it('refuses a command its allowed check says no to, with the sentence its key names', async () => {
     let canPrint = false;
-    const checked: CommandDef = {
+    const checked: CommandDefinition = {
       id: 'document:print',
       label: 'Print',
       allowed: () => canPrint,
       notAllowedKey: 'commands.notAllowed.doc-print',
     };
-    const thrown: CommandDef = {
+    const thrown: CommandDefinition = {
       id: 'acme:thrown',
       label: 'Thrown',
       allowed: () => {
         throw new Error('no plugin');
       },
     };
-    const general: CommandDef = { id: 'acme:general', label: 'Send', allowed: () => false };
+    const general: CommandDefinition = { id: 'acme:general', label: 'Send', allowed: () => false };
     const strings = { 'commands.notAllowed.doc-print': "Printing isn't allowed" };
     const hidden = harnessWith(
       { commands: [checked, thrown, general] },
@@ -762,7 +841,7 @@ describe('settings', () => {
   it('takes its commands and categories from the settings, live', () => {
     const { ctx, commands } = harness({ commands: [{ id: 'zoom:in', label: 'In' }] });
     const changed: string[][] = [];
-    commands.onSettingsChanged((event) => changed.push([...event.changed]));
+    commands.onSettingsChanged((event) => changed.push([...event.changedKeys]));
     const wake = vi.fn();
     ctx.subscribe(wake);
 
@@ -801,13 +880,14 @@ describe('settings', () => {
 
 describe('labels', () => {
   /** An i18n stand-in that knows the keys it's given, in one language. */
-  const i18nWith = (strings: Record<string, string>) => ({
-    t: (key: string, options?: { fallbackKey?: string; fallback?: string }) =>
+  const i18nWith = (strings: Record<string, string>) => {
+    const t = (key: string, options?: { fallbackKey?: string; fallback?: string }) =>
       strings[key] ??
       (options?.fallbackKey === undefined ? undefined : strings[options.fallbackKey]) ??
       options?.fallback ??
-      key,
-  });
+      key;
+    return { t, getTranslator: () => t };
+  };
 
   it('shows the string under the id, then the translated label, then the plain label, then the id', async () => {
     const { createKernel, definePlugin } = await import('@embedpdf/core');

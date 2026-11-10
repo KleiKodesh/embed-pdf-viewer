@@ -12,23 +12,25 @@ import './accent.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
-// The characters of the cover's title.
-const TITLE = { start: 28, count: 30 };
+// The characters of "Documents", the first word on the cover.
+// [!doc-range welcome firstWord]
+const FIRST_WORD = { start: 28, count: 9 };
+// [!/doc-range]
 const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// The cover's title is selected on load, so the accent shows; drag over any text to see more.
+// The first word is selected on load, so the accent shows; drag over any text to see more.
 function SelectTitle() {
   const selection = useSelection();
   const cover = usePageList()[0]?.ref;
   useEffect(() => {
-    if (cover) selection.select({ page: cover, ...TITLE });
+    if (cover) selection.select({ page: cover, ...FIRST_WORD });
   }, [selection, cover]);
   return null;
 }

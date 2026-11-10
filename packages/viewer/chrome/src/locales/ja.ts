@@ -71,6 +71,7 @@ export const ja: Locale = {
         group: 'スクロール',
         vertical: '縦方向',
         horizontal: '横方向',
+        paged: '1ページずつ',
       },
       rotate: {
         group: '回転',
@@ -114,6 +115,13 @@ export const ja: Locale = {
         copy: 'コピー',
         strip: 'テキスト選択の操作',
       },
+      snapshot: {
+        tool: 'スナップショットを作成',
+        copy: 'コピー',
+        save: '画像を保存',
+        clear: 'スナップショットを解除',
+        strip: 'スナップショットの操作',
+      },
       shapes: {
         rectangle: '長方形',
         circle: '楕円',
@@ -142,6 +150,7 @@ export const ja: Locale = {
       redact: {
         mark: '墨消し用にマーク',
         applyAll: '墨消しを適用',
+        apply: { other: '{count} 件の墨消しを適用' },
         clearAll: 'マークを消去',
       },
       undo: '元に戻す',
@@ -161,6 +170,7 @@ export const ja: Locale = {
         'doc-annotate-modify': '注釈の変更は許可されていません',
         'doc-annotate-read': '注釈の表示は許可されていません',
         'doc-attachments-modify': 'ファイルの追加は許可されていません',
+        'doc-content-copy': 'スナップショットは許可されていません',
         'doc-download': 'ダウンロードは許可されていません',
         'doc-forms-modify': 'フォームフィールドの編集は許可されていません',
         'doc-outline-modify': 'しおりの変更は許可されていません',
@@ -346,6 +356,7 @@ export const ja: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: '種類',
         opacity: '不透明度',
         stroke: '線',
         fill: '塗り',
@@ -493,7 +504,7 @@ export const ja: Locale = {
       lineStart: '始点',
       lineEnd: '終点',
       empty: 'スタイルを編集するには、描画ツールを選ぶか注釈を選択してください。',
-      selected: '{count} 件を選択中',
+      selected: { other: '{count} 件を選択中' },
       toolDefaults: '{tool}のデフォルト',
       defaults: 'デフォルト',
       fontGroups: {
@@ -516,20 +527,6 @@ export const ja: Locale = {
         other: '新しいテキストを書けません',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'フラグ (/F)',
-      print: 'ページの印刷時に含める',
-      hidden: 'どこにも現れない：画面、クリック、印刷',
-      noView: '画面では非表示、印刷はされる場合あり',
-      toggleNoView: '「表示しない」注釈を選択中だけ表示',
-      readOnly: '表示されるがクリックできない',
-      locked: '移動・サイズ変更・削除・スタイル変更ができない',
-      lockedContents: 'テキストは変更不可、形状は変更可',
-      noZoom: '画面上のサイズが一定（左上を基準に固定）',
-      noRotate: 'ページを回転しても正立したまま',
-      invisible: '旧仕様：不明なサブタイプを非表示',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: '添付ファイルを読み込み中…',
@@ -539,8 +536,7 @@ export const ja: Locale = {
       dropHint: 'またはここにファイルをドロップ',
       adding: '追加中…',
       onPage: '{page} ページ',
-      count: '{count} 個のファイル',
-      countPlural: '{count} 個のファイル',
+      count: { other: '{count} 個のファイル' },
     },
     outline: {
       filter: 'しおりを絞り込む',
@@ -594,10 +590,9 @@ export const ja: Locale = {
       retry: '再試行',
       empty: 'コメントはまだありません。コメントツールでスレッドを開始できます。',
       emptyReadOnly: 'この文書にはコメントがありません。',
-      anonymous: '不明',
+      anonymous: 'ゲスト',
       page: '{page} ページ',
-      count: 'コメント {count} 件',
-      countPlural: 'コメント {count} 件',
+      count: { other: 'コメント {count} 件' },
       reply: '返信',
       replyPlaceholder: '返信…',
       addPlaceholder: 'コメントを追加…',
@@ -624,7 +619,7 @@ export const ja: Locale = {
       searchWholeWord: '単語単位',
       searchRegex: '正規表現',
       searchSearching: '検索中…',
-      searchResults: '{count} 件の結果が見つかりました',
+      searchResults: { other: '{count} 件の結果が見つかりました' },
       searchNoResults: '結果なし',
       searchPrevious: '前の結果',
       searchNext: '次の結果',
@@ -640,10 +635,12 @@ export const ja: Locale = {
       redactionArea: '領域のマーク',
       redactionText: 'テキストのマーク',
       redactionRemove: 'マークを削除',
-      redactConfirmTitle: '墨消しを適用しますか？',
-      redactConfirmBody:
-        '{count} 個の墨消しマークの下にあるコンテンツを完全に削除します。この操作は取り消せません。',
-      redactConfirmCollateral: 'ほかに {count} 個の注釈も削除されます。',
+      redactConfirmTitle: { other: '墨消しを適用しますか？' },
+      redactConfirmBody: {
+        other:
+          '{count} 個の墨消しマークの下にあるコンテンツを完全に削除します。この操作は取り消せません。',
+      },
+      redactConfirmCollateral: { other: 'ほかに {count} 個の注釈も削除されます。' },
       redactApply: '適用',
       redactApplying: '適用中…',
       formatLabel: '書式',

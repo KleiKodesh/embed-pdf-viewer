@@ -14,7 +14,7 @@ describe("FormsClient", () => {
             needsAppearances: true,
             fields: [
                 {
-                    family: "text",
+                    kind: "text",
                     ref: { kind: "objectNumber", objectNumber: 1 },
                     name: "name",
                     origin: "acroform",
@@ -79,7 +79,7 @@ describe("FormsClient", () => {
                     importedBy: "importedBy",
                     actions: {},
                     box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
-                    rotation: 1.1,
+                    rotation: 1,
                     color: "color",
                     interiorColor: "interiorColor",
                     strokeWidth: 1.1,
@@ -92,7 +92,8 @@ describe("FormsClient", () => {
                     caption: "caption",
                     checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
-                    fieldFamily: "text",
+                    fieldKind: "text",
+                    hasMark: true,
                 },
             ],
             calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
@@ -117,7 +118,7 @@ describe("FormsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -152,7 +153,9 @@ describe("FormsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -204,7 +207,7 @@ describe("FormsClient", () => {
             ],
             position: "start",
         };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -244,7 +247,7 @@ describe("FormsClient", () => {
             ],
             position: "start",
         };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -280,7 +283,7 @@ describe("FormsClient", () => {
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
             field: {
-                family: "text",
+                kind: "text",
                 ref: { kind: "objectNumber", objectNumber: 1 },
                 name: "name",
                 origin: "acroform",
@@ -292,10 +295,10 @@ describe("FormsClient", () => {
                 valueEntry: { kind: "none" },
                 defaultValueEntry: { kind: "none" },
                 actions: {
-                    keystroke: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    format: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    keystroke: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    format: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    validate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    calculate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
                 },
                 groupId: "groupId",
                 createdBy: "createdBy",
@@ -350,7 +353,7 @@ describe("FormsClient", () => {
                     importedBy: "importedBy",
                     actions: {},
                     box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
-                    rotation: 1.1,
+                    rotation: 1,
                     color: "color",
                     interiorColor: "interiorColor",
                     strokeWidth: 1.1,
@@ -363,7 +366,8 @@ describe("FormsClient", () => {
                     caption: "caption",
                     checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
-                    fieldFamily: "text",
+                    fieldKind: "text",
+                    hasMark: true,
                 },
             ],
             meta: {
@@ -377,7 +381,9 @@ describe("FormsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -420,7 +426,7 @@ describe("FormsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { string: { key: "value" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -449,7 +455,7 @@ describe("FormsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { string: { key: "value" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -481,7 +487,7 @@ describe("FormsClient", () => {
         const rawResponseBody = {
             fields: [
                 {
-                    family: "text",
+                    kind: "text",
                     ref: { kind: "objectNumber", objectNumber: 1 },
                     name: "name",
                     origin: "acroform",
@@ -546,7 +552,7 @@ describe("FormsClient", () => {
                     importedBy: "importedBy",
                     actions: {},
                     box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
-                    rotation: 1.1,
+                    rotation: 1,
                     color: "color",
                     interiorColor: "interiorColor",
                     strokeWidth: 1.1,
@@ -559,7 +565,8 @@ describe("FormsClient", () => {
                     caption: "caption",
                     checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
-                    fieldFamily: "text",
+                    fieldKind: "text",
+                    hasMark: true,
                 },
             ],
             meta: {
@@ -573,7 +580,9 @@ describe("FormsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -612,7 +621,7 @@ describe("FormsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -635,7 +644,7 @@ describe("FormsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -662,7 +671,7 @@ describe("FormsClient", () => {
             widget: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
             page: { kind: "objectNumber", objectNumber: 1 },
             field: {
-                family: "text",
+                kind: "text",
                 ref: { kind: "objectNumber", objectNumber: 1 },
                 name: "name",
                 origin: "acroform",
@@ -674,10 +683,10 @@ describe("FormsClient", () => {
                 valueEntry: { kind: "none" },
                 defaultValueEntry: { kind: "none" },
                 actions: {
-                    keystroke: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    format: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    keystroke: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    format: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    validate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    calculate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
                 },
                 groupId: "groupId",
                 createdBy: "createdBy",
@@ -705,7 +714,9 @@ describe("FormsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -726,7 +737,7 @@ describe("FormsClient", () => {
 
         server
             .mockEndpoint()
-            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotationKey")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -736,7 +747,7 @@ describe("FormsClient", () => {
             docId: "docId",
             layerName: "layerName",
             pageKey: "pageKey",
-            annotKey: "annotKey",
+            annotationKey: "annotationKey",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -745,11 +756,11 @@ describe("FormsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotationKey")
             .respondWith()
             .statusCode(400)
             .jsonBody(rawResponseBody)
@@ -760,7 +771,7 @@ describe("FormsClient", () => {
                 docId: "docId",
                 layerName: "layerName",
                 pageKey: "pageKey",
-                annotKey: "annotKey",
+                annotationKey: "annotationKey",
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
     });
@@ -769,11 +780,11 @@ describe("FormsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotationKey")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -784,7 +795,7 @@ describe("FormsClient", () => {
                 docId: "docId",
                 layerName: "layerName",
                 pageKey: "pageKey",
-                annotKey: "annotKey",
+                annotationKey: "annotationKey",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -830,20 +841,20 @@ describe("FormsClient", () => {
                 modifiedBy: "modifiedBy",
                 importedBy: "importedBy",
                 actions: {
-                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    activate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
                 },
                 box: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
-                rotation: 1.1,
+                rotation: 1,
                 color: "color",
                 interiorColor: "interiorColor",
                 strokeWidth: 1.1,
@@ -856,7 +867,8 @@ describe("FormsClient", () => {
                 caption: "caption",
                 checkStyle: "check",
                 field: { kind: "objectNumber", objectNumber: 1 },
-                fieldFamily: "text",
+                fieldKind: "text",
+                hasMark: true,
             },
             appearance: { action: "preserved", changed: true },
             meta: {
@@ -870,7 +882,9 @@ describe("FormsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -891,7 +905,7 @@ describe("FormsClient", () => {
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotationKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
@@ -902,7 +916,7 @@ describe("FormsClient", () => {
             docId: "docId",
             layerName: "layerName",
             pageKey: "pageKey",
-            annotKey: "annotKey",
+            annotationKey: "annotationKey",
             patch: {},
         });
         expect(response).toEqual(rawResponseBody);
@@ -912,11 +926,11 @@ describe("FormsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { patch: {} };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotationKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -928,7 +942,7 @@ describe("FormsClient", () => {
                 docId: "docId",
                 layerName: "layerName",
                 pageKey: "pageKey",
-                annotKey: "annotKey",
+                annotationKey: "annotationKey",
                 patch: {},
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
@@ -938,11 +952,11 @@ describe("FormsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { patch: {} };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotationKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -954,7 +968,7 @@ describe("FormsClient", () => {
                 docId: "docId",
                 layerName: "layerName",
                 pageKey: "pageKey",
-                annotKey: "annotKey",
+                annotationKey: "annotationKey",
                 patch: {},
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
@@ -981,7 +995,9 @@ describe("FormsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -1038,7 +1054,7 @@ describe("FormsClient", () => {
             ],
             position: "start",
         };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -1087,7 +1103,7 @@ describe("FormsClient", () => {
             ],
             position: "start",
         };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

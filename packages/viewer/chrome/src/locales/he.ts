@@ -72,6 +72,7 @@ export const he: Locale = {
         group: 'גלילה',
         vertical: 'אנכית',
         horizontal: 'אופקית',
+        paged: 'עמוד אחר עמוד',
       },
       rotate: {
         group: 'סובב',
@@ -115,6 +116,13 @@ export const he: Locale = {
         copy: 'העתק',
         strip: 'פעולות בחירת טקסט',
       },
+      snapshot: {
+        tool: 'צילום תמונת מצב',
+        copy: 'העתק',
+        save: 'שמור תמונה',
+        clear: 'נקה תמונת מצב',
+        strip: 'פעולות תמונת מצב',
+      },
       shapes: {
         rectangle: 'מלבן',
         circle: 'עיגול',
@@ -143,6 +151,7 @@ export const he: Locale = {
       redact: {
         mark: 'סמן להשחרה',
         applyAll: 'החל השחרות',
+        apply: { one: 'החל השחרה', two: 'החל {count} השחרות', other: 'החל {count} השחרות' },
         clearAll: 'נקה סימונים',
       },
       undo: 'בטל',
@@ -162,6 +171,7 @@ export const he: Locale = {
         'doc-annotate-modify': 'שינוי ביאורים אינו מותר',
         'doc-annotate-read': 'צפייה בביאורים אינה מותרת',
         'doc-attachments-modify': 'אסור להוסיף קבצים',
+        'doc-content-copy': 'צילום תמונות מצב אינו מותר',
         'doc-download': 'הורדה אינה מותרת',
         'doc-forms-modify': 'עריכת שדות טופס אינה מותרת',
         'doc-outline-modify': 'אין הרשאה לשנות סימניות',
@@ -346,6 +356,7 @@ export const he: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'סוג',
         opacity: 'אטימות',
         stroke: 'קו',
         fill: 'מילוי',
@@ -493,7 +504,11 @@ export const he: Locale = {
       lineStart: 'התחלה',
       lineEnd: 'סוף',
       empty: 'בחר כלי ציור או בחר ביאור כדי לערוך את הסגנון שלו.',
-      selected: 'נבחרו: {count}',
+      selected: {
+        one: 'נבחר פריט אחד',
+        two: 'נבחרו {count} פריטים',
+        other: 'נבחרו {count} פריטים',
+      },
       toolDefaults: 'ברירות מחדל של {tool}',
       defaults: 'ברירות מחדל',
       fontGroups: {
@@ -516,20 +531,6 @@ export const he: Locale = {
         other: 'לא ניתן לכתוב בו טקסט חדש',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'דגלים (/F)',
-      print: 'כלול בעת הדפסת העמוד',
-      hidden: 'נעלם בכל מקום: מסך, לחיצות, הדפסה',
-      noView: 'מוסתר במסך, ייתכן שיודפס',
-      toggleNoView: 'הצג ביאור ללא תצוגה כשהוא נבחר',
-      readOnly: 'גלוי אך לא ניתן ללחוץ עליו',
-      locked: 'ללא הזזה / שינוי גודל / מחיקה / שינוי סגנון',
-      lockedContents: 'לא ניתן לשנות את הטקסט; את הצורה ניתן',
-      noZoom: 'גודל קבוע במסך (מעוגן לפינה השמאלית העליונה)',
-      noRotate: 'נשאר זקוף כשהעמוד מסתובב',
-      invisible: 'מדור קודם: הסתר תת־סוגים לא ידועים',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'טוען קבצים מצורפים…',
@@ -539,8 +540,7 @@ export const he: Locale = {
       dropHint: 'או שחררו קבצים כאן',
       adding: 'מוסיף…',
       onPage: 'עמוד {page}',
-      count: 'קובץ {count}',
-      countPlural: '{count} קבצים',
+      count: { one: 'קובץ אחד', two: '{count} קבצים', other: '{count} קבצים' },
     },
     outline: {
       filter: 'סינון סימניות',
@@ -593,10 +593,9 @@ export const he: Locale = {
       retry: 'נסה שוב',
       empty: 'אין הערות עדיין. השתמש בכלי הפתק כדי לפתוח שרשור.',
       emptyReadOnly: 'אין הערות במסמך זה.',
-      anonymous: 'לא ידוע',
+      anonymous: 'אורח',
       page: 'עמוד {page}',
-      count: 'הערות: {count}',
-      countPlural: 'הערות: {count}',
+      count: { one: 'הערה אחת', two: '{count} הערות', other: '{count} הערות' },
       reply: 'השב',
       replyPlaceholder: 'השב…',
       addPlaceholder: 'הוסף הערה…',
@@ -623,7 +622,11 @@ export const he: Locale = {
       searchWholeWord: 'מילה שלמה',
       searchRegex: 'ביטוי רגולרי',
       searchSearching: 'מחפש…',
-      searchResults: 'תוצאות: {count}',
+      searchResults: {
+        one: 'נמצאה תוצאה אחת',
+        two: 'נמצאו {count} תוצאות',
+        other: 'נמצאו {count} תוצאות',
+      },
       searchNoResults: 'אין תוצאות',
       searchPrevious: 'התוצאה הקודמת',
       searchNext: 'התוצאה הבאה',
@@ -638,10 +641,21 @@ export const he: Locale = {
       redactionArea: 'סימון אזור',
       redactionText: 'סימון טקסט',
       redactionRemove: 'הסר סימון',
-      redactConfirmTitle: 'להחיל את ההשחרות?',
-      redactConfirmBody:
-        'התוכן שמתחת לסימוני ההשחרה ({count}) יוסר לצמיתות. לא ניתן לבטל פעולה זו.',
-      redactConfirmCollateral: 'יוסרו גם ביאורים אחרים ({count}).',
+      redactConfirmTitle: {
+        one: 'להחיל את ההשחרה?',
+        two: 'להחיל את ההשחרות?',
+        other: 'להחיל את ההשחרות?',
+      },
+      redactConfirmBody: {
+        one: 'התוכן שמתחת לסימון השחרה אחד יוסר לצמיתות. לא ניתן לבטל פעולה זו.',
+        two: 'התוכן שמתחת ל-{count} סימוני השחרה יוסר לצמיתות. לא ניתן לבטל פעולה זו.',
+        other: 'התוכן שמתחת ל-{count} סימוני השחרה יוסר לצמיתות. לא ניתן לבטל פעולה זו.',
+      },
+      redactConfirmCollateral: {
+        one: 'יוסר גם ביאור אחד נוסף.',
+        two: 'יוסרו גם {count} ביאורים נוספים.',
+        other: 'יוסרו גם {count} ביאורים נוספים.',
+      },
       redactApply: 'החל',
       redactApplying: 'מחיל…',
       formatLabel: 'תבנית',

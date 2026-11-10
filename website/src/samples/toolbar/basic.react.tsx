@@ -24,7 +24,7 @@ const plugins = [
 ];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -76,7 +76,7 @@ function MainToolbar() {
           title={command.label}
           aria-label={command.label}
           disabled={!command.enabled}
-          aria-pressed={command.active}
+          aria-pressed={command.pressable ? command.active : undefined}
           onClick={run}
         >
           <span className="icon" aria-hidden>

@@ -99,20 +99,23 @@ export class DocClient {
     public head(
         request: CloudPDF.HeadDocRequest,
         requestOptions?: DocClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocHead200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocHeadResponse> {
         return core.HttpResponsePromise.fromPromise(this.__head(request, requestOptions));
     }
 
     private async __head(
         request: CloudPDF.HeadDocRequest,
         requestOptions?: DocClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocHead200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocHeadResponse>> {
         const { docId, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -132,13 +135,16 @@ export class DocClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocHead200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocHeadResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -176,20 +182,23 @@ export class DocClient {
     public changes(
         request: CloudPDF.DocChangesRequest,
         requestOptions?: DocClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocChanges200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocChangesResponse> {
         return core.HttpResponsePromise.fromPromise(this.__changes(request, requestOptions));
     }
 
     private async __changes(
         request: CloudPDF.DocChangesRequest,
         requestOptions?: DocClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocChanges200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocChangesResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -212,19 +221,31 @@ export class DocClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocChanges200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocChangesResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 413:
-                    throw new CloudPDF.ContentTooLargeError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ContentTooLargeError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -263,7 +284,10 @@ export class DocClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher<core.BinaryResponse>({
@@ -290,7 +314,10 @@ export class DocClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -328,20 +355,23 @@ export class DocClient {
     public downloadLink(
         request: CloudPDF.DocDownloadLinkRequest,
         requestOptions?: DocClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocDownloadLink200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocDownloadLinkResponse> {
         return core.HttpResponsePromise.fromPromise(this.__downloadLink(request, requestOptions));
     }
 
     private async __downloadLink(
         request: CloudPDF.DocDownloadLinkRequest,
         requestOptions?: DocClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocDownloadLink200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocDownloadLinkResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -364,16 +394,19 @@ export class DocClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocDownloadLink200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocDownloadLinkResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 501:
                     throw new CloudPDF.NotImplementedError(
-                        _response.error.body as CloudPDF.DocDownloadLink501Response,
+                        _response.error.body as CloudPDF.ErrorResponse,
                         _response.rawResponse,
                     );
                 default:
@@ -410,20 +443,23 @@ export class DocClient {
     public manifest(
         request: CloudPDF.ManifestDocRequest,
         requestOptions?: DocClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocManifest200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocManifestResponse> {
         return core.HttpResponsePromise.fromPromise(this.__manifest(request, requestOptions));
     }
 
     private async __manifest(
         request: CloudPDF.ManifestDocRequest,
         requestOptions?: DocClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocManifest200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocManifestResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -443,13 +479,16 @@ export class DocClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocManifest200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocManifestResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -490,7 +529,10 @@ export class DocClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher<core.BinaryResponse>({
@@ -517,7 +559,10 @@ export class DocClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -553,20 +598,23 @@ export class DocClient {
     public text(
         request: CloudPDF.TextDocRequest,
         requestOptions?: DocClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocText200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocTextResponse> {
         return core.HttpResponsePromise.fromPromise(this.__text(request, requestOptions));
     }
 
     private async __text(
         request: CloudPDF.TextDocRequest,
         requestOptions?: DocClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocText200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocTextResponse>> {
         const { docId, layerName, pageKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -586,13 +634,16 @@ export class DocClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocText200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocTextResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

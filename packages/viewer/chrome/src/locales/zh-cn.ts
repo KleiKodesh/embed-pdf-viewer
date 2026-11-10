@@ -71,6 +71,7 @@ export const zhCN: Locale = {
         group: '滚动',
         vertical: '垂直',
         horizontal: '水平',
+        paged: '逐页',
       },
       rotate: {
         group: '旋转',
@@ -114,6 +115,13 @@ export const zhCN: Locale = {
         copy: '复制',
         strip: '文本选择操作',
       },
+      snapshot: {
+        tool: '拍快照',
+        copy: '复制',
+        save: '保存图像',
+        clear: '清除快照',
+        strip: '快照操作',
+      },
       shapes: {
         rectangle: '矩形',
         circle: '椭圆',
@@ -142,6 +150,7 @@ export const zhCN: Locale = {
       redact: {
         mark: '标记涂黑',
         applyAll: '应用涂黑',
+        apply: { other: '应用 {count} 处涂黑' },
         clearAll: '清除标记',
       },
       undo: '撤销',
@@ -161,6 +170,7 @@ export const zhCN: Locale = {
         'doc-annotate-modify': '不允许更改注释',
         'doc-annotate-read': '不允许查看注释',
         'doc-attachments-modify': '不允许添加文件',
+        'doc-content-copy': '不允许拍快照',
         'doc-download': '不允许下载',
         'doc-forms-modify': '不允许编辑表单字段',
         'doc-outline-modify': '不允许更改书签',
@@ -345,6 +355,7 @@ export const zhCN: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: '类型',
         opacity: '不透明度',
         stroke: '描边',
         fill: '填充',
@@ -492,7 +503,7 @@ export const zhCN: Locale = {
       lineStart: '起点',
       lineEnd: '终点',
       empty: '选择一个绘图工具或选中一个注释以编辑其样式。',
-      selected: '已选择 {count} 项',
+      selected: { other: '已选择 {count} 项' },
       toolDefaults: '{tool} 默认值',
       defaults: '默认值',
       fontGroups: {
@@ -515,20 +526,6 @@ export const zhCN: Locale = {
         other: '无法用它书写新文本',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: '标志 (/F)',
-      print: '打印页面时包含',
-      hidden: '在屏幕、单击和打印中均隐藏',
-      noView: '在屏幕上隐藏，但仍可能打印',
-      toggleNoView: '选中时显示设为“不显示”的注释',
-      readOnly: '可见但不可单击',
-      locked: '不可移动、调整大小、删除或更改样式',
-      lockedContents: '文本不可更改；几何形状可以更改',
-      noZoom: '屏幕上大小固定（锚定于左上角）',
-      noRotate: '页面旋转时保持直立',
-      invisible: '旧版：隐藏未知的子类型',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: '正在加载附件…',
@@ -538,8 +535,7 @@ export const zhCN: Locale = {
       dropHint: '或将文件拖放到此处',
       adding: '正在添加…',
       onPage: '第 {page} 页',
-      count: '{count} 个文件',
-      countPlural: '{count} 个文件',
+      count: { other: '{count} 个文件' },
     },
     outline: {
       filter: '筛选书签',
@@ -592,10 +588,9 @@ export const zhCN: Locale = {
       retry: '重试',
       empty: '尚无注释。使用注释工具开始讨论。',
       emptyReadOnly: '此文档没有注释。',
-      anonymous: '未知',
+      anonymous: '访客',
       page: '第 {page} 页',
-      count: '{count} 条注释',
-      countPlural: '{count} 条注释',
+      count: { other: '{count} 条注释' },
       reply: '回复',
       replyPlaceholder: '回复…',
       addPlaceholder: '添加注释…',
@@ -622,7 +617,7 @@ export const zhCN: Locale = {
       searchWholeWord: '全字匹配',
       searchRegex: '正则表达式',
       searchSearching: '正在搜索…',
-      searchResults: '找到 {count} 个结果',
+      searchResults: { other: '找到 {count} 个结果' },
       searchNoResults: '无结果',
       searchPrevious: '上一个结果',
       searchNext: '下一个结果',
@@ -637,9 +632,9 @@ export const zhCN: Locale = {
       redactionArea: '区域标记',
       redactionText: '文本标记',
       redactionRemove: '删除标记',
-      redactConfirmTitle: '应用涂黑？',
-      redactConfirmBody: '永久删除 {count} 个涂黑标记下的内容。此操作无法撤销。',
-      redactConfirmCollateral: '另有 {count} 个注释也将被删除。',
+      redactConfirmTitle: { other: '应用涂黑？' },
+      redactConfirmBody: { other: '永久删除 {count} 个涂黑标记下的内容。此操作无法撤销。' },
+      redactConfirmCollateral: { other: '另有 {count} 个注释也将被删除。' },
       redactApply: '应用',
       redactApplying: '正在应用…',
       formatLabel: '格式',

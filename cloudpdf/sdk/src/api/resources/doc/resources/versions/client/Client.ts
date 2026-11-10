@@ -41,20 +41,23 @@ export class VersionsClient {
     public list(
         request: CloudPDF.doc.ListVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocVersionsList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocVersionsListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.doc.ListVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocVersionsList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocVersionsListResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -74,13 +77,16 @@ export class VersionsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocVersionsList200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocVersionsListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -113,24 +119,24 @@ export class VersionsClient {
      *     await client.doc.versions.analysis({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         sha: "sha"
+     *         sha256: "sha256"
      *     })
      */
     public analysis(
         request: CloudPDF.doc.AnalysisVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocVersionsAnalysis200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocVersionsAnalysisResponse> {
         return core.HttpResponsePromise.fromPromise(this.__analysis(request, requestOptions));
     }
 
     private async __analysis(
         request: CloudPDF.doc.AnalysisVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocVersionsAnalysis200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocVersionsAnalysisResponse>> {
         const {
             docId,
             layerName,
-            sha,
+            sha256,
             "since.signature": sinceSignature,
             "since.revision": sinceRevision,
             level,
@@ -149,7 +155,10 @@ export class VersionsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -157,7 +166,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/analysis/${core.url.encodePathParam(sha)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/analysis/${core.url.encodePathParam(sha256)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -173,18 +182,21 @@ export class VersionsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocVersionsAnalysis200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocVersionsAnalysisResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -198,7 +210,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/analysis/{sha}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/analysis/{sha256}",
         );
     }
 
@@ -218,12 +230,15 @@ export class VersionsClient {
         request: CloudPDF.doc.DownloadVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, sha, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha256, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher<core.BinaryResponse>({
@@ -231,7 +246,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/download/${core.url.encodePathParam(sha)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/download/${core.url.encodePathParam(sha256)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -250,7 +265,10 @@ export class VersionsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -264,7 +282,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/download/{sha}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/download/{sha256}",
         );
     }
 
@@ -284,12 +302,15 @@ export class VersionsClient {
         request: CloudPDF.doc.RevisionVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, sha, index, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha256, index, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher<core.BinaryResponse>({
@@ -297,7 +318,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/revisions/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(index)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/revisions/${core.url.encodePathParam(sha256)}/${core.url.encodePathParam(index)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -316,7 +337,10 @@ export class VersionsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -330,7 +354,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/revisions/{sha}/{index}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/revisions/{sha256}/{index}",
         );
     }
 
@@ -346,26 +370,29 @@ export class VersionsClient {
      *     await client.doc.versions.signatures({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         sha: "sha"
+     *         sha256: "sha256"
      *     })
      */
     public signatures(
         request: CloudPDF.doc.SignaturesVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocVersionsSignatures200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocVersionsSignaturesResponse> {
         return core.HttpResponsePromise.fromPromise(this.__signatures(request, requestOptions));
     }
 
     private async __signatures(
         request: CloudPDF.doc.SignaturesVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocVersionsSignatures200Response>> {
-        const { docId, layerName, sha, "X-Document-Password": documentPassword } = request;
+    ): Promise<core.WithRawResponse<CloudPDF.DocVersionsSignaturesResponse>> {
+        const { docId, layerName, sha256, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -373,7 +400,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha256)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -386,7 +413,7 @@ export class VersionsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocVersionsSignatures200Response,
+                data: _response.body as CloudPDF.DocVersionsSignaturesResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -394,7 +421,10 @@ export class VersionsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -408,7 +438,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha256}",
         );
     }
 
@@ -430,12 +460,15 @@ export class VersionsClient {
         request: CloudPDF.doc.SignatureContentsVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, sha, fieldKey, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha256, fieldKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher<core.BinaryResponse>({
@@ -443,7 +476,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(fieldKey)}/contents`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha256)}/${core.url.encodePathParam(fieldKey)}/contents`,
             ),
             method: "GET",
             headers: _headers,
@@ -462,7 +495,10 @@ export class VersionsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -476,7 +512,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}/{fieldKey}/contents",
+            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha256}/{fieldKey}/contents",
         );
     }
 
@@ -498,12 +534,15 @@ export class VersionsClient {
         request: CloudPDF.doc.SignatureDigestVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, sha, fieldKey, algorithm, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha256, fieldKey, algorithm, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher<core.BinaryResponse>({
@@ -511,7 +550,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(fieldKey)}/digest/${core.url.encodePathParam(algorithm)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha256)}/${core.url.encodePathParam(fieldKey)}/digest/${core.url.encodePathParam(algorithm)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -530,7 +569,10 @@ export class VersionsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -544,7 +586,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}/{fieldKey}/digest/{algorithm}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha256}/{fieldKey}/digest/{algorithm}",
         );
     }
 }

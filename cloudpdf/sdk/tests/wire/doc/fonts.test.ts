@@ -14,6 +14,7 @@ describe("FontsClient", () => {
                 {
                     name: "name",
                     source: "standard",
+                    builtIn: true,
                     familyName: "familyName",
                     weight: 1,
                     italic: true,
@@ -22,8 +23,8 @@ describe("FontsClient", () => {
                     restrictions: ["subset"],
                     programs: [
                         {
-                            displayHash: null,
-                            sourceHash: null,
+                            displaySha256: null,
+                            sourceSha256: null,
                             embedded: "whole",
                             format: null,
                             embeddingPermission: null,
@@ -34,8 +35,8 @@ describe("FontsClient", () => {
             ],
             fallbacks: ["fallbacks"],
             lastResort: {
-                displayHash: "displayHash",
-                sourceHash: "sourceHash",
+                displaySha256: "displaySha256",
+                sourceSha256: "sourceSha256",
                 embedded: "whole",
                 format: "truetype",
                 embeddingPermission: "installable",
@@ -62,7 +63,7 @@ describe("FontsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -125,7 +126,7 @@ describe("FontsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { runs: [{ text: "text" }, { text: "text" }] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -158,7 +159,7 @@ describe("FontsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { runs: [{ text: "text" }, { text: "text" }] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

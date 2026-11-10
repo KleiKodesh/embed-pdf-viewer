@@ -11,7 +11,7 @@ import {
 
 import '../kiosk.css';
 
-const forms = '/pdfs/forms.pdf';
+const forms = 'https://www.embedpdf.com/pdfs/forms.pdf';
 
 type Form = ViewerPlugins['form'];
 
@@ -73,7 +73,7 @@ const config: ViewerConfig<Kiosk> = {
   warnBeforeLeaving: false,
   // No opening, saving or printing files, no search, and no selecting text: a long press is only
   // ever a tap on the form.
-  disable: ['documents', 'search', 'text'],
+  features: { documents: false, search: false, text: false },
   plugins: {
     stage: { zoom: { mode: 'fit-width' } },
     form: { fields: { background: 'rgb(253 239 225 / 0.9)' } },

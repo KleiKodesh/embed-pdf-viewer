@@ -22,12 +22,12 @@ import { pdfPageCountOf } from './internal/write/stampDrawing';
 import { annotationRefOf } from './internal/identity/annotationName';
 import { resolveAnnotIndexRaw } from './internal/identity/resolveAnnotIndexRaw';
 import { prepareCreate } from './internal/mutations/prepareCreate';
-import { annotationIndexByName } from './internal/read/annotationIndexByName';
+import { annotationIndexByName, nameTakenError } from './internal/read/annotationIndexByName';
 import { readContextFor } from './internal/read/annotationReadContext';
 import { joinWidgetFieldNumbers } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
-import { applyDraft } from './internal/write/annotationWriterRegistry';
+import { applyDraft, drawAppearanceResource } from './internal/write/annotationWriterRegistry';
 import { generateAppearance } from './internal/write/generateAppearance';
 import {
   restoreAttribution,
@@ -149,9 +149,10 @@ export class AnnotationBatchApplier {
         prepareCreate(create.draft, create.resources, ctx),
       );
       labelled(create.label, () => this.claimName(given.nm, record, claimed));
-      // A fresh name is never taken: no claim needed.
+      // A create of your own left without a name gets a fresh one, never
+      // taken: no claim needed. `nm: null` asks for none.
       const draft =
-        given.nm || create.attribution.kind !== 'stamp'
+        given.nm !== undefined || create.attribution.kind !== 'stamp'
           ? given
           : { ...given, nm: generateUuidV7() };
       if (create.objectNumber !== undefined) {
@@ -178,7 +179,8 @@ export class AnnotationBatchApplier {
       return { create, record, ctx, draft, replyTo, parent };
     });
     throwIfAborted(signal);
-    if (prepared.length === 0) return { created: [], meta: metaOf(this.session.writeStamp(), [], []) };
+    if (prepared.length === 0)
+      return { created: [], meta: metaOf(this.session.writeStamp(), [], []) };
 
     const placed = prepared.map(({ create, record, ctx, draft }): Placed => {
       throwIfAborted(signal);
@@ -203,6 +205,7 @@ export class AnnotationBatchApplier {
       try {
         labelled(create.label, () => applyDraft(fn, mem, annotPtr, draft, ctx));
         generateAppearance(fn, annotPtr, draft.blendMode);
+        drawAppearanceResource(fn, mem, annotPtr, draft.subtype, ctx);
         objectNumber = fn.EPDFAnnot_GetObjectNumber(annotPtr);
         if (objectNumber <= 0) {
           throw new EngineError(
@@ -261,10 +264,10 @@ export class AnnotationBatchApplier {
       );
     });
 
-    const readCtx = readContextFor(this.session, this.fonts);
+    const readContext = readContextFor(this.session, this.fonts);
     const created = placed.map((at) =>
       this.withOpen(at, (annotPtr) =>
-        readAnnotationFromPtr(fn, mem, annotPtr, at.pageObjectNumber, at.index, readCtx),
+        readAnnotationFromPtr(fn, mem, annotPtr, at.pageObjectNumber, at.index, readContext),
       ),
     );
     joinWidgetFieldNumbers(this.runtime, this.session, created);
@@ -287,11 +290,7 @@ export class AnnotationBatchApplier {
       claimed.has(claim) ||
       annotationIndexByName(this.runtime, docPtr, record.pageIndex, nm) >= 0
     ) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `nm '${nm}' is already used on page ${record.pageObjectNumber}`,
-        { details: { field: 'nm' } },
-      );
+      throw nameTakenError(nm, record.pageObjectNumber);
     }
     claimed.add(claim);
   }
@@ -386,7 +385,7 @@ function metaOf(
     affectedPages: pages.map((page) => toPageRef(page)),
     cacheDelta: null,
     ...stamp,
-    changed: [
+    changedRefs: [
       ...placed.map(
         (at): AnnotationRef => ({
           kind: 'objectNumber',

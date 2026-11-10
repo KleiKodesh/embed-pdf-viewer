@@ -42,6 +42,7 @@ Here **Approve** writes to a status line of your app, above the viewer:
 | :-- | :-- |
 | `id` | A unique name. Start yours with your own prefix, such as `acme:`. |
 | `label` | What people see, or `labelKey` for a [translated](translations) label |
+| `labelParams` | The values for its label's `{name}` slots, such as a count: see [A label with a value](#a-label-with-a-value) |
 | `icon` | An icon's name: the viewer's or [your own](#icons) |
 | `shortcut` | A key, such as `'Mod+Shift+S'`, or a list of keys. `Mod` is `Cmd` on a Mac and `Ctrl` elsewhere. |
 | `shortcutInTextFields` | `true`: its shortcut works in a text field in the viewer too, as Find's does |
@@ -52,7 +53,7 @@ Here **Approve** writes to a status line of your app, above the viewer:
 | `menu` | A [menu](menus) it opens, instead of `run` |
 | `panel` | A [panel](panels) it opens and closes, instead of `run` |
 | `requires` | The [permissions](#permissions) it needs from the scope. Without them, it's hidden. |
-| `categories` | The features it belongs to, so [`disable`](../features/turning-off) turns it off with them. A name of your own makes a new feature. |
+| `categories` | The features it belongs to, so [`features`](../features/turning-off) turns it off with them. A name of your own makes a new feature. |
 
 A command is the same thing as in headless: see [Commands &
 shortcuts](/docs/headless/ui/commands#define-a-command).
@@ -95,6 +96,39 @@ can be a constant outside your component and never see an old value. Give it a n
 something changes, as you do with any prop: the viewer sees a new object, not a change inside the
 one it has (`[...done, item]`, not `done.push(item)`). In TypeScript, `ViewerConfig<AppState>` gives
 `appState` its type in every command.
+
+## A label with a value
+
+`labelParams` gives the values for the `{name}` slots in a label, such as how many pages are
+selected:
+
+```js
+{
+  commands: [
+    {
+      id: 'acme:extract',
+      labelKey: 'acme.extract',
+      label: 'Extract {count} pages',
+      icon: 'download',
+      labelParams: ({ get }) => ({ count: get('pageEdit').getSelected().length }),
+      enabled: ({ get }) => get('pageEdit').getSelected().length > 0,
+      run: extract,
+    },
+  ],
+  strings: {
+    en: { 'acme.extract': { one: 'Extract {count} page', other: 'Extract {count} pages' } },
+    nl: { 'acme.extract': { one: '{count} pagina extraheren', other: "{count} pagina's extraheren" } },
+  },
+}
+```
+
+It gets what `enabled` gets, and the viewer asks it again whenever a plugin's state or `appState`
+changes, so the label is always right. A number `count` also picks the plural form: `one` and
+`other`, and the other forms a language has, such as `few` and `many` in Polish. The values go into
+`label`, into the words under `labelKey` in each language, and into a string under the command's
+id. The label shows with them everywhere the command does: its button, a menu, the tooltip, and the
+sentence that says why it isn't allowed. A `labelParams` that throws gives no values, and the slots
+show as they are.
 
 ## Change what a built-in button does
 
@@ -152,8 +186,9 @@ doesn't have it, the command is gone from every bar and menu, and its shortcut d
 The names are the scope's permissions, listed on [Permissions](/docs/headless/concepts/permissions).
 The built-in commands already say what they need, so for a user whose scope doesn't allow
 changes the editing tools are gone, and with `notAllowed: 'disable'` they show greyed out instead,
-with the reason in their tooltip. To leave a command out for everyone, [disable](../features/turning-off)
-it instead: `disable: ['acme:approve']`.
+with the reason in their tooltip. To leave a command out for everyone, turn off its feature instead:
+`categories: ['acme.approve']`, then `features: { 'acme.approve': false }`. See
+[Your own commands](../features/turning-off#your-own-commands).
 
 A command whose setting a plugin [locks](/docs/headless/viewing/stage#lock-a-setting) for the
 document, such as the facing-pages choices while a plugin shows one page at a time, shows greyed
@@ -187,10 +222,11 @@ can't run now.
 | `zoom:50`, `zoom:100`, `zoom:150`, `zoom:200`, `zoom:400` | Zoom to a level |
 | `page:next`, `page:previous`, `page:first`, `page:last`, `page:go-to` | Move through pages; the first four show while the document has more than one page |
 | `view:single-page`, `view:two-pages`, `view:cover-page` | Pages side by side |
-| `view:scroll-vertical`, `view:scroll-horizontal` | The scrolling direction |
+| `view:scroll-vertical`, `view:scroll-horizontal`, `view:scroll-paged` | Scroll down or across, or [one page at a time](/docs/headless/viewing/stage#one-page-at-a-time) |
 | `view:rotate-clockwise`, `view:rotate-counterclockwise`, `view:fullscreen` | Turn the view; fill the screen with the viewer, not your page: see [Full screen](../concepts/how-it-works#full-screen) |
 | `tool:pointer`, `tool:pan` | Select, or drag the pages |
 | `tool:zoom` | Drag a box to zoom to it, or click to zoom in (Alt-click: out) |
+| `tool:snapshot` | Drag a box to [take that part of the page](../documents#take-a-snapshot) as a picture, or click for the whole page |
 | `tool:note`, `tool:link`, `tool:highlight`, `tool:underline`, `tool:strikeout`, `tool:squiggly` | Comment and mark up |
 | `tool:ink`, `tool:ink-highlight`, `tool:free-text`, `tool:callout`, `tool:insert-text`, `tool:replace-text` | Draw and write |
 | `tool:square`, `tool:circle`, `tool:line`, `tool:arrow`, `tool:polygon`, `tool:polyline` | Shapes |
@@ -211,8 +247,10 @@ can't run now.
 | `page:insert-blank`, `page:insert-file` | Insert a blank page, or the pages of a PDF, after the selected pages, and select what came in; `args: { position, files }` say where, and which PDFs |
 | `page:extract`, `page:select-all`, `menu:page` | Save the selected pages as a new PDF; select every page; open the selected pages' [menu](menus) |
 | `selection:copy`, `selection:highlight`, `selection:underline`, `selection:strikeout` | Act on selected text |
+| `snapshot:copy`, `snapshot:save`, `snapshot:clear` | Copy the snapshot (`Ctrl`/`Cmd`+`C`), save it as a PNG, or let it go (`Escape`) |
 | `annotation:comment`, `annotation:style`, `annotation:link`, `annotation:group`, `annotation:ungroup`, `annotation:delete` | Act on selected annotations |
 | `annotation:save-file` | Save the file of a selected file attachment |
+| `annotation:apply-redaction` | Remove what's under the selected redaction marks for good, after asking, when every selected annotation is one |
 | `help:shortcuts` | Show every shortcut (`?`) |
 
 Every tool you add to the [annotation plugin](/docs/headless/annotations/tools) gets its
@@ -246,8 +284,8 @@ Every icon the viewer has, by name:
 `formCheckbox`, `formDesign`, `formListbox`, `formRadio`, `formSelect`, `formTextfield`, `freeText`,
 `fullscreen`, `fullscreenExit`, `group`, `hand`, `highlight`, `horizontal`, `inkHighlighter`,
 `insertText`, `italic`, `line`, `lineArrow`, `link`, `linkOff`, `listTree`, `lock`, `marqueeSelect`,
-`menu`, `message`, `pageRotateClockwise`, `pageRotateCounterClockwise`, `palette`, `paperclip`,
-`pencilMarker`, `perimeter`, `photo`, `plus`, `pointer`, `polygon`, `print`, `redact`, `redactArea`,
+`menu`, `message`, `pageByPage`, `pageRotateClockwise`, `pageRotateCounterClockwise`, `palette`,
+`paperclip`, `pencilMarker`, `perimeter`, `photo`, `plus`, `pointer`, `polygon`, `print`, `redact`, `redactArea`,
 `redactCombined`, `redactionSidebar`, `replaceText`, `rotateClockwise`, `rotateCounterClockwise`,
 `rubberStamp`, `rubberStampPlus`, `ruler`, `save`, `screenshot`, `search`, `send`, `settings`,
 `sidebar`, `signature`, `singlePage`, `square`, `squares`, `squiggly`, `strikethrough`, `text`,

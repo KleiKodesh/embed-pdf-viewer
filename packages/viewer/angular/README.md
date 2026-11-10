@@ -14,7 +14,7 @@ import { EpdfPdfViewer } from '@embedpdf/viewer-angular';
 @Component({
   selector: 'app-root',
   imports: [EpdfPdfViewer],
-  template: `<epdf-pdf-viewer src="/report.pdf" style="height: 100vh" />`,
+  template: `<epdf-pdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh" />`,
 })
 export class App {}
 ```
@@ -36,7 +36,7 @@ your injector, your state and your CSS apply:
   selector: 'app-review',
   imports: [EpdfPdfViewer, EpdfToolbarItem, DocPicker],
   template: `
-    <epdf-pdf-viewer src="/report.pdf" [layout]="layout">
+    <epdf-pdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" [layout]="layout">
       <ng-template epdfToolbarItem="doc-picker"><app-doc-picker /></ng-template>
     </epdf-pdf-viewer>
   `,
@@ -54,7 +54,7 @@ export class Review {
 ## Driving the viewer
 
 ```html
-<epdf-pdf-viewer src="/report.pdf" (ready)="$event.commands.execute('zoom:in')" />
+<epdf-pdf-viewer src="https://www.embedpdf.com/pdfs/welcome.pdf" (ready)="$event.commands.execute('zoom:in')" />
 ```
 
 `(ready)` hands you the `viewer`: each plugin's API by its name
@@ -66,7 +66,7 @@ and the `watch` reactivity primitive. Inside the viewer's templates, inject
 when someone resizes a panel. When the viewer goes, its `viewer` is done: its
 listeners stop and its calls refuse.
 
-`src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their inputs
+`src`, `theme`, `locale`, `features`, `readOnly` and `fetch` follow their inputs
 while the viewer runs; every other input is read once, so render a new
 `<epdf-pdf-viewer>` (another `@if` branch) to start over with a changed one.
 

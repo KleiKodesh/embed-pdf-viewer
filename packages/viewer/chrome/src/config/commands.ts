@@ -24,13 +24,18 @@
  *   history undo/redo                      → real History
  */
 import { panelCommandOf } from '@embedpdf/core-ui';
-import type { AnnotationToolInput } from '@embedpdf/react/annotation';
-import { CommandsToken, type CommandDef, type IconAccent } from '@embedpdf/react/commands';
+import type { AnnotationRef, AnnotationToolInput } from '@embedpdf/react/annotation';
+import {
+  CommandsToken,
+  standardCommands,
+  type CommandDefinition,
+  type IconAccent,
+} from '@embedpdf/react/commands';
 import { FormToken } from '@embedpdf/react/form';
 import { HistoryToken } from '@embedpdf/react/history';
 import { DocumentsToken } from '@embedpdf/react/runtime';
 import { StageToken, ZoomMode } from '@embedpdf/react/stage';
-import type { SpreadMode } from '@embedpdf/react/stage';
+import type { LayoutKind, SpreadMode } from '@embedpdf/react/stage';
 import { InteractionToken } from '@embedpdf/react/interaction';
 import { ShellToken } from '@embedpdf/react/shell';
 import { AnnotationToken } from '@embedpdf/react/annotation';
@@ -41,7 +46,9 @@ import { RedactionToken } from '@embedpdf/react/redaction';
 import { StampToken } from '@embedpdf/react/stamp';
 import { SignatureToken } from '@embedpdf/react/signature';
 import { I18nToken } from '@embedpdf/react/i18n';
-import { saveFile } from '@embedpdf/web';
+import { RenderToken, SNAPSHOT_TOOL } from '@embedpdf/react/render';
+import type { PageRef } from '@embedpdf/react/runtime';
+import { copyImage, saveFile } from '@embedpdf/web';
 
 import type { Feature } from '../features';
 import { attachmentCommands } from './attachments';
@@ -52,7 +59,7 @@ import { outlineCommands } from './outline';
 import { pageCommands } from './page-commands';
 
 // ── helpers ────────────────────────────────────────────────────────────────
-type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
+type Ctx = Parameters<NonNullable<CommandDefinition['run']>>[0];
 
 /** The dialog the Go to Page command opens without a page to go to (ui/go-to-page.tsx). */
 export const GO_TO_PAGE_DIALOG = 'go-to-page';
@@ -97,13 +104,31 @@ const manyPages = (commandContext: Ctx) => (stage(commandContext)?.getPageCount(
 const interaction = (commandContext: Ctx) => commandContext.tryGet(InteractionToken);
 const anno = (commandContext: Ctx) => commandContext.tryGet(AnnotationToken);
 const textSelection = (commandContext: Ctx) => commandContext.tryGet(SelectionToken);
+const renderOf = (commandContext: Ctx) => commandContext.tryGet(RenderToken);
+/** The snapshot the snapshot tool holds: the snapshot strip's verbs show while there is one. */
+const snapshotOf = (commandContext: Ctx) => renderOf(commandContext)?.getSnapshot() ?? null;
+
+/** The standard download: the document with every change, saved under the document's name. */
+const standardDownload = standardCommands.find(
+  (command): command is CommandDefinition => 'id' in command && command.id === 'document:download',
+)!;
+
+/** A snapshot's file name: the document's name and the page's number, as a PNG (`Report p3.png`). */
+const snapshotFileName = (commandContext: Ctx, page: PageRef): string => {
+  const documents = commandContext.tryGet(DocumentsToken);
+  const id = commandContext.documentId ?? undefined;
+  const name = (documents?.get(id)?.name ?? 'document').replace(/\.pdf$/i, '');
+  const index =
+    documents?.listPages(id).findIndex((info) => info.ref.objectNumber === page.objectNumber) ?? -1;
+  return `${name} p${index + 1}.png`;
+};
 
 /**
  * Whether the session may run a command, as the plugin that owns its verb says, and the
  * sentence for when it may not (docs/conventions/permissions.md). Without the plugin there is
  * nothing to ask, and the command's own `enabled` or `visible` says it can't run.
  */
-type Check = Pick<CommandDef, 'allowed' | 'notAllowedKey'>;
+type Check = Pick<CommandDefinition, 'allowed' | 'notAllowedKey'>;
 
 /** Drawing an annotation of any kind: `annotation.canCreate()`. */
 const CREATES_ANNOTATIONS: Check = {
@@ -154,16 +179,30 @@ const canMeasureNow = (commandContext: Ctx): boolean => {
 
 // ── annotation-selection predicates (drive the floating strip's contents) ────
 const hasAnnotationSelection = (commandContext: Ctx) =>
-  (anno(commandContext)?.selection.list().length ?? 0) > 0;
+  (anno(commandContext)?.selection.getSelected().length ?? 0) > 0;
 /** Whether people may change every selected annotation by hand (no turned-off feature froze it). */
 const selectionEditable = (commandContext: Ctx): boolean => {
   const annotation = anno(commandContext);
-  return (annotation?.selection.list() ?? []).every(({ ref }) => annotation!.isEditable(ref));
+  return (annotation?.selection.getSelected() ?? []).every(({ ref }) =>
+    annotation!.isEditable(ref),
+  );
 };
 /** Strip items gate per subtype (comment hidden on links/widgets) through
  *  one derivation over the selected DTOs, not per-command lookups. */
 const selectionSubtypes = (commandContext: Ctx) =>
-  new Set((anno(commandContext)?.selection.list() ?? []).map((annotation) => annotation.subtype));
+  new Set(
+    (anno(commandContext)?.selection.getSelected() ?? []).map((annotation) => annotation.subtype),
+  );
+/**
+ * The selected redaction marks, when every selected annotation is one; none for a mixed
+ * selection, so the annotation bar's Apply never stands for part of what's selected.
+ */
+const selectedMarks = (commandContext: Ctx): readonly AnnotationRef[] => {
+  const selected = anno(commandContext)?.selection.getSelected() ?? [];
+  return selected.every((annotation) => annotation.subtype === 'redact')
+    ? selected.map((annotation) => annotation.ref)
+    : [];
+};
 /**
  * The selection's `link` value: a target, `null` (linkable but none set), or
  * `undefined` when the selection cannot carry a link at all (widgets, mixed
@@ -243,7 +282,7 @@ const toolCommand = (
   toolId: string,
   icon: string | undefined,
   { feature, check, accent }: ToolOptions,
-): Omit<CommandDef, 'labelKey'> => {
+): Omit<CommandDefinition, 'labelKey'> => {
   if (icon) TOOL_ICONS[toolId] = { icon, ...(accent ? { accent } : {}) };
   TOOL_FEATURES[toolId] = feature;
   return {
@@ -264,7 +303,7 @@ const tool = (
   labelKey: string,
   icon: string,
   options: ToolOptions,
-): CommandDef => ({ ...toolCommand(id, toolId, icon, options), labelKey });
+): CommandDefinition => ({ ...toolCommand(id, toolId, icon, options), labelKey });
 
 /**
  * Selected text made into a highlight, an underline or a strikeout, with the colors of the
@@ -276,7 +315,7 @@ const markupSelection = (
   labelKey: string,
   icon: string,
   feature: Feature,
-): CommandDef => ({
+): CommandDefinition => ({
   id,
   labelKey,
   icon,
@@ -294,14 +333,19 @@ const pageArgOf = (args: unknown): number | null => {
 };
 
 /** A fixed zoom level (fraction), e.g. 1 = 100%. */
-const zoomLevel = (id: string, level: number, label: string): CommandDef => ({
+const zoomLevel = (id: string, level: number, label: string): CommandDefinition => ({
   id,
   labelKey: label,
   run: (commandContext) => stage(commandContext)?.zoomTo({ level }),
   enabled: (commandContext) => stage(commandContext) != null,
 });
 
-const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): CommandDef => ({
+const spread = (
+  id: string,
+  mode: SpreadMode,
+  labelKey: string,
+  icon: string,
+): CommandDefinition => ({
   id,
   labelKey,
   icon,
@@ -311,7 +355,26 @@ const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): C
   locked: (commandContext) => stage(commandContext)?.getLock('spread') ?? null,
 });
 
-export const defaultCommands: CommandDef[] = [
+const scroll = (
+  id: string,
+  layout: Exclude<LayoutKind, 'grid'>,
+  labelKey: string,
+  icon: string,
+): CommandDefinition => ({
+  id,
+  labelKey,
+  icon,
+  run: (commandContext) => stage(commandContext)?.updateSettings({ flow: 'continuous', layout }),
+  active: (commandContext) => {
+    const settings = stage(commandContext)?.getSettings();
+    return settings?.flow === 'continuous' && settings.layout === layout;
+  },
+  enabled: (commandContext) => stage(commandContext) != null,
+  locked: (commandContext) =>
+    stage(commandContext)?.getLock('flow') ?? stage(commandContext)?.getLock('layout') ?? null,
+});
+
+export const defaultCommands: CommandDefinition[] = [
   // ── zoom ───────────────────────────────────────────────────────────────
   {
     id: 'zoom:in',
@@ -445,6 +508,19 @@ export const defaultCommands: CommandDef[] = [
     active: (commandContext) => interaction(commandContext)?.getActiveToolId() === 'zoom',
     enabled: (commandContext) => interaction(commandContext) != null,
   },
+  // Drag a box to take that part of a page as a picture, or click for the whole page. A PDF
+  // that forbids copying forbids it, as in Acrobat (`render.canSnapshot()`).
+  {
+    id: 'tool:snapshot',
+    labelKey: 'commands.snapshot.tool',
+    icon: 'screenshot',
+    categories: ['snapshots'],
+    allowed: (commandContext) => renderOf(commandContext)?.canSnapshot() ?? true,
+    notAllowedKey: 'commands.notAllowed.doc-content-copy',
+    run: (commandContext) => interaction(commandContext)?.activateTool(SNAPSHOT_TOOL),
+    active: (commandContext) => interaction(commandContext)?.getActiveToolId() === SNAPSHOT_TOOL,
+    enabled: (commandContext) => interaction(commandContext)?.hasTool(SNAPSHOT_TOOL) ?? false,
+  },
 
   // The panels' `panel:<id>` commands come from the layout's panels (config/panels.ts).
 
@@ -484,16 +560,13 @@ export const defaultCommands: CommandDef[] = [
     categories: ['documents.download'],
     allowed: (commandContext) => commandContext.tryGet(DocumentsToken)?.canDownload() ?? true,
     notAllowedKey: 'commands.notAllowed.doc-download',
+    // The download runs the document's save actions itself (WillSave → read → DidSave)
+    // when the actions plugin is installed, so the WillSave changes are in the bytes.
     run: (commandContext) => {
-      const id = commandContext.documentId ?? undefined;
-      const documents = commandContext.tryGet(DocumentsToken);
-      if (!documents) return;
-      // The download runs the document's save actions itself (WillSave → read → DidSave)
-      // when the actions plugin is installed, so the WillSave changes are in the bytes.
-      documents
-        .download(id)
-        .then((bytes) => saveFile(bytes, 'document.pdf', 'application/pdf'))
-        .catch((error) => console.warn('[snippet-react] download failed', error));
+      if (!commandContext.tryGet(DocumentsToken)) return;
+      Promise.resolve(standardDownload.run?.(commandContext)).catch((error: unknown) =>
+        console.warn('[embedpdf] download failed', error),
+      );
     },
     enabled: (commandContext) => commandContext.documentId != null,
   },
@@ -513,23 +586,19 @@ export const defaultCommands: CommandDef[] = [
   spread('view:single-page', 'none', 'commands.spread.none', 'singlePage'),
   spread('view:two-pages', 'odd', 'commands.spread.odd', 'doublePage'),
   spread('view:cover-page', 'even', 'commands.spread.even', 'book2'),
+  // Scrolling is one choice of how the pages come: down, across, or one at a
+  // time. Down and across set `flow` with `layout`; one at a time leaves
+  // `layout` alone, as it does nothing in paged flow.
+  scroll('view:scroll-vertical', 'vertical', 'commands.scroll.vertical', 'vertical'),
+  scroll('view:scroll-horizontal', 'horizontal', 'commands.scroll.horizontal', 'horizontal'),
   {
-    id: 'view:scroll-vertical',
-    labelKey: 'commands.scroll.vertical',
-    icon: 'vertical',
-    run: (commandContext) => stage(commandContext)?.updateSettings({ layout: 'vertical' }),
-    active: (commandContext) => stage(commandContext)?.getSettings().layout === 'vertical',
+    id: 'view:scroll-paged',
+    labelKey: 'commands.scroll.paged',
+    icon: 'pageByPage',
+    run: (commandContext) => stage(commandContext)?.updateSettings({ flow: 'paged' }),
+    active: (commandContext) => stage(commandContext)?.getSettings().flow === 'paged',
     enabled: (commandContext) => stage(commandContext) != null,
-    locked: (commandContext) => stage(commandContext)?.getLock('layout') ?? null,
-  },
-  {
-    id: 'view:scroll-horizontal',
-    labelKey: 'commands.scroll.horizontal',
-    icon: 'horizontal',
-    run: (commandContext) => stage(commandContext)?.updateSettings({ layout: 'horizontal' }),
-    active: (commandContext) => stage(commandContext)?.getSettings().layout === 'horizontal',
-    enabled: (commandContext) => stage(commandContext) != null,
-    locked: (commandContext) => stage(commandContext)?.getLock('layout') ?? null,
+    locked: (commandContext) => stage(commandContext)?.getLock('flow') ?? null,
   },
   // View rotation (Adobe's "Rotate View"): rotates how every page displays in
   // the main stage lens — non-persistent, nothing written to the PDF. The
@@ -778,8 +847,8 @@ export const defaultCommands: CommandDef[] = [
     check: DESIGNS_FORMS,
   }),
 
-  // ── redaction (the toolbar arms the tool; the panel owns the destructive
-  // verbs — Apply All / Clear live in the redaction sidebar) ─────────────────
+  // ── redaction (the toolbar arms the tool; the panel applies every mark and
+  // the annotation bar the selected ones, both through the one confirmation) ──
   // Marks are annotations, so marking is `redaction.canMark()`.
   tool('tool:redact', 'redact', 'commands.redact.mark', 'redactArea', {
     feature: 'redaction',
@@ -799,6 +868,26 @@ export const defaultCommands: CommandDef[] = [
     enabled: (commandContext) => {
       const redaction = commandContext.tryGet(RedactionToken);
       return !!redaction && redaction.getPendingCount() > 0 && !redaction.isApplying();
+    },
+  },
+  {
+    // The annotation bar's Apply: the selected marks only. The same confirmation asks first,
+    // given the marks selected at the click, so it applies what the user saw selected.
+    id: 'annotation:apply-redaction',
+    labelKey: 'commands.redact.apply',
+    labelParams: (commandContext) => ({ count: selectedMarks(commandContext).length }),
+    icon: 'check',
+    categories: ['redaction'],
+    allowed: (commandContext) => commandContext.tryGet(RedactionToken)?.canApply() ?? true,
+    run: (commandContext) =>
+      commandContext.tryGet(ShellToken)?.open(REDACT_CONFIRM_DIALOG, {
+        exclusive: 'modal',
+        props: { refs: selectedMarks(commandContext) },
+      }),
+    visible: (commandContext) => selectedMarks(commandContext).length > 0,
+    enabled: (commandContext) => {
+      const redaction = commandContext.tryGet(RedactionToken);
+      return !!redaction && !redaction.isApplying();
     },
   },
 
@@ -867,7 +956,7 @@ export const defaultCommands: CommandDef[] = [
     // turned-off feature froze (`isEditable`).
     enabled: (commandContext) => {
       const annotation = anno(commandContext);
-      const selected = annotation?.selection.list() ?? [];
+      const selected = annotation?.selection.getSelected() ?? [];
       return (
         selected.length > 0 &&
         selected.every(({ ref }) => annotation!.canDelete(ref) && annotation!.isEditable(ref))
@@ -918,7 +1007,7 @@ export const defaultCommands: CommandDef[] = [
       const stamp = commandContext.tryGet(StampToken);
       const documentId = commandContext.documentId;
       if (!annotation || !stamp || documentId == null) return;
-      const dtos = annotation.selection.list();
+      const dtos = annotation.selection.getSelected();
       const page = dtos[0]?.ref.page;
       if (page === undefined) return;
       const i18n = commandContext.tryGet(I18nToken);
@@ -963,7 +1052,7 @@ export const defaultCommands: CommandDef[] = [
       !selectionSubtypes(commandContext).has('widget') &&
       !selectionSubtypes(commandContext).has('redact') &&
       new Set(
-        (anno(commandContext)?.selection.list() ?? []).map(
+        (anno(commandContext)?.selection.getSelected() ?? []).map(
           (annotation) => annotation.ref.page.objectNumber,
         ),
       ).size === 1,
@@ -1038,6 +1127,55 @@ export const defaultCommands: CommandDef[] = [
     'strikethrough',
     'annotations.markup',
   ),
+
+  // ── the snapshot (the snapshot strip's verbs) ───────────────────────────
+  {
+    id: 'snapshot:copy',
+    labelKey: 'commands.snapshot.copy',
+    icon: 'copy',
+    shortcut: 'Mod+C',
+    categories: ['snapshots'],
+    visible: (commandContext) => snapshotOf(commandContext) != null,
+    // Straight to the clipboard, in the click itself: the picture follows when it's there. A
+    // copy lets the snapshot go, which also dismisses its strip, as copying text does.
+    run: (commandContext) => {
+      const render = renderOf(commandContext);
+      const snapshot = render?.getSnapshot();
+      if (!render || !snapshot) return;
+      void copyImage(snapshot.image).then(
+        () => {
+          // A copy can outlive the click: never let it go of a newer snapshot.
+          if (render.getSnapshot() === snapshot) render.clearSnapshot();
+        },
+        () => {}, // Copy failed: keep the snapshot, to copy again or save.
+      );
+    },
+  },
+  {
+    id: 'snapshot:save',
+    labelKey: 'commands.snapshot.save',
+    icon: 'download',
+    categories: ['snapshots'],
+    visible: (commandContext) => snapshotOf(commandContext) != null,
+    run: (commandContext) => {
+      const snapshot = snapshotOf(commandContext);
+      if (!snapshot) return;
+      const name = snapshotFileName(commandContext, snapshot.page);
+      snapshot.image
+        .then((image) => image.blob())
+        .then((blob) => saveFile(blob, name, 'image/png'))
+        .catch((error) => console.warn('[snippet-react] snapshot save failed', error));
+    },
+  },
+  {
+    id: 'snapshot:clear',
+    labelKey: 'commands.snapshot.clear',
+    icon: 'x',
+    shortcut: 'Escape',
+    categories: ['snapshots'],
+    visible: (commandContext) => snapshotOf(commandContext) != null,
+    run: (commandContext) => renderOf(commandContext)?.clearSnapshot(),
+  },
 
   // ── link strip items: Link / Go to link / Remove link ────────────────────
   {
@@ -1120,7 +1258,7 @@ function modeCommand(
   id: (typeof MODE_SURFACES)[number],
   labelKey: string,
   { feature }: { feature?: Feature } = {},
-): CommandDef {
+): CommandDefinition {
   return {
     id,
     labelKey,
@@ -1148,8 +1286,8 @@ function modeCommand(
 export function toolCommandsFor(
   tools: readonly AnnotationToolInput[],
   isTaken: (id: string) => boolean,
-): CommandDef[] {
-  return tools.flatMap((input): CommandDef[] => {
+): CommandDefinition[] {
+  return tools.flatMap((input): CommandDefinition[] => {
     const id = `tool:${input.id}`;
     if (isTaken(id)) return [];
     const base = input.extends;

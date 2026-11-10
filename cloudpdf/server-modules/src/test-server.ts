@@ -110,6 +110,15 @@ export async function launchTestServer(
   let url: string;
   try {
     await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
+    // Its tenant has every module turned on, as an operator turns them on for theirs.
+    await db
+      .insertInto('tenants')
+      .values({
+        id: TENANT,
+        name: TENANT,
+        features_json: JSON.stringify(options.modules.map(({ id }) => ({ id }))),
+      })
+      .execute();
     licensed = await license(db);
     bundle = await licensed.build({
       verifier: { mode: 'hs256', secret },
@@ -178,13 +187,13 @@ export async function launchTestServer(
       const bytes = new Uint8Array(pdf);
       const sha256 = createHash('sha256').update(bytes).digest('hex');
       const init = (await admin(adminWirePaths.documentsInit(TENANT), {
-        contentLength: bytes.byteLength,
+        sizeBytes: bytes.byteLength,
         contentSha256: sha256,
         ...(name !== undefined ? { name } : {}),
       })) as AdminDocumentInitResponse;
       const { id } = init.document;
       // The test server stores files on disk, which takes no presigned upload.
-      if (init.tag !== 'deduped' && init.upload.kind === 'proxy') {
+      if (init.status !== 'deduped' && init.upload.kind === 'proxy') {
         const form = new FormData();
         form.set('file', new Blob([bytes], { type: 'application/pdf' }), name ?? `${id}.pdf`);
         await admin(init.upload.url, form);

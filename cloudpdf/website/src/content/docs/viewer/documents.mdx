@@ -12,7 +12,7 @@ description: Open a PDF, or several as tabs, handle passwords, and download, pri
 Give the viewer a document with `src`: a URL, a `File`, or bytes.
 
 ```js
-{ src: '/reports/2026-q3.pdf' }
+{ src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' } }
 ```
 
 A relative URL is relative to your page. A URL on another site needs CORS headers that allow
@@ -30,14 +30,23 @@ and who opens it:
 | `src` | What it is |
 | :-- | :-- |
 | `{ token }` | A token your backend creates for the user and one document. It says who they are and what they may do. |
+| `{ id, token }` | The same, with the document's id: when `src` changes but the id doesn't, the document stays open |
 | `{ id }` | A document by its id, when the engine's own token allows it (`engine: { token }`) |
 | `{ grant }` | A grant from the CloudPDF dashboard (`grt_…`): public access, which needs no backend |
 
 ```js
-{ src: { token: () => fetchDocumentToken('contract-42') } }
+{
+  src: {
+    id: contract.documentId,
+    token: () => fetchDocumentToken(contract.id),
+  },
+}
 ```
 
-A token is a string, or a function that gives a fresh one when the old one runs out. The pages come
+A token is a string, or a function. The viewer calls the function for a token, keeps it, and calls
+it again in the background a minute before it expires, so a long session never runs out. With `id`,
+a function written inline in a component is fine: a new one on every render is still the same
+document. The pages come
 from CloudPDF, so there's no file to serve and no CORS to set up; a grant opens only on the
 websites it allows. [Authentication](/docs/engine/authentication) has what a token carries.
 
@@ -72,9 +81,9 @@ Give `documents` instead of `src` to open several at once. Each one gets a tab:
 ```js
 {
   documents: [
-    { src: '/contract.pdf', name: 'Contract' },
-    { src: '/appendix.pdf', name: 'Appendix A' },
-    { src: '/scan.pdf', name: 'Signed scan', active: true },
+    { src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }, name: 'Guide' },
+    { src: { grant: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' }, name: 'Article' },
+    { src: { grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' }, name: 'Floor plan', active: true },
   ],
 }
 ```
@@ -188,8 +197,8 @@ your token goes only to your own server.
 
 ```js
 const { document } = await viewer.documents.open(
-  { kind: 'url', url: '/invoice-1042.pdf' },
-  { name: 'Invoice 1042' },
+  { kind: 'url', url: 'https://www.cloudpdf.com/pdfs/invoice.pdf' },
+  { name: 'Invoice' },
 );
 
 viewer.documents.setActive(document.id);
@@ -220,7 +229,8 @@ viewer.documents.close(document.id);
 ## Download and print
 
 The document menu has **Download** and **Print**, and `Ctrl`/`Cmd`+`S` and `Ctrl`/`Cmd`+`P` work
-while the viewer has focus. A download includes every annotation, form value and signature.
+while the viewer has focus. A download includes every annotation, form value and signature, and is
+saved under the document's name, with `.pdf` added when the name has none.
 
 **Print** opens a dialog: every page, the current page or pages such as `1-3, 5`, and whether
 annotations print. Nothing is made while the user chooses: its **Print** button prepares those
@@ -243,6 +253,37 @@ it:
 viewer.commands.execute('document:print');
 await viewer.documents.print();
 ```
+
+## Take a snapshot
+
+Snapshots start off. Turn them on, and **Take a Snapshot** joins the document menu:
+
+```js
+{ features: { snapshots: true } }
+```
+
+It takes part of a page as a picture, like Acrobat's snapshot tool. Drag a box over a page, or click a page for all of it. The box stays, with a bar
+under it:
+
+- **Copy** puts the picture on the clipboard, to paste into a message, a document or a slide.
+  `Ctrl`/`Cmd`+`C` does the same. Once it's copied, the box goes, as selected text does.
+- **Save image** downloads it as a PNG, named after the document and the page.
+
+`Escape` lets the box go, and so does switching to another tool. The picture is the box at twice
+its size in points, 144 DPI, with the annotations and form fields the user sees. For bigger
+pictures, raise the [render plugin's](/docs/headless/viewing/render#take-a-snapshot)
+`snapshot.scale`:
+
+```js
+{
+  plugins: {
+    render: { snapshot: { scale: 3 } },
+  },
+}
+```
+
+A PDF that doesn't allow copying doesn't allow snapshots either, as in Acrobat: **Take a Snapshot**
+isn't in the menu. From your own button, run `tool:snapshot`; it needs `snapshots: true` too.
 
 ## Save to your server
 

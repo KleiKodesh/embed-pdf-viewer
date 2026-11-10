@@ -19,7 +19,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source notice]
 const notice = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/notice.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/notice.pdf');
   return { kind: 'bytes', id: 'notice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -133,7 +133,7 @@ export class App {
       untracked(() => {
         const richText = this.annotation.list().find((each) => each.nm === 'rich-text');
         if (!richText) return;
-        this.annotation.selection.set([richText.ref]);
+        this.annotation.selection.select([richText.ref]);
         stage.reveal(richText.page, { rect: richText.rect });
       });
     });

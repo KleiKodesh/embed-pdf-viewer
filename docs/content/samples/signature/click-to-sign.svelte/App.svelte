@@ -24,12 +24,12 @@
     annotationPlugin(),
     formPlugin(),
     stampPlugin({ assetEngine }),
-    signaturePlugin({ key: () => signer }),
+    signaturePlugin({ signingKey: () => signer }),
   ];
 
   // [!doc-source agreement]
   const agreement = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/agreement.pdf');
+    const response = await fetch('https://www.embedpdf.com/pdfs/agreement.pdf');
     return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]

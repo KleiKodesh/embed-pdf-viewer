@@ -22,7 +22,7 @@ import {
   type PageRenderViewport,
   type PluginErrorInfo,
 } from '@embedpdf/core';
-import type { Rect } from '@embedpdf/core-geometry';
+import { intersectRects, type Rect } from '@embedpdf/core-geometry';
 import { AppearanceStore, RecentPictures } from './appearance-store';
 import type {
   InvalidateOptions,
@@ -59,6 +59,7 @@ import {
 } from './paint-plan';
 import { createPictureReports, PICTURE_STATES } from './pictures';
 import { RasterStore } from './raster-store';
+import { createSnapshots } from './snapshot';
 import { baseAskWidth, resolveStrategy, type ResolvedStrategy } from './strategy';
 import { TileManager } from './tile-manager';
 
@@ -232,7 +233,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   /** The page a pending copy copies; null for any other page. */
   const copiedFrom = (page: PageRef): PageRef | null => {
     const pending = ctx.document()?.pendingPages.get(page.objectNumber);
-    return pending?.look === 'copy' ? pending.of : null;
+    return pending?.kind === 'copy' ? pending.of : null;
   };
   /** Resolves once the engine has a pending page; rejects `not-found` when it went first. */
   const whenHeld = async (page: PageRef, signal: AbortSignal | undefined): Promise<void> => {
@@ -367,6 +368,50 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     );
   }
 
+  /**
+   * A picture of part of a page, or a turned one, for its caller alone: no
+   * layer asks for it, so it skips the store. The rect is cut at the page's
+   * edge, and the size is the caller's, as the engine takes it.
+   */
+  function renderPart(
+    page: PageRef,
+    pageSize: { width: number; height: number },
+    options: RenderPageOptions,
+    layers: PageRenderLayers,
+    format: RenderFormat | undefined,
+    quality: number | undefined,
+  ): Promise<PageImageHandle> {
+    const rect = options.rect && intersectRects(options.rect, { x: 0, y: 0, ...pageSize });
+    if (rect && !(rect.width > 0 && rect.height > 0)) {
+      throw new PluginError('invalid-input', 'render', 'the rect misses the page', {
+        details: { field: 'rect' },
+      });
+    }
+    const signal = options.signal;
+    const draw = (drawn: PageRef): Promise<PageImageHandle> => {
+      const task = ctx.doc
+        .with({ priority: 'high' })
+        .page(drawn)
+        .render.image({
+          ...(rect ? { target: { kind: 'rect' as const, rect } } : {}),
+          viewport:
+            options.width !== undefined
+              ? { kind: 'width', width: Math.max(1, Math.round(options.width)) }
+              : { kind: 'scale', scale: options.scale ?? 1 },
+          ...(options.rotation ? { rotation: options.rotation } : {}),
+          ...layers,
+          ...(format !== undefined ? { format } : {}),
+          ...(quality !== undefined ? { quality } : {}),
+        });
+      if (signal?.aborted) task.abort(reasonOf(signal));
+      else signal?.addEventListener('abort', () => task.abort(reasonOf(signal)), { once: true });
+      return task;
+    };
+    // A copy draws as the page it copies, which the engine may not have yet either.
+    const drawn = copiedFrom(page) ?? page;
+    return isPending(drawn) ? whenHeld(drawn, signal).then(() => draw(drawn)) : draw(drawn);
+  }
+
   /** The public door: the requested size, exactly. Async so refusals reject. */
   async function renderPage(
     pageArgument: PageRef | number,
@@ -374,11 +419,17 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   ): Promise<PageImageHandle> {
     ctx.assertAllowed(RENDER_SCOPE, 'render.renderPage');
     const { ref: page, size } = ctx.pageOf(pageArgument);
-    const width = Math.max(1, Math.round(options.width ?? (options.scale ?? 1) * size.width));
     const layers = pictureLayers(options, 'render.renderPage');
     const strategy = currentStrategy();
     const format = options.format ?? strategy.format;
     const quality = options.quality ?? strategy.quality;
+    if (options.rect !== undefined || options.rotation) {
+      return ctx.cancellable(
+        options.signal,
+        renderPart(page, size, options, layers, format, quality),
+      );
+    }
+    const width = Math.max(1, Math.round(options.width ?? (options.scale ?? 1) * size.width));
     // Exact-size renders share the store with the conformed door: a width
     // that matches a conformed raster (same format, default quality) is the
     // same key, so the cached image serves it.
@@ -629,7 +680,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         pages.delete(page.objectNumber);
         tiles.releasePage(viewId, page.objectNumber);
       },
-      dispose: () => {
+      destroy: () => {
         const view = views.get(viewId);
         if (!view || view.refs === 0) return;
         view.refs -= 1;
@@ -658,6 +709,12 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     const shown = new Set<PageObjectNumber>();
     for (const view of views.values()) for (const page of view.pages.keys()) shown.add(page);
     for (const page of shown) replanPage(page);
+  });
+
+  const snapshots = createSnapshots(ctx, {
+    renderPage,
+    renderPolicy,
+    settings: () => settings.get().snapshot,
   });
 
   const api: RenderHostCapability = {
@@ -713,10 +770,13 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     createViewDemand,
     reportPicture: pictures.open,
     renderAppearances,
-    keptAppearances: (family, item) => recentAppearances.of(family, annotationKey(item)),
+    getKeptAppearances: (family, item) => recentAppearances.of(family, annotationKey(item)),
     getAppearanceScale: (renderScale) => snapAppearanceScale(renderPolicy(), renderScale),
     onRenderCompleted: renderCompleted.on,
     onRenderFailed: renderFailed.on,
+
+    // ── snapshots, both lenses ──
+    ...snapshots.api,
   };
 
   return {
@@ -729,6 +789,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         if (!change) return;
         publishInvalidation(change.pages, change.scope, 'origin' in event ? event.origin : null);
       });
+      snapshots.connect();
     },
   };
 }

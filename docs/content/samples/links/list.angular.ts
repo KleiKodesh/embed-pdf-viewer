@@ -18,7 +18,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source links]
 const links = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/links.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/links.pdf');
   return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -40,9 +40,7 @@ const links = async (): Promise<OpenInput> => {
         </li>
       }
     </ul>
-    <p class="last">
-      <code>activated$</code> {{ last() ?? 'not yet' }}
-    </p>
+    <p class="last"><code>activated$</code> {{ last() ?? 'not yet' }}</p>
   `,
 })
 export class LinkList {
@@ -57,7 +55,9 @@ export class LinkList {
     // Every way of following a link ends up here: a click, a key, or code.
     this.link.activated$
       .pipe(takeUntilDestroyed())
-      .subscribe(({ target, activation }) => this.last.set(`${target.kind} → ${activation.outcome}`));
+      .subscribe(({ target, activation }) =>
+        this.last.set(`${target.kind} → ${activation.status}`),
+      );
   }
 }
 

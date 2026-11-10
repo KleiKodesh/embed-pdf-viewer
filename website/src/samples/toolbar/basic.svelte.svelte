@@ -22,7 +22,7 @@
   ];
 
   const welcome = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/welcome.pdf');
+    const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
     return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 
@@ -87,7 +87,7 @@
             title={cmd.label}
             aria-label={cmd.label}
             disabled={!cmd.enabled}
-            aria-pressed={cmd.active}
+            aria-pressed={cmd.pressable ? cmd.active : undefined}
             onclick={run}
           >
             <span class="icon" aria-hidden="true">

@@ -34,7 +34,12 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
 <div id="viewer"></div>
 <script type="module">
   import EmbedPDF from '/embedpdf.js';
-  window.element = EmbedPDF.init({ target: '#viewer', src: '/sample.pdf', theme: 'light' });
+  window.element = EmbedPDF.init({
+    target: '#viewer',
+    src: '/sample.pdf',
+    theme: 'light',
+    features: { 'forms.building': true },
+  });
 </script>
 </body></html>`;
 
@@ -65,7 +70,7 @@ const textFieldsOnScreen = (tab: Page): Promise<Widget[]> =>
     ).offsetParent!.getBoundingClientRect();
     const found: Widget[] = [];
     for (const field of viewer.get('form').list()) {
-      if (field.family !== 'text') continue;
+      if (field.kind !== 'text') continue;
       const widget = field.widgets[0];
       if (widget?.page?.objectNumber !== page.ref.objectNumber) continue;
       const lent = annotation.get(widget.ref);
@@ -208,23 +213,23 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
     await frames(tab);
   });
 
-  /** Make a group of `family` with one button at (72, 72) on page 1, and select it. */
-  const groupOf = (family: 'radio' | 'checkbox', name: string) =>
+  /** Make a group of `kind` with one button at (72, 72) on page 1, and select it. */
+  const groupOf = (kind: 'radio' | 'checkbox', name: string) =>
     tab.evaluate(
-      async ({ family: kind, name: called }) => {
+      async ({ kind, name: called }) => {
         const { viewer } = window.element;
         const page = viewer.documents.getPage(0);
         const rect = { x: 72, y: 72, width: 16, height: 16 };
         const { field } = await viewer.get('form').create({
-          family: kind,
+          kind,
           name: called,
           widgets: [
             { page: page.ref, rect, ...(kind === 'radio' ? { exportValue: 'Choice1' } : {}) },
           ],
         });
-        viewer.get('annotation').selection.set([field.widgets[0].ref]);
+        viewer.get('annotation').selection.select([field.widgets[0].ref]);
       },
-      { family, name },
+      { kind, name },
     );
 
   /** Press the sidebar's add button and wait for the field's second widget. */
@@ -260,7 +265,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
         boxes: form.getWidgets(ref).map((row: any) => row.box),
         selected: window.element.viewer
           .get('annotation')
-          .selection.list()
+          .selection.getSelected()
           .map((record: any) => record.ref.objectNumber),
         last: field.widgets[1].objectNumber,
       };

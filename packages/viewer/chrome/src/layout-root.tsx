@@ -188,7 +188,12 @@ export function LayoutRoot({
   const commands = useCommands();
   const documentId = useDocumentId() ?? undefined;
   const omitted = useKernelValue(
-    () => omittedCommandsOf(data, (id) => commands.resolveCommand(id, documentId)),
+    () =>
+      omittedCommandsOf(
+        data,
+        (id) => commands.resolveCommand(id, documentId),
+        (id) => commands.getCommand(id),
+      ),
     sameStrings,
   );
 
@@ -211,6 +216,7 @@ export function LayoutRoot({
     const strips = {
       selection: stable('strip:selection', stripOf(data, 'selection', bar)),
       annotation: stable('strip:annotation', stripOf(data, 'annotation', bar)),
+      snapshot: stable('strip:snapshot', stripOf(data, 'snapshot', bar)),
     };
     const menus = new Map<string, readonly MenuSection[]>();
     for (const id of Object.keys(data.menus ?? {}))

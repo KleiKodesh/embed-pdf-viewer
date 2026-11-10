@@ -42,9 +42,9 @@ export function createAnnotationController(ctx: AnnotationContext) {
   // and follows them when they change.
   ctx.state.update(withSnap, settings.get().snap);
   ctx.state.update(withEditable, settings.get().editable);
-  settings.api.onSettingsChanged(({ settings: next, changed }) => {
-    if (changed.includes('snap')) ctx.state.update(withSnap, next.snap);
-    if (changed.includes('editable')) ctx.state.update(withEditable, next.editable);
+  settings.api.onSettingsChanged(({ settings: next, changedKeys }) => {
+    if (changedKeys.includes('snap')) ctx.state.update(withSnap, next.snap);
+    if (changedKeys.includes('editable')) ctx.state.update(withEditable, next.editable);
   });
 
   // Reads: pure projections of the model.
@@ -66,8 +66,8 @@ export function createAnnotationController(ctx: AnnotationContext) {
     await services.store.whenWritten();
   };
   // A text box, or a gesture, on an annotation the `editable` rule now freezes ends.
-  settings.api.onSettingsChanged(({ changed }) => {
-    if (!changed.includes('editable')) return;
+  settings.api.onSettingsChanged(({ changedKeys }) => {
+    if (!changedKeys.includes('editable')) return;
     const model = services.store.model();
     const editing = model.editing === null ? undefined : model.byId[model.editing];
     if (editing && !isContentsEditableByHand(model, editing)) void text.text.end();
@@ -86,7 +86,7 @@ export function createAnnotationController(ctx: AnnotationContext) {
   const render = createRenderReads(ctx, services, ghost, stamps);
   const icons = createIcons(ctx, services, stamps);
   const selection = createSelectionWrites(ctx, services, annotations, properties, chrome, text);
-  const measurement = createMeasurement(ctx, services, crud);
+  const measurement = createMeasurement(ctx, services);
   const pointer = createPointer(ctx, services, chrome, measurement);
   const drafts = createDrafts(ctx, services, annotations);
   const markup = createMarkupWrites(ctx, services, annotations);

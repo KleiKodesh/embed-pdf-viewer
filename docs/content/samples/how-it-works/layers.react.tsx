@@ -26,12 +26,12 @@ const plugins = [
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
-// Something on every layer on load: the matches of a search, and the title selected.
+// Something on every layer on load: the matches of a search, and the first word selected.
 function OnLoad() {
   const search = useSearch();
   const selection = useSelection();
@@ -41,7 +41,9 @@ function OnLoad() {
     void search.search({ text: 'PDF' });
   }, [search]);
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    // [!doc-range welcome firstWord]
+    if (cover) selection.select({ page: cover, start: 28, count: 9 });
+    // [!/doc-range]
   }, [selection, cover]);
 
   return null;

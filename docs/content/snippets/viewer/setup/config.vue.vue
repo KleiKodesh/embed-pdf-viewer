@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { PDFViewer, type Viewer } from '@embedpdf/viewer-vue';
 
-const disable = ['forms'];
+const features = { forms: false };
 const onReady = (viewer: Viewer) => console.log('ready', viewer);
 </script>
 
 <template>
   <PDFViewer
-    src="/report.pdf"
+    src="https://www.embedpdf.com/pdfs/welcome.pdf"
     theme="system"
-    :disable="disable"
+    :features="features"
     style="height: 100vh"
     @ready="onReady"
   />

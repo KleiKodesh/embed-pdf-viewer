@@ -21,7 +21,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -48,7 +48,7 @@ const welcome = async (): Promise<OpenInput> => {
         <li>
           <button type="button" class="result" [epdfCommand]="result.id" #command="epdfCommand">
             <span>{{ command.label() }}</span>
-            @if (command.shortcut(); as shortcut) {
+            @if (command.shortcutLabel(); as shortcut) {
               <kbd class="shortcut">{{ shortcut }}</kbd>
             }
           </button>

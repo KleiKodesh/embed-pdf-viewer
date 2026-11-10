@@ -5,6 +5,8 @@ import {
   GrantVisitorListQuerySchema,
   adminOperations,
   type AdminOperation,
+  type GrantRecord,
+  type GrantVisitorRecord,
 } from '@cloudpdf/contract';
 import { validateScopeArray, type Identity } from '@embedpdf/engine-core/runtime';
 import { DEFAULT_LAYER_NAME } from '@embedpdf/engine-core/wire';
@@ -21,6 +23,8 @@ import type { GrantVisitorsRepo, ListedGrantVisitor } from '../../db/repos/grant
 import type { GrantLayerMode, GrantRow, GrantsRepo } from '../../db/repos/grants.repo';
 import type { LayersRepo } from '../../db/repos/page_state.repo';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
+import { errorBody } from '../_helpers';
+import { isoTime, isoTimeOrNull } from '../../time';
 
 export interface AdminGrantsRoutesDeps {
   grants: GrantsRepo;
@@ -98,38 +102,32 @@ export async function registerAdminGrantsRoutes(
     const ctx = requireTenantAccess(req, tenantId, createOp.scope);
     const parsed = GrantCreateRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+      return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
     }
     const body = parsed.data;
     try {
       validateScopeArray(body.scope);
       deps.permissions.assertGrantable(body.scope);
     } catch (err) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: (err as Error).message } });
+      return reply.code(400).send(errorBody('InvalidArg', (err as Error).message));
     }
     requireHeldScope(req, body.scope);
     const settingsRefusal = refuseLinkSettings(body);
     if (settingsRefusal) {
-      return reply.code(400).send({ error: { code: 'InvalidArg', message: settingsRefusal } });
+      return reply.code(400).send(errorBody('InvalidArg', settingsRefusal));
     }
     const doc = await documents.findById(body.docId);
     if (!doc) {
-      return reply.code(404).send({
-        error: { code: 'NotFound', message: `document does not exist: ${body.docId}` },
-      });
+      return reply.code(404).send(errorBody('NotFound', `document does not exist: ${body.docId}`));
     }
     if (doc.tenantId !== tenantId) {
-      return reply.code(403).send({
-        error: { code: 'Forbidden', message: 'document does not belong to this tenant' },
-      });
+      return reply
+        .code(403)
+        .send(errorBody('Forbidden', 'document does not belong to this tenant'));
     }
     const layerMode = body.layerMode ?? 'shared';
     const refusal = await refuseLayer(doc.id, layerMode, body.layerName);
-    if (refusal) return reply.code(400).send({ error: { code: 'InvalidArg', message: refusal } });
+    if (refusal) return reply.code(400).send(errorBody('InvalidArg', refusal));
     const grant = await grants.create({
       tenantId,
       docId: body.docId,
@@ -145,14 +143,14 @@ export async function registerAdminGrantsRoutes(
       ...(body.visitorIdentity !== undefined ? { visitorIdentity: body.visitorIdentity } : {}),
       ...(body.identity !== undefined ? { identity: body.identity } : {}),
       scope: body.scope,
-      ...(body.origins !== undefined ? { origins: body.origins } : {}),
+      ...(body.origins != null ? { origins: body.origins } : {}),
       ...(body.passphrase !== undefined
         ? { passphraseHash: hashGrantPassphrase(body.passphrase) }
         : {}),
       ...(body.sessionTtlSeconds !== undefined
         ? { sessionTtlSeconds: body.sessionTtlSeconds }
         : {}),
-      ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt } : {}),
+      ...(body.expiresAt != null ? { expiresAt: Date.parse(body.expiresAt) } : {}),
       createdBy: ctx.sub,
     });
     await securityEvents.append({
@@ -174,9 +172,7 @@ export async function registerAdminGrantsRoutes(
     requireTenantAccess(req, tenantId, listOp.scope);
     const parsed = GrantListQuerySchema.safeParse(req.query ?? {});
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+      return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
     }
     const { limit, cursor, docId, archived } = parsed.data;
     const before = cursor === undefined ? undefined : decodeListCursor(cursor);
@@ -199,9 +195,7 @@ export async function registerAdminGrantsRoutes(
     requireTenantAccess(req, tenantId, getOp.scope);
     const grant = await grants.findById(grantId);
     if (!grant || grant.tenantId !== tenantId) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `grant does not exist: ${grantId}`));
     }
     return reply.send({ grant: grantPublic(grant) });
   });
@@ -212,9 +206,7 @@ export async function registerAdminGrantsRoutes(
     const ctx = requireTenantAccess(req, tenantId, updateOp.scope);
     const parsed = GrantUpdateRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+      return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
     }
     const body = parsed.data;
     if (body.scope !== undefined) {
@@ -222,17 +214,13 @@ export async function registerAdminGrantsRoutes(
         validateScopeArray(body.scope);
         deps.permissions.assertGrantable(body.scope);
       } catch (err) {
-        return reply
-          .code(400)
-          .send({ error: { code: 'InvalidArg', message: (err as Error).message } });
+        return reply.code(400).send(errorBody('InvalidArg', (err as Error).message));
       }
       requireHeldScope(req, body.scope);
     }
     const existing = await grants.findById(grantId);
     if (!existing || existing.tenantId !== tenantId) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `grant does not exist: ${grantId}`));
     }
     if (existing.archivedAt !== null) return archivedConflict(reply, grantId);
     // The grant as it will be: what it asks and what it says are checked together.
@@ -242,14 +230,14 @@ export async function registerAdminGrantsRoutes(
       identity: body.identity !== undefined ? body.identity : existing.identity,
     });
     if (settingsRefusal) {
-      return reply.code(400).send({ error: { code: 'InvalidArg', message: settingsRefusal } });
+      return reply.code(400).send(errorBody('InvalidArg', settingsRefusal));
     }
     const layerMode = body.layerMode ?? existing.layerMode;
     const layerChanges = body.layerMode !== undefined || body.layerName !== undefined;
     if (layerChanges) {
       const refusal = await refuseLayer(existing.docId, layerMode, body.layerName);
       if (refusal) {
-        return reply.code(400).send({ error: { code: 'InvalidArg', message: refusal } });
+        return reply.code(400).send(errorBody('InvalidArg', refusal));
       }
     }
     const updated = await grants.update(grantId, tenantId, {
@@ -284,12 +272,12 @@ export async function registerAdminGrantsRoutes(
         ? { sessionTtlSeconds: body.sessionTtlSeconds }
         : {}),
       ...(body.disabled !== undefined ? { disabled: body.disabled } : {}),
-      ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt } : {}),
+      ...(body.expiresAt !== undefined
+        ? { expiresAt: body.expiresAt === null ? null : Date.parse(body.expiresAt) }
+        : {}),
     });
     if (!updated) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `grant does not exist: ${grantId}`));
     }
     await securityEvents.append({
       tenantId,
@@ -310,15 +298,11 @@ export async function registerAdminGrantsRoutes(
     const ctx = requireTenantAccess(req, tenantId, archiveOp.scope);
     const existing = await grants.findById(grantId);
     if (!existing || existing.tenantId !== tenantId) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `grant does not exist: ${grantId}`));
     }
     const archived = await grants.archive(grantId, tenantId);
     if (!archived) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `grant does not exist: ${grantId}`));
     }
     if (existing.archivedAt === null) {
       await securityEvents.append({
@@ -340,15 +324,11 @@ export async function registerAdminGrantsRoutes(
     requireTenantAccess(req, tenantId, visitorsListOp.scope);
     const parsed = GrantVisitorListQuerySchema.safeParse(req.query ?? {});
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+      return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
     }
     const grant = await grants.findById(grantId);
     if (!grant || grant.tenantId !== tenantId) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `grant does not exist: ${grantId}`));
     }
     const { limit, cursor } = parsed.data;
     const before = cursor === undefined ? undefined : decodeListCursor(cursor);
@@ -371,17 +351,13 @@ export async function registerAdminGrantsRoutes(
     };
     requireTenantAccess(req, tenantId, visitorsDeleteOp.scope);
     if (!VISITOR_ID.test(visitorId)) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: `not a visitor id: ${visitorId}` } });
+      return reply.code(400).send(errorBody('InvalidArg', `not a visitor id: ${visitorId}`));
     }
     // An archived grant's visitors can be deleted too: erasing someone's
     // answers never waits on the grant.
     const grant = await grants.findById(grantId);
     if (!grant || grant.tenantId !== tenantId) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `grant does not exist: ${grantId}`));
     }
     await deleteVisitor({ tenantId, grantId, visitorId, docId: grant.docId });
     return reply.code(204).send();
@@ -393,9 +369,7 @@ export async function registerAdminGrantsRoutes(
     const ctx = requireTenantAccess(req, tenantId, deleteOp.scope);
     const existing = await grants.findById(grantId);
     if (!existing || existing.tenantId !== tenantId) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `grant does not exist: ${grantId}`));
     }
     // Deleting a grant never deletes its visitors (their answers, their
     // layers): one that has any is archived instead.
@@ -404,13 +378,15 @@ export async function registerAdminGrantsRoutes(
       visitors.countForGrant(grantId),
     ]);
     if (visitorLayers > 0 || visitorCount > 0) {
-      return reply.code(409).send({
-        error: {
-          code: 'Conflict',
-          message: `grant ${grantId} has visitors (${visitorCount}) or visitors' layers (${visitorLayers}): archive it instead, or delete them first`,
-          details: { visitors: visitorCount, visitorLayers },
-        },
-      });
+      return reply
+        .code(409)
+        .send(
+          errorBody(
+            'Conflict',
+            `grant ${grantId} has visitors (${visitorCount}) or visitors' layers (${visitorLayers}): archive it instead, or delete them first`,
+            { visitors: visitorCount, visitorLayers },
+          ),
+        );
     }
     await grants.delete(grantId, tenantId);
     await securityEvents.append({
@@ -463,29 +439,31 @@ const VISITOR_ID = /^[0-9a-f]{24}$/;
 
 /** An archived grant is final: it takes no more changes. */
 function archivedConflict(reply: FastifyReply, grantId: string): FastifyReply {
-  return reply.code(409).send({
-    error: {
-      code: 'Conflict',
-      message: `grant ${grantId} is archived: create a new grant to give access again`,
-    },
-  });
+  return reply
+    .code(409)
+    .send(
+      errorBody(
+        'Conflict',
+        `grant ${grantId} is archived: create a new grant to give access again`,
+      ),
+    );
 }
 
 /** Wire shape of a visitor (`GrantVisitorRecord`). */
-function visitorPublic(v: ListedGrantVisitor): Record<string, unknown> {
+function visitorPublic(v: ListedGrantVisitor): GrantVisitorRecord {
   return {
     visitorId: v.visitorId,
     answers: v.answers,
     emailVerified: v.emailVerifiedAt !== null,
-    consentedAt: v.consentedAt,
-    firstSeenAt: v.firstSeenAt,
-    lastSeenAt: v.lastSeenAt,
-    layer: v.layer ? { layerName: v.layer.name, storageSizeBytes: v.layer.storageSizeBytes } : null,
+    consentedAt: isoTimeOrNull(v.consentedAt),
+    firstSeenAt: isoTime(v.firstSeenAt),
+    lastSeenAt: isoTime(v.lastSeenAt),
+    layer: v.layer ? { layerName: v.layer.name, sizeBytes: v.layer.storageSizeBytes } : null,
   };
 }
 
 /** Wire shape: the scrypt envelope never leaves the row. */
-function grantPublic(g: GrantRow): Record<string, unknown> {
+function grantPublic(g: GrantRow): GrantRecord {
   return {
     id: g.id,
     tenantId: g.tenantId,
@@ -502,12 +480,12 @@ function grantPublic(g: GrantRow): Record<string, unknown> {
     passphraseProtected: g.passphraseHash !== null,
     sessionTtlSeconds: g.sessionTtlSeconds,
     disabled: g.disabled,
-    archivedAt: g.archivedAt,
-    expiresAt: g.expiresAt,
+    archivedAt: isoTimeOrNull(g.archivedAt),
+    expiresAt: isoTimeOrNull(g.expiresAt),
     exchangeCount: g.exchangeCount,
-    lastExchangedAt: g.lastExchangedAt,
+    lastExchangedAt: isoTimeOrNull(g.lastExchangedAt),
     createdBy: g.createdBy,
-    createdAt: g.createdAt,
-    updatedAt: g.updatedAt,
+    createdAt: isoTime(g.createdAt),
+    updatedAt: isoTime(g.updatedAt),
   };
 }

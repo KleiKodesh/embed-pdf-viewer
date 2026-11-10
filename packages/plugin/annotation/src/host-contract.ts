@@ -19,7 +19,7 @@ import type {
   Point,
   ViewEnv,
 } from '@embedpdf/core-annotation';
-import type { PageRotation } from '@embedpdf/core-geometry';
+import type { Rotation } from '@embedpdf/core-geometry';
 import type {
   AnnotationAppearanceImage,
   AnnotationPosition,
@@ -32,7 +32,10 @@ import type {
   RichTextParagraph,
   SerializedEngineError,
 } from '@embedpdf/engine-core/runtime';
-import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
+import type {
+  AnnotationCommitEntry,
+  AnnotationCommitResult,
+} from '@embedpdf/plugin-actions/contract/host';
 import type { AppearancePicture } from '@embedpdf/plugin-render/contract/host';
 
 import type {
@@ -107,17 +110,17 @@ export interface AnnotationLender {
     position: AnnotationPosition,
   ): readonly ChangeOp[];
   /** Whether this session may change and delete the record. */
-  authority(record: Annotation): { readonly update: boolean; readonly delete: boolean };
+  getAuthority(record: Annotation): { readonly update: boolean; readonly delete: boolean };
   /** What its records' pictures on a page depend on: a new value means new pictures. */
-  pictureEpoch(page: PageRef): string;
+  getPictureEpoch(page: PageRef): string;
   /** A record's confirmed picture version; kept for one that went, so an undo brings it back with it. */
-  pictureVersion(record: AnnotationRef): number;
+  getPictureVersion(record: AnnotationRef): number;
   /**
    * The record's look as it shows isn't its confirmed look yet, whatever changed it (a restyle,
    * a resize, one just placed, a change the lender made itself): it draws live, by its
    * {@link painter}, until the engine's picture of it is there.
    */
-  pending(record: AnnotationRef): boolean;
+  isPending(record: AnnotationRef): boolean;
   /**
    * How the lender draws the record live: the record upright in `box` (its box, or where a
    * gesture has it), in page space; `null` for one it doesn't draw. A record with a painter
@@ -174,10 +177,21 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     viewports: PageMeasurementViewport[] | undefined,
     fallback: PdfMeasure,
   ): void;
-  remeasurePage(page: PageRef, scale: PdfMeasure): Promise<RecalibrationReport>;
+  /**
+   * Resolves once the document's measurements can be re-measured: the
+   * annotations loaded (a failed load retried) and every pending load settled.
+   */
+  whenRemeasurable(): Promise<void>;
+  /**
+   * Stage the update of every measurement on `page` to `scale`, at once, so a
+   * group (`ctx.changes.group`) takes it into its change. What it staged is
+   * `updated`; a refused change refuses all of it. `error` is set, and
+   * nothing staged, when the annotations aren't loaded.
+   */
+  stageRemeasure(page: PageRef, scale: PdfMeasure): RecalibrationReport;
   /** A distance draft was captured (the measurement plugin turns it into a calibration). */
   readonly onDraftCaptured: EventHook<CapturedAnnotationDraft>;
-  distanceCreationPage(): PageRef | null;
+  getDistanceCreationPage(): PageRef | null;
 
   // ── render projections (page space; a view env projects for a rotated / zoomed view) ──
   /**
@@ -187,7 +201,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    */
   getSelectionAnchorIn(view: {
     scale?: number;
-    rotation?: PageRotation;
+    rotation?: Rotation;
     zoom?: number;
   }): AnnotationSelectionAnchor | null;
   /**
@@ -209,12 +223,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * engine picture is drawn under. `null` for one that isn't a free text here.
    */
   getTextItem(ref: AnnotationRef, view?: ViewEnv): TextItem | null;
-  listChromeNodes(
-    page: PageRef,
-    scale?: number,
-    rotation?: PageRotation,
-    zoom?: number,
-  ): ChromeNode[];
+  listChromeNodes(page: PageRef, scale?: number, rotation?: Rotation, zoom?: number): ChromeNode[];
   listLinkItems(page: PageRef): LinkNavItem[];
   /**
    * What a page's pictures depend on: its baked records at their picture
@@ -247,11 +256,15 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     page: PageRef,
     point: Point,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
   ): boolean;
   draftContents(ref: AnnotationRef, text: string): void;
-  draftRichText(ref: AnnotationRef, doc: { paragraphs: RichTextParagraph[] }): void;
+  /** Returns the paragraphs it keeps: the text typed at the caret takes a style chosen there. */
+  draftRichText(
+    ref: AnnotationRef,
+    doc: { paragraphs: RichTextParagraph[] },
+  ): { paragraphs: RichTextParagraph[] };
   setTextSelection(ref: AnnotationRef, range: { start: number; end: number } | null): void;
   /**
    * The CSS family list a face is drawn with in a text box (`id`; `null` for
@@ -270,7 +283,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     page: PageRef,
     point: Point,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
     touch?: boolean,
   ): 'handle' | 'rotate' | 'group-handle' | 'annot' | 'empty';
@@ -278,14 +291,14 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     page: PageRef,
     point: Point,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
   ): boolean;
   getCursorAt(
     page: PageRef,
     point: Point,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
   ): string | null;
   hoverAt(
@@ -293,7 +306,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
       page: PageRef;
       point: Point;
       scale?: number;
-      rotation?: PageRotation;
+      rotation?: Rotation;
       zoom?: number;
     } | null,
   ): void;
@@ -303,7 +316,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     point: Point,
     shift: boolean,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
     touch?: boolean,
   ): void;
@@ -313,7 +326,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     point: Point,
     shift: boolean,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
   ): void;
   createPointer(
@@ -322,13 +335,13 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     page: PageRef,
     point: Point,
     finish?: boolean,
-    displayRotation?: PageRotation,
+    displayRotation?: Rotation,
   ): void;
   finishInkDraft(): void;
   /** Place with the active tool at a click; `displayRotation` and `zoom` are the page's view there. */
-  placeAt(page: PageRef, point: Point, displayRotation?: PageRotation, zoom?: number): boolean;
-  placeArmedStamp(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
-  requestStampAt(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
+  placeAt(page: PageRef, point: Point, displayRotation?: Rotation, zoom?: number): boolean;
+  placeArmedStamp(page: PageRef, point: Point, displayRotation?: Rotation): boolean;
+  requestStampAt(page: PageRef, point: Point, displayRotation?: Rotation): boolean;
 
   // ── markup bridge (the selection plugin meets the text tools) ──
   /**
@@ -355,7 +368,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     toolId: string,
     page: PageRef,
     point: Point,
-    displayRotation?: PageRotation,
+    displayRotation?: Rotation,
     zoom?: number,
   ): void;
   clearGhost(): void;
@@ -388,7 +401,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   /** The engaged behavior that owns this annotation now, or `null`. */
   getBehaviorFor(annotation: Annotation): Behavior | null;
   pruneEngagedSelection(): void;
-  commitScriptEffects(entries: AnnotCommitEntry[]): Promise<AnnotCommitResult>;
+  commitScriptEffects(entries: AnnotationCommitEntry[]): Promise<AnnotationCommitResult>;
 }
 
 /**

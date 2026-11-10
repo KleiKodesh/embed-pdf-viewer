@@ -17,7 +17,7 @@ import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/a
 import { localEngine } from '@embedpdf/engine';
 
 const layout = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/layout.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/layout.pdf');
   return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -113,7 +113,7 @@ export class App {
       untracked(() => {
         const circle = this.annotation.list().find((each) => each.nm === 'circle');
         if (!circle) return;
-        this.annotation.selection.set([circle.ref]);
+        this.annotation.selection.select([circle.ref]);
         stage.reveal(circle.page, { rect: circle.rect });
       });
     });

@@ -22,7 +22,7 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
 const layout = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/layout.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/layout.pdf');
   return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -38,7 +38,7 @@ function SelectSquare() {
     done.current = true;
     const square = annotation.list().find((each) => each.nm === 'square');
     if (!square) return;
-    annotation.selection.set([square.ref]);
+    annotation.selection.select([square.ref]);
     stage.reveal(square.page, { rect: square.rect });
   }, [annotation, stage, ready]);
 

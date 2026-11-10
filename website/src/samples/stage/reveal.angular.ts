@@ -20,7 +20,7 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { localEngine } from '@embedpdf/engine';
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -122,7 +122,7 @@ export class App {
         stage.reveal(SPOTS[0].page, {
           rect: SPOTS[0].rect,
           zoom: 'fit-width',
-          anchor: { y: 0.35 },
+          align: { y: 0.35 },
         }),
       );
     });
@@ -131,7 +131,7 @@ export class App {
   protected reveal(stage: EpdfStage, index: number, zoom: RevealZoom) {
     const spot = SPOTS[index];
     // The box lands about a third from the top, like a browser's find bar.
-    stage.reveal(spot.page, { rect: spot.rect, zoom, anchor: { y: 0.35 } });
+    stage.reveal(spot.page, { rect: spot.rect, zoom, align: { y: 0.35 } });
     this.active.set(index);
   }
 }

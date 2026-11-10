@@ -71,6 +71,7 @@ export const it: Locale = {
         group: 'Scorrimento',
         vertical: 'Verticale',
         horizontal: 'Orizzontale',
+        paged: 'Pagina per pagina',
       },
       rotate: {
         group: 'Ruota',
@@ -114,6 +115,13 @@ export const it: Locale = {
         copy: 'Copia',
         strip: 'Azioni selezione testo',
       },
+      snapshot: {
+        tool: 'Scatta istantanea',
+        copy: 'Copia',
+        save: 'Salva immagine',
+        clear: 'Elimina istantanea',
+        strip: 'Azioni istantanea',
+      },
       shapes: {
         rectangle: 'Rettangolo',
         circle: 'Ovale',
@@ -142,6 +150,11 @@ export const it: Locale = {
       redact: {
         mark: 'Contrassegna per oscuramento',
         applyAll: 'Applica oscuramenti',
+        apply: {
+          one: 'Applica oscuramento',
+          many: 'Applica {count} di oscuramenti',
+          other: 'Applica {count} oscuramenti',
+        },
         clearAll: 'Cancella contrassegni',
       },
       undo: 'Annulla',
@@ -161,6 +174,7 @@ export const it: Locale = {
         'doc-annotate-modify': 'La modifica delle annotazioni non è consentita',
         'doc-annotate-read': 'La visualizzazione delle annotazioni non è consentita',
         'doc-attachments-modify': 'L’aggiunta di file non è consentita',
+        'doc-content-copy': 'Le istantanee non sono consentite',
         'doc-download': 'Il download non è consentito',
         'doc-forms-modify': 'La modifica dei campi modulo non è consentita',
         'doc-outline-modify': 'La modifica dei segnalibri non è consentita',
@@ -346,6 +360,7 @@ export const it: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'Tipo',
         opacity: 'Opacità',
         stroke: 'Traccia',
         fill: 'Riempimento',
@@ -493,7 +508,11 @@ export const it: Locale = {
       lineStart: 'Inizio',
       lineEnd: 'Fine',
       empty: 'Scegli uno strumento di disegno o seleziona un’annotazione per modificarne lo stile.',
-      selected: 'Selezionate: {count}',
+      selected: {
+        one: '{count} selezionata',
+        many: '{count} selezionate',
+        other: '{count} selezionate',
+      },
       toolDefaults: 'Valori predefiniti: {tool}',
       defaults: 'Valori predefiniti',
       fontGroups: {
@@ -516,20 +535,6 @@ export const it: Locale = {
         other: 'Non è possibile scrivervi nuovo testo',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Indicatori (/F)',
-      print: 'Includi quando la pagina viene stampata',
-      hidden: 'Nascosta ovunque: schermo, clic, stampa',
-      noView: 'Nascosta a schermo, può comunque essere stampata',
-      toggleNoView: 'Mostra un’annotazione non visualizzata quando è selezionata',
-      readOnly: 'Visibile ma non cliccabile',
-      locked: 'Impossibile spostare / ridimensionare / eliminare / cambiare stile',
-      lockedContents: 'Il testo non può cambiare; la geometria sì',
-      noZoom: 'Dimensione fissa a schermo (ancorata in alto a sinistra)',
-      noRotate: 'Resta dritta quando la pagina ruota',
-      invisible: 'Obsoleto: nascondi i sottotipi sconosciuti',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Caricamento degli allegati…',
@@ -539,8 +544,7 @@ export const it: Locale = {
       dropHint: 'Oppure rilascia i file qui',
       adding: 'Aggiunta in corso…',
       onPage: 'Pagina {page}',
-      count: '{count} file',
-      countPlural: '{count} file',
+      count: { one: '{count} file', many: '{count} di file', other: '{count} file' },
     },
     outline: {
       filter: 'Filtra segnalibri',
@@ -594,10 +598,9 @@ export const it: Locale = {
       retry: 'Riprova',
       empty: 'Ancora nessun commento. Usa lo strumento Nota per avviare una discussione.',
       emptyReadOnly: 'Nessun commento in questo documento.',
-      anonymous: 'Sconosciuto',
+      anonymous: 'Ospite',
       page: 'Pagina {page}',
-      count: '{count} commento',
-      countPlural: '{count} commenti',
+      count: { one: '{count} commento', many: '{count} di commenti', other: '{count} commenti' },
       reply: 'Rispondi',
       replyPlaceholder: 'Rispondi…',
       addPlaceholder: 'Aggiungi un commento…',
@@ -624,7 +627,11 @@ export const it: Locale = {
       searchWholeWord: 'Parola intera',
       searchRegex: 'Espressione regolare',
       searchSearching: 'Ricerca in corso…',
-      searchResults: 'Risultati trovati: {count}',
+      searchResults: {
+        one: '{count} risultato trovato',
+        many: '{count} di risultati trovati',
+        other: '{count} risultati trovati',
+      },
       searchNoResults: 'Nessun risultato',
       searchPrevious: 'Risultato precedente',
       searchNext: 'Risultato successivo',
@@ -640,10 +647,22 @@ export const it: Locale = {
       redactionArea: 'Contrassegno area',
       redactionText: 'Contrassegno testo',
       redactionRemove: 'Rimuovi contrassegno',
-      redactConfirmTitle: 'Applicare gli oscuramenti?',
-      redactConfirmBody:
-        'Rimuovere definitivamente il contenuto sotto i contrassegni di oscuramento ({count}). L’operazione non può essere annullata.',
-      redactConfirmCollateral: 'Verranno rimosse anche altre annotazioni: {count}.',
+      redactConfirmTitle: {
+        one: 'Applicare l’oscuramento?',
+        many: 'Applicare gli oscuramenti?',
+        other: 'Applicare gli oscuramenti?',
+      },
+      redactConfirmBody: {
+        one: 'Rimuovere definitivamente il contenuto sotto {count} contrassegno di oscuramento. L’operazione non può essere annullata.',
+        many: 'Rimuovere definitivamente il contenuto sotto {count} di contrassegni di oscuramento. L’operazione non può essere annullata.',
+        other:
+          'Rimuovere definitivamente il contenuto sotto {count} contrassegni di oscuramento. L’operazione non può essere annullata.',
+      },
+      redactConfirmCollateral: {
+        one: 'Verrà rimossa anche {count} altra annotazione.',
+        many: 'Verranno rimosse anche {count} di altre annotazioni.',
+        other: 'Verranno rimosse anche {count} altre annotazioni.',
+      },
       redactApply: 'Applica',
       redactApplying: 'Applicazione…',
       formatLabel: 'Formato',

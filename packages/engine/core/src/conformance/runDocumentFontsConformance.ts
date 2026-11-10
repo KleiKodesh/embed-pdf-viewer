@@ -128,7 +128,7 @@ export function runDocumentFontsConformance(
     async function fieldIn(doc: DocumentHandle, fontFamily: string, value: string, name: string) {
       const page = await firstPage(doc);
       const { field } = await doc.forms.create({
-        family: 'text',
+        kind: 'text',
         name,
         widgets: [{ page, rect: { x: 40, y: 40, width: 200, height: 24 }, fontFamily }],
       });
@@ -144,17 +144,24 @@ export function runDocumentFontsConformance(
       );
       const helvetica = fontNamed(list.fonts, 'helvetica')!;
       expect(helvetica).toMatchObject({
+        builtIn: true,
         canChoose: true,
         restrictions: [],
         familyName: 'Helvetica',
       });
-      expect(helvetica.programs[0]!.displayHash).toMatch(HEX_SHA256);
+      expect(helvetica.programs[0]!.displaySha256).toMatch(HEX_SHA256);
 
       const served = fontNamed(list.fonts, servedFont.key)!;
-      expect(served).toMatchObject({ source: 'engine', canChoose: true, restrictions: [] });
+      // The harness's own font, though a fallback: not one the engine comes with.
+      expect(served).toMatchObject({
+        source: 'engine',
+        builtIn: false,
+        canChoose: true,
+        restrictions: [],
+      });
       expect(served.programs[0]).toMatchObject({
-        displayHash: servedFont.sha256,
-        sourceHash: servedFont.sha256,
+        displaySha256: servedFont.sha256,
+        sourceSha256: servedFont.sha256,
         format: 'truetype',
         canDownload: true,
       });
@@ -164,7 +171,7 @@ export function runDocumentFontsConformance(
         expect(fontNamed(list.fonts, key)?.source).toBe('engine');
       }
       expect(list.lastResort).toMatchObject({ canDownload: true, embedded: 'none' });
-      expect(list.lastResort.displayHash).toMatch(HEX_SHA256);
+      expect(list.lastResort.displaySha256).toMatch(HEX_SHA256);
       await doc.close();
     });
 
@@ -179,7 +186,7 @@ export function runDocumentFontsConformance(
       });
       expect(answer.runs[0]).toMatchObject({
         font: 'helvetica',
-        program: fontNamed(list.fonts, 'helvetica')!.programs[0]!.displayHash,
+        program: fontNamed(list.fonts, 'helvetica')!.programs[0]!.displaySha256,
         substituted: false,
       });
       expect(answer.runs[0]!.fallbacks[0]).toBe(servedFont.sha256);
@@ -205,7 +212,7 @@ export function runDocumentFontsConformance(
       expect(plain.meta.missingCharacters).toBe(undefined);
 
       const { field } = await doc.forms.create({
-        family: 'text',
+        kind: 'text',
         name: 'missing',
         widgets: [
           { page, rect: { x: 40, y: 140, width: 200, height: 24 }, fontFamily: 'helvetica' },
@@ -260,7 +267,9 @@ export function runDocumentFontsConformance(
       const fontsChangedBy = (opId: string) =>
         events.filter(
           (event) =>
-            event.type === 'fonts.changed' && 'tx' in event.origin && event.origin.tx?.id === opId,
+            event.type === 'fonts.changed' &&
+            'transaction' in event.origin &&
+            event.origin.transaction?.id === opId,
         );
 
       const square = await doc.page(page).annotations.create({
@@ -297,12 +306,12 @@ export function runDocumentFontsConformance(
       expect(roboto.name).toBe(roboto.postScriptName);
       const program = roboto.programs[0]!;
       expect(program).toMatchObject({ embedded: 'whole', format: 'truetype', canDownload: true });
-      expect(program.displayHash).toBe(servedFont.sha256);
+      expect(program.displaySha256).toBe(servedFont.sha256);
 
-      expect(await sha256(await doc.fonts.downloadProgram(program.displayHash!))).toBe(
-        program.displayHash,
+      expect(await sha256(await doc.fonts.downloadProgram(program.displaySha256!))).toBe(
+        program.displaySha256,
       );
-      const info = await doc.fonts.getProgram(program.displayHash!);
+      const info = await doc.fonts.getProgram(program.displaySha256!);
       expect(covers(info.covers, 'A')).toBe(true);
       expect(info.ascent > 500 && info.descent < 0).toBe(true);
 
@@ -317,7 +326,7 @@ export function runDocumentFontsConformance(
           candidate.ref.kind === 'objectNumber' && candidate.ref.objectNumber === widgetNumber,
       )!;
       const readBack = fontNamed(list.fonts, widget.fontFamily!);
-      expect(readBack?.programs[0]?.displayHash).toBe(program.displayHash);
+      expect(readBack?.programs[0]?.displaySha256).toBe(program.displaySha256);
       await doc.close();
     });
 
@@ -327,8 +336,8 @@ export function runDocumentFontsConformance(
         (candidate) => candidate.source === 'document' && candidate.name === 'FoxitFixed',
       )!;
       expect(font.programs).toHaveLength(2);
-      expect(new Set(font.programs.map((program) => program.sourceHash)).size).toBe(1);
-      const hashes = font.programs.map((program) => program.displayHash!);
+      expect(new Set(font.programs.map((program) => program.sourceSha256)).size).toBe(1);
+      const hashes = font.programs.map((program) => program.displaySha256!);
       expect(new Set(hashes).size).toBe(2);
       for (const hash of hashes) {
         expect(await sha256(await doc.fonts.downloadProgram(hash))).toBe(hash);
@@ -364,9 +373,9 @@ export function runDocumentFontsConformance(
     test('downloads the built-in programs and the served font, and refuses a hash it doesn’t name', async () => {
       const doc = await open(fixtures.page);
       const list = await doc.fonts.list();
-      const helvetica = fontNamed(list.fonts, 'helvetica')!.programs[0]!.displayHash!;
+      const helvetica = fontNamed(list.fonts, 'helvetica')!.programs[0]!.displaySha256!;
       expect(await sha256(await doc.fonts.downloadProgram(helvetica))).toBe(helvetica);
-      const lastResort = list.lastResort.displayHash!;
+      const lastResort = list.lastResort.displaySha256!;
       expect(await sha256(await doc.fonts.downloadProgram(lastResort))).toBe(lastResort);
       expect(await sha256(await doc.fonts.downloadProgram(servedFont.sha256))).toBe(
         servedFont.sha256,
@@ -382,7 +391,7 @@ export function runDocumentFontsConformance(
     test('a program’s bytes go only to a token that may write text', async () => {
       const doc = await options.openReadOnly(engine!, fixtures.page.slice());
       const list = await doc.fonts.list();
-      const helvetica = fontNamed(list.fonts, 'helvetica')!.programs[0]!.displayHash!;
+      const helvetica = fontNamed(list.fonts, 'helvetica')!.programs[0]!.displaySha256!;
       const refused = await rejection(doc.fonts.downloadProgram(helvetica));
       expect(refused.code).toBe(EngineErrorCode.Forbidden);
       expect((refused.details as { anyOf?: string[] }).anyOf).toContain('doc.annotate.modify');
@@ -404,16 +413,16 @@ export function runDocumentFontsConformance(
         });
         const program = font.programs[0]!;
         expect(program).toMatchObject({ format, embedded: 'whole', canDownload: true });
-        expect(program.displayHash === program.sourceHash).toBe(false);
-        const bytes = await doc.fonts.downloadProgram(program.displayHash!);
+        expect(program.displaySha256 === program.sourceSha256).toBe(false);
+        const bytes = await doc.fonts.downloadProgram(program.displaySha256!);
         expect(String.fromCharCode(...bytes.slice(0, 4))).toBe('OTTO');
-        expect(await sha256(bytes)).toBe(program.displayHash);
+        expect(await sha256(bytes)).toBe(program.displaySha256);
       }
 
       // The Type 1 font holds the letters of "Hello world" (in capitals) and no
       // space: the browser gets exactly the characters the engine writes with it.
       const hello = fontNamed(list.fonts, 'Roboto2-Regular')!.programs[0]!;
-      const info = await doc.fonts.getProgram(hello.displayHash!);
+      const info = await doc.fonts.getProgram(hello.displaySha256!);
       expect(['H', 'E', 'L', 'O', 'W', 'R', 'D'].every((c) => covers(info.covers, c))).toBe(true);
       expect(covers(info.covers, ' ')).toBe(false);
       expect(covers(info.covers, 'A')).toBe(false);
@@ -429,7 +438,7 @@ export function runDocumentFontsConformance(
       expect(answer.runs[0]).toMatchObject({
         font: 'Roboto2-Regular',
         substituted: false,
-        program: hello.displayHash,
+        program: hello.displaySha256,
       });
       await doc.close();
     });

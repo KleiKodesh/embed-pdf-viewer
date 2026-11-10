@@ -17,15 +17,15 @@ describe("DocumentsClient", () => {
                     name: "name",
                     folderId: "folderId",
                     state: "pending",
-                    baseSha: "baseSha",
-                    storageSizeBytes: 1.1,
+                    baseSha256: "baseSha256",
+                    sizeBytes: 1,
                     metadata: { key: "value" },
                     idempotencyKey: "idempotencyKey",
                     failureReason: "failureReason",
                     thumbnailState: "pending",
                     thumbnailUrl: "thumbnailUrl",
-                    createdAt: 1.1,
-                    updatedAt: 1.1,
+                    createdAt: "2024-01-15T09:30:00Z",
+                    updatedAt: "2024-01-15T09:30:00Z",
                     createdBy: "createdBy",
                 },
             ],
@@ -50,7 +50,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -78,22 +78,22 @@ describe("DocumentsClient", () => {
                 name: "name",
                 folderId: "folderId",
                 state: "pending",
-                baseSha: "baseSha",
-                storageSizeBytes: 1.1,
+                baseSha256: "baseSha256",
+                sizeBytes: 1,
                 metadata: { key: "value" },
                 idempotencyKey: "idempotencyKey",
                 failureReason: "failureReason",
                 thumbnailState: "pending",
                 thumbnailUrl: "thumbnailUrl",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: "2024-01-15T09:30:00Z",
+                updatedAt: "2024-01-15T09:30:00Z",
                 createdBy: "createdBy",
             },
         };
 
         server
             .mockEndpoint()
-            .get("/v1/tenants/tenantId/documents/id")
+            .get("/v1/tenants/tenantId/documents/docId")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -101,7 +101,7 @@ describe("DocumentsClient", () => {
 
         const response = await client.documents.get({
             tenantId: "tenantId",
-            id: "id",
+            docId: "docId",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -110,11 +110,11 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .get("/v1/tenants/tenantId/documents/id")
+            .get("/v1/tenants/tenantId/documents/docId")
             .respondWith()
             .statusCode(403)
             .jsonBody(rawResponseBody)
@@ -123,7 +123,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.get({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
             });
         }).rejects.toThrow(CloudPDF.ForbiddenError);
     });
@@ -132,11 +132,11 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .get("/v1/tenants/tenantId/documents/id")
+            .get("/v1/tenants/tenantId/documents/docId")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -145,7 +145,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.get({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -154,11 +154,11 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        server.mockEndpoint().delete("/v1/tenants/tenantId/documents/id").respondWith().statusCode(200).build();
+        server.mockEndpoint().delete("/v1/tenants/tenantId/documents/docId").respondWith().statusCode(200).build();
 
         const response = await client.documents.delete({
             tenantId: "tenantId",
-            id: "id",
+            docId: "docId",
         });
         expect(response).toEqual(undefined);
     });
@@ -167,11 +167,11 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .delete("/v1/tenants/tenantId/documents/id")
+            .delete("/v1/tenants/tenantId/documents/docId")
             .respondWith()
             .statusCode(403)
             .jsonBody(rawResponseBody)
@@ -180,7 +180,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.delete({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
             });
         }).rejects.toThrow(CloudPDF.ForbiddenError);
     });
@@ -189,11 +189,11 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .delete("/v1/tenants/tenantId/documents/id")
+            .delete("/v1/tenants/tenantId/documents/docId")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -202,7 +202,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.delete({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -218,22 +218,22 @@ describe("DocumentsClient", () => {
                 name: "name",
                 folderId: "folderId",
                 state: "pending",
-                baseSha: "baseSha",
-                storageSizeBytes: 1.1,
+                baseSha256: "baseSha256",
+                sizeBytes: 1,
                 metadata: { key: "value" },
                 idempotencyKey: "idempotencyKey",
                 failureReason: "failureReason",
                 thumbnailState: "pending",
                 thumbnailUrl: "thumbnailUrl",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: "2024-01-15T09:30:00Z",
+                updatedAt: "2024-01-15T09:30:00Z",
                 createdBy: "createdBy",
             },
         };
 
         server
             .mockEndpoint()
-            .patch("/v1/tenants/tenantId/documents/id")
+            .patch("/v1/tenants/tenantId/documents/docId")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
@@ -242,7 +242,7 @@ describe("DocumentsClient", () => {
 
         const response = await client.documents.update({
             tenantId: "tenantId",
-            id: "id",
+            docId: "docId",
             name: "name",
         });
         expect(response).toEqual(rawResponseBody);
@@ -252,11 +252,11 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { name: "x" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .patch("/v1/tenants/tenantId/documents/id")
+            .patch("/v1/tenants/tenantId/documents/docId")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -266,7 +266,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.update({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
                 name: "x",
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
@@ -276,11 +276,11 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { name: "x" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .patch("/v1/tenants/tenantId/documents/id")
+            .patch("/v1/tenants/tenantId/documents/docId")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(403)
@@ -290,7 +290,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.update({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
                 name: "x",
             });
         }).rejects.toThrow(CloudPDF.ForbiddenError);
@@ -300,11 +300,11 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { name: "x" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .patch("/v1/tenants/tenantId/documents/id")
+            .patch("/v1/tenants/tenantId/documents/docId")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -314,7 +314,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.update({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
                 name: "x",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
@@ -331,22 +331,22 @@ describe("DocumentsClient", () => {
                 name: "name",
                 folderId: "folderId",
                 state: "pending",
-                baseSha: "baseSha",
-                storageSizeBytes: 1.1,
+                baseSha256: "baseSha256",
+                sizeBytes: 1,
                 metadata: { key: "value" },
                 idempotencyKey: "idempotencyKey",
                 failureReason: "failureReason",
                 thumbnailState: "pending",
                 thumbnailUrl: "thumbnailUrl",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: "2024-01-15T09:30:00Z",
+                updatedAt: "2024-01-15T09:30:00Z",
                 createdBy: "createdBy",
             },
         };
 
         server
             .mockEndpoint()
-            .post("/v1/tenants/tenantId/documents/id/commit")
+            .post("/v1/tenants/tenantId/documents/docId/commit")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
@@ -355,7 +355,7 @@ describe("DocumentsClient", () => {
 
         const response = await client.documents.commit({
             tenantId: "tenantId",
-            id: "id",
+            docId: "docId",
             sha256: "sha256",
         });
         expect(response).toEqual(rawResponseBody);
@@ -365,11 +365,11 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { sha256: "sha256" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .post("/v1/tenants/tenantId/documents/id/commit")
+            .post("/v1/tenants/tenantId/documents/docId/commit")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -379,7 +379,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.commit({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
                 sha256: "sha256",
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
@@ -389,11 +389,11 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { sha256: "sha256" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
-            .post("/v1/tenants/tenantId/documents/id/commit")
+            .post("/v1/tenants/tenantId/documents/docId/commit")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -403,7 +403,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.commit({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
                 sha256: "sha256",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
@@ -414,22 +414,22 @@ describe("DocumentsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { source: { kind: "url", url: "url" } };
         const rawResponseBody = {
-            tag: "imported",
+            status: "imported",
             document: {
                 id: "id",
                 tenantId: "tenantId",
                 name: "name",
                 folderId: "folderId",
                 state: "pending",
-                baseSha: "baseSha",
-                storageSizeBytes: 1.1,
+                baseSha256: "baseSha256",
+                sizeBytes: 1,
                 metadata: { key: "value" },
                 idempotencyKey: "idempotencyKey",
                 failureReason: "failureReason",
                 thumbnailState: "pending",
                 thumbnailUrl: "thumbnailUrl",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: "2024-01-15T09:30:00Z",
+                updatedAt: "2024-01-15T09:30:00Z",
                 createdBy: "createdBy",
             },
         };
@@ -457,7 +457,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { source: { kind: "url", url: "url" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -483,7 +483,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { source: { kind: "url", url: "url" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -509,7 +509,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { source: { kind: "url", url: "url" } };
-        const rawResponseBody = { error: { code: "code", message: "message" } };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -534,29 +534,29 @@ describe("DocumentsClient", () => {
     test("init (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { contentLength: 1.1, contentSha256: "contentSha256" };
+        const rawRequestBody = { sizeBytes: 1, contentSha256: "contentSha256" };
         const rawResponseBody = {
-            tag: "created",
+            status: "created",
             document: {
                 id: "id",
                 tenantId: "tenantId",
                 name: "name",
                 folderId: "folderId",
                 state: "pending",
-                baseSha: "baseSha",
-                storageSizeBytes: 1.1,
+                baseSha256: "baseSha256",
+                sizeBytes: 1,
                 metadata: { key: "value" },
                 idempotencyKey: "idempotencyKey",
                 failureReason: "failureReason",
                 thumbnailState: "pending",
                 thumbnailUrl: "thumbnailUrl",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: "2024-01-15T09:30:00Z",
+                updatedAt: "2024-01-15T09:30:00Z",
                 createdBy: "createdBy",
             },
             upload: {
                 kind: "presigned",
-                presigned: { url: "url", headers: { key: "value" }, method: "PUT", expiresAt: 1.1 },
+                presigned: { url: "url", headers: { key: "value" }, method: "PUT", expiresAt: "2024-01-15T09:30:00Z" },
                 key: "key",
             },
         };
@@ -572,7 +572,7 @@ describe("DocumentsClient", () => {
 
         const response = await client.documents.init({
             tenantId: "tenantId",
-            contentLength: 1.1,
+            sizeBytes: 1,
             contentSha256: "contentSha256",
         });
         expect(response).toEqual(rawResponseBody);
@@ -581,8 +581,8 @@ describe("DocumentsClient", () => {
     test("init (2)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { contentLength: 1, contentSha256: "contentSha256" };
-        const rawResponseBody = { key: "value" };
+        const rawRequestBody = { sizeBytes: 1, contentSha256: "contentSha256" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -596,7 +596,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.init({
                 tenantId: "tenantId",
-                contentLength: 1,
+                sizeBytes: 1,
                 contentSha256: "contentSha256",
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
@@ -605,8 +605,8 @@ describe("DocumentsClient", () => {
     test("init (3)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { contentLength: 1, contentSha256: "contentSha256" };
-        const rawResponseBody = { key: "value" };
+        const rawRequestBody = { sizeBytes: 1, contentSha256: "contentSha256" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -620,7 +620,7 @@ describe("DocumentsClient", () => {
         await expect(async () => {
             return await client.documents.init({
                 tenantId: "tenantId",
-                contentLength: 1,
+                sizeBytes: 1,
                 contentSha256: "contentSha256",
             });
         }).rejects.toThrow(CloudPDF.ForbiddenError);

@@ -217,7 +217,7 @@ export type {
   MeasurementFormatOptions,
   MeasureFromRatioOptions,
   FormFieldRef,
-  FormFieldDTO,
+  FormField,
   FormBundle,
   FormImportResult,
   FormValuesImportResult,

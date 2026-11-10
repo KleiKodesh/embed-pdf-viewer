@@ -27,6 +27,7 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 import { readLayerArtifactHeader } from '../src/storage/layerArtifact';
+import { pinOf } from './_helpers/pins';
 
 const SECRET = 'layer-download-secret';
 const TENANT = 'tenant-layer-download';
@@ -261,7 +262,11 @@ describe('an incremental download', () => {
     const { docVersion } = await json(await call('GET', DOC, layer, '/manifest'));
     const path = (version: number) =>
       wirePaths
-        .layerDownloadVersioned(DOC, layer, { docVersion: version, mode: 'incremental' })
+        .layerDownloadVersioned(DOC, layer, {
+          docVersion: version,
+          mode: 'incremental',
+          pin: pinOf('download'),
+        })
         .replace(`/v1/docs/${DOC}/layers/${layer}`, '');
     const { result: bytes, dispatched } = await jobsDuring(async () =>
       bytesOf(await call('GET', DOC, layer, path(docVersion))),
@@ -305,16 +310,20 @@ describe('a download link', () => {
       extras: { download: { docVersion, mode: 'incremental' } },
     });
   const versionedUrl = (layer: string, docVersion: number) =>
-    `${baseUrl}${wirePaths.layerDownloadVersioned(DOC, layer, { docVersion, mode: 'incremental' })}`;
+    `${baseUrl}${wirePaths.layerDownloadVersioned(DOC, layer, {
+      docVersion,
+      mode: 'incremental',
+      pin: pinOf('download'),
+    })}`;
 
   test('downloads the layer with a plain GET, without the engine, and is not cached', async () => {
     const layer = 'linked';
     await edit(layer);
-    const made = await json(await mint(layer, { expiresIn: 120 }));
+    const made = await json(await mint(layer, { expiresInSeconds: 120 }));
     expect(made.url).toMatch(
       new RegExp(`^${baseUrl}/v1/docs/${DOC}/layers/${layer}/download@.+\\?link=`),
     );
-    expect(made.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000) + 100);
+    expect(Date.parse(made.expiresAt)).toBeGreaterThan(Date.now() + 100_000);
 
     const { result: res, dispatched } = await jobsDuring(() => fetch(made.url));
     const bytes = await bytesOf(res);
@@ -368,7 +377,7 @@ describe('a download link', () => {
 
   test('making one needs doc.download, and an expiry in range', async () => {
     expect((await mint('linked', {}, ['doc.open'])).status).toBe(403);
-    expect((await mint('linked', { expiresIn: 30 })).status).toBe(400);
-    expect((await mint('linked', { expiresIn: 7200 })).status).toBe(400);
+    expect((await mint('linked', { expiresInSeconds: 30 })).status).toBe(400);
+    expect((await mint('linked', { expiresInSeconds: 7200 })).status).toBe(400);
   });
 });

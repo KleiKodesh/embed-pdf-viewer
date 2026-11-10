@@ -47,7 +47,10 @@ export class AttachmentsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher<core.BinaryResponse>({
@@ -74,11 +77,20 @@ export class AttachmentsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 413:
-                    throw new CloudPDF.ContentTooLargeError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ContentTooLargeError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -115,20 +127,23 @@ export class AttachmentsClient {
     public list(
         request: CloudPDF.doc.ListAttachmentsRequest,
         requestOptions?: AttachmentsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocAttachmentsList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocAttachmentsListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.doc.ListAttachmentsRequest,
         requestOptions?: AttachmentsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocAttachmentsList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocAttachmentsListResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -148,16 +163,16 @@ export class AttachmentsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocAttachmentsList200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocAttachmentsListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

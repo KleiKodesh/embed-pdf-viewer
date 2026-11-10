@@ -23,7 +23,7 @@ const plugins = [
 ];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -36,7 +36,7 @@ function Result({ id }: { id: string }) {
     <li>
       <button type="button" className="result" disabled={!command.enabled} onClick={command.run}>
         <span>{command.label}</span>
-        {command.shortcut && <kbd className="shortcut">{command.shortcut}</kbd>}
+        {command.shortcutLabel && <kbd className="shortcut">{command.shortcutLabel}</kbd>}
       </button>
     </li>
   );

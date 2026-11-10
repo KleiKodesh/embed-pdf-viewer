@@ -147,15 +147,15 @@ const linkTargetOf = async (doc: DocumentHandle) => {
  */
 export function runOutlineConformance(
   runner: ConformanceTestRunner,
-  opts: OutlineConformanceOptions,
+  options: OutlineConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`outline conformance: ${opts.label}`, () => {
+  describe(`outline conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -166,7 +166,7 @@ export function runOutlineConformance(
       body: (doc: DocumentHandle) => Promise<void>,
       bytes = OUTLINE_FIXTURE_PDF,
     ) => {
-      const doc = await opts.open(engine, bytes.slice());
+      const doc = await options.open(engine, bytes.slice());
       try {
         await body(doc);
       } finally {
@@ -188,7 +188,7 @@ export function runOutlineConformance(
           action: null,
           target: {
             kind: 'goto',
-            destination: { kind: 'xyz', page: FIRST_PAGE, x: 20, y: 20 },
+            destination: { kind: 'xyz', page: FIRST_PAGE, x: 20, y: 20, zoom: null },
           },
         });
         expect(itemOf(outline, A1)).toMatchObject({
@@ -221,7 +221,7 @@ export function runOutlineConformance(
         expect(outline.incomplete).toBe(false);
         const shared = {
           kind: 'goto',
-          destination: { kind: 'xyz', page: FIRST_PAGE, x: 10, y: 10 },
+          destination: { kind: 'xyz', page: FIRST_PAGE, x: 10, y: 10, zoom: null },
         };
         expect(itemOf(outline, SHARED_ONE)).toMatchObject({
           target: shared,
@@ -230,7 +230,10 @@ export function runOutlineConformance(
         expect(itemOf(outline, SHARED_TWO)).toMatchObject({ target: shared });
         expect(await linkTargetOf(doc)).toMatchObject(shared);
         expect(itemOf(outline, HYPERREF)).toMatchObject({
-          target: { kind: 'goto', destination: { kind: 'xyz', page: SECOND_PAGE, x: 0, y: 100 } },
+          target: {
+            kind: 'goto',
+            destination: { kind: 'xyz', page: SECOND_PAGE, x: 0, y: 100, zoom: null },
+          },
           action: { root: { type: 'goto' } },
         });
         expect(itemOf(outline, OLD_DESTS)).toMatchObject({
@@ -334,11 +337,14 @@ export function runOutlineConformance(
           italic: true,
         });
         const retargeted = await doc.outline.update(C1, {
-          target: { kind: 'goto', destination: { kind: 'xyz', page: SECOND_PAGE, x: 10, y: 40 } },
+          target: {
+            kind: 'goto',
+            destination: { kind: 'xyz', page: SECOND_PAGE, x: 10, y: 40, zoom: null },
+          },
         });
         expect(retargeted.item.target).toMatchObject({
           kind: 'goto',
-          destination: { kind: 'xyz', page: SECOND_PAGE, x: 10, y: 40 },
+          destination: { kind: 'xyz', page: SECOND_PAGE, x: 10, y: 40, zoom: null },
         });
         expect(retargeted.item.action).toMatchObject({ root: { type: 'goto' } });
       });
@@ -403,7 +409,7 @@ export function runOutlineConformance(
     test('a move takes items together with the items under them, and names both parents', async () => {
       await withOutline(async (doc) => {
         const moved = await doc.outline.move([C, D], A, { after: A1 });
-        expect(moved.meta.changed).toEqual([C, D]);
+        expect(moved.meta.changedRefs).toEqual([C, D]);
         expect(orderOf(moved.orders, null)).toEqual([6, 7]);
         expect(orderOf(moved.orders, A)).toEqual([10, 8, 9]);
         const outline = await doc.outline.get();
@@ -440,7 +446,7 @@ export function runOutlineConformance(
       await withOutline(async (doc) => {
         const before = await doc.outline.get();
         const deleted = await doc.outline.delete(C);
-        expect(deleted.meta.changed).toEqual([C, C1]);
+        expect(deleted.meta.changedRefs).toEqual([C, C1]);
         expect(titles(await doc.outline.get())).toEqual(['A', 'A1', 'B', 'D']);
         const undo = await doc.apply({ undoOf: deleted.meta.opId });
         expect(undo.items.map((item) => item.type)).toEqual(['outline.restore']);
@@ -488,13 +494,13 @@ export function runOutlineConformance(
         ]);
         expect(outline[0]).toMatchObject({ item: { title: 'New', parent: C } });
         expect(outline[1]).toMatchObject({ item: { title: 'Newer' } });
-        expect(outline[2]).toMatchObject({ meta: { changed: [created] } });
+        expect(outline[2]).toMatchObject({ meta: { changedRefs: [created] } });
         expect(outline[3]).toMatchObject({ deleted: [created] });
       });
     });
 
     test('without doc.outline.modify every write is refused; reading still works', async () => {
-      const doc = await opts.openReadOnly(engine, OUTLINE_FIXTURE_PDF.slice());
+      const doc = await options.openReadOnly(engine, OUTLINE_FIXTURE_PDF.slice());
       try {
         expect(titles(await doc.outline.get())).toEqual(['A', 'A1', 'B', 'C', 'C1', 'D']);
         const denied = { code: EngineErrorCode.Forbidden };

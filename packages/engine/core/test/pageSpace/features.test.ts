@@ -5,7 +5,7 @@ import { pdfRectOf } from '../../src/geometry/pageSpace';
 import type { PdfRect } from '../../src/geometry/primitives';
 import { toPageRef } from '../../src/identity/PageRef';
 import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
-import type { FormFieldDTO } from '../../src/forms/field';
+import type { FormField } from '../../src/forms/field';
 import type { WidgetAnnotation } from '../../src/annotation/kinds/widget';
 import { pageFormFieldOf, pageWidgetOf, pdfWidgetPlacementOf } from '../../src/pageSpace/forms';
 import { pageViewportsOf, pdfMeasureOf } from '../../src/pageSpace/measure';
@@ -70,12 +70,17 @@ describe('pages in page space', () => {
       actions: {
         open: {
           incomplete: false,
-          warningFlags: 0,
           warnings: [],
           root: {
             subtype: 'GoTo',
             type: 'goto' as const,
-            destination: { kind: 'xyz' as const, page: toPageRef(6), left: -250, top: 350 },
+            destination: {
+              kind: 'xyz' as const,
+              page: toPageRef(6),
+              left: -250,
+              top: 350,
+              zoom: null,
+            },
             next: [],
           },
         },
@@ -88,7 +93,7 @@ describe('pages in page space', () => {
       namedPages: [],
     });
     expect(pages[0]!.actions?.open?.root).toMatchObject({
-      destination: { kind: 'xyz', page: toPageRef(6), x: 50, y: 40 },
+      destination: { kind: 'xyz', page: toPageRef(6), x: 50, y: 40, zoom: null },
     });
     expect('actions' in pages[1]!).toBe(false);
   });
@@ -114,13 +119,12 @@ describe('render, form and measure values', () => {
   test("a field's actions go to spots on the pages they go to; the rest of the field stays", () => {
     const boxOf = visibleBoxesOf([layout(4, crop)]);
     const field = {
-      family: 'pushbutton',
+      kind: 'pushbutton',
       name: 'go',
       widgets: [],
       actions: {
         calculate: {
           incomplete: false,
-          warningFlags: 0,
           warnings: [],
           root: {
             subtype: 'GoTo',
@@ -130,7 +134,7 @@ describe('render, form and measure values', () => {
           },
         },
       },
-    } as unknown as FormFieldDTO<PdfCoordinates>;
+    } as unknown as FormField<PdfCoordinates>;
     expect(pageFormFieldOf(field, boxOf)).toEqual({
       ...field,
       actions: {
@@ -146,10 +150,10 @@ describe('render, form and measure values', () => {
       },
     });
     const plain = {
-      family: 'pushbutton',
+      kind: 'pushbutton',
       name: 'plain',
       widgets: [],
-    } as unknown as FormFieldDTO<PdfCoordinates>;
+    } as unknown as FormField<PdfCoordinates>;
     expect(pageFormFieldOf(plain, boxOf)).toEqual(plain);
   });
 

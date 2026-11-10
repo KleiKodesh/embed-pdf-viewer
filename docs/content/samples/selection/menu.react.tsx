@@ -24,7 +24,7 @@ type Placement = (typeof PLACEMENTS)[number];
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -53,13 +53,15 @@ function SelectionActions() {
   );
 }
 
-// Something selected on load, so the menu shows: the title on the cover.
+// Something selected on load, so the menu shows: "Documents", the first word on the cover.
 function SelectTitle() {
   const selection = useSelection();
   const cover = usePageList()[0]?.ref;
 
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    // [!doc-range welcome firstWord]
+    if (cover) selection.select({ page: cover, start: 28, count: 9 });
+    // [!/doc-range]
   }, [selection, cover]);
 
   return null;

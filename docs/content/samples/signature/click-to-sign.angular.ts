@@ -27,7 +27,7 @@ const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 
 // [!doc-source agreement]
 const agreement = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/agreement.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/agreement.pdf');
   return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -51,7 +51,7 @@ const agreement = async (): Promise<OpenInput> => {
       withAnnotation(),
       withForm(),
       withStamp({ assetEngine }),
-      withSignature({ key: () => signer }),
+      withSignature({ signingKey: () => signer }),
     ),
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -96,7 +96,8 @@ export class App {
     // Ada's signature, once she signs: the agreement already carries Lanternfield's.
     const signed = this.signature.signatures().find((each) => each.fieldName === 'approval');
     if (signed) return `The field is signed by ${signed.signer.name}`;
-    if (this.stamp.armedAsset()) return 'Click the empty field to sign it, or anywhere else to place it';
+    if (this.stamp.armedAsset())
+      return 'Click the empty field to sign it, or anywhere else to place it';
     if (this.mark()) return 'Arm the signature, then click where it goes';
     return 'Getting ready…';
   });

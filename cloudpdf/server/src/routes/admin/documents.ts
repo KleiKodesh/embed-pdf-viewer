@@ -12,8 +12,10 @@ import {
   type AdminOperation,
   type DocumentListSort,
   type ListOrder,
+  type AdminDocumentRecord,
+  type AdminInitUpload,
 } from '@cloudpdf/contract';
-import { decodePdfBits, type PdfBits } from '@embedpdf/engine-core/runtime';
+import { permissionFlagsOf, type PdfPermissionFlags } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { decodeSortedListCursor, encodeSortedListCursor } from './_cursor';
@@ -26,8 +28,10 @@ import {
   type UploadAccessContext,
 } from '../../app/jwt-plugin';
 import { listPositionOf } from '../../db/repos/documents.repo';
-import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
+import type { DocumentLifecycleService, InitUpload } from '../../services/DocumentLifecycleService';
 import type { ObjectStore } from '../../storage/ObjectStore';
+import { errorBody } from '../_helpers';
+import { isoTime } from '../../time';
 
 export interface AdminDocumentsRouteDeps {
   lifecycle: DocumentLifecycleService;
@@ -40,22 +44,22 @@ export interface AdminDocumentsRouteDeps {
  *
  * The flow customers walk through:
  *   1. POST /v1/tenants/:tenantId/documents/init
- *      body: { contentLength, contentSha256, name?, metadata?, idempotencyKey?, dedupMode?, docId? }
- *      -> { id, state, tag: 'created'|'resumed'|'deduped', upload?: { ... } }
+ *      body: { sizeBytes, contentSha256, name?, metadata?, idempotencyKey?, dedupMode?, docId? }
+ *      -> { id, state, status: 'created'|'resumed'|'deduped', upload?: { ... } }
  *
  *   2. (If not deduped:) PUT the bytes to `upload.url` (presigned) or
- *      POST multipart to `.../documents/:id/upload-proxy` when the
+ *      POST multipart to `.../documents/:docId/upload-proxy` when the
  *      deployment selected the bounded origin fallback.
  *
- *   3. POST .../documents/:id/commit
+ *   3. POST .../documents/:docId/commit
  *      body: { sha256 }
- *      -> { id, state, baseSha, ... }
+ *      -> { id, state, baseSha256, ... }
  *
  * Or, replacing all three when the bytes already live in the
  * customer's own storage — the server-side pull:
  *      POST /v1/tenants/:tenantId/documents/import
  *      body: { source: { kind: 'url', url }, expected?, ... }
- *      -> { tag: 'imported'|'deduped', document }
+ *      -> { status: 'imported'|'deduped'|'accepted', document }
  *
  * Listing / deleting / downloading are flat REST against the tenant documents collection.
  */
@@ -95,7 +99,7 @@ export async function registerAdminDocumentsRoutes(
     const result = await lifecycle.init({
       tenantId: ctx.tenantId,
       sub: ctx.sub,
-      contentLength: body.contentLength,
+      contentLength: body.sizeBytes,
       contentSha256: body.contentSha256,
       name: body.name,
       folderId: filing.folderId,
@@ -103,7 +107,7 @@ export async function registerAdminDocumentsRoutes(
       idempotencyKey: body.idempotencyKey ?? null,
       dedupMode: body.dedupMode,
       docId: body.docId,
-      uploadTtlSec: body.uploadTtlSec,
+      uploadTtlSec: body.uploadTtlSeconds,
       uploadPreference: body.uploadPreference,
       ...(ctx.via === 'upload-jwt'
         ? {
@@ -116,9 +120,9 @@ export async function registerAdminDocumentsRoutes(
         : {}),
     });
 
-    if (result.tag === 'deduped') {
+    if (result.status === 'deduped') {
       return reply.send({
-        tag: result.tag,
+        status: result.status,
         document: docPublic(result.doc),
       });
     }
@@ -128,20 +132,20 @@ export async function registerAdminDocumentsRoutes(
     const upload = await lifecycle.issueUpload(
       result.doc.id,
       ctx.tenantId,
-      body.contentLength,
+      body.sizeBytes,
       (docId) => adminWirePaths.documentUploadProxy(tenantId, docId),
-      { ttlSec: body.uploadTtlSec, preference: body.uploadPreference },
+      { ttlSec: body.uploadTtlSeconds, preference: body.uploadPreference },
     );
     return reply.send({
-      tag: result.tag,
+      status: result.status,
       document: docPublic(result.doc),
-      upload,
+      upload: uploadPublic(upload),
     });
   });
 
   const commitOp = adminOperations['documents.commit'];
   mount(commitOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireUploadAccess(req, tenantId, commitOp.scope);
     const body = parseCommitBody(req);
     if (ctx.via === 'upload-jwt') {
@@ -158,7 +162,7 @@ export async function registerAdminDocumentsRoutes(
 
   const uploadProxyOp = adminOperations['documents.uploadProxy'];
   mount(uploadProxyOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireUploadAccess(req, tenantId, uploadProxyOp.scope);
     if (ctx.via === 'upload-jwt') {
       await lifecycle.requireStartedByUploadToken(ctx.tenantId, id, ctx.jti);
@@ -208,8 +212,8 @@ export async function registerAdminDocumentsRoutes(
       mode: body.mode,
     });
     return reply
-      .code(result.tag === 'accepted' ? 202 : 200)
-      .send({ tag: result.tag, document: docPublic(result.doc) });
+      .code(result.status === 'accepted' ? 202 : 200)
+      .send({ status: result.status, document: docPublic(result.doc) });
   });
 
   const listOp = adminOperations['documents.list'];
@@ -252,7 +256,7 @@ export async function registerAdminDocumentsRoutes(
 
   const getOp = adminOperations['documents.get'];
   mount(getOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireTenantAccess(req, tenantId, getOp.scope);
     const doc = await lifecycle.get(ctx.tenantId, id);
     return reply.send({ document: docPublic(doc) });
@@ -260,7 +264,7 @@ export async function registerAdminDocumentsRoutes(
 
   const updateOp = adminOperations['documents.update'];
   mount(updateOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireTenantAccess(req, tenantId, updateOp.scope);
     const body = parseUpdateBody(req);
     const doc = await lifecycle.rename(ctx.tenantId, id, body.name);
@@ -269,9 +273,9 @@ export async function registerAdminDocumentsRoutes(
 
   const downloadOp = adminOperations['documents.download'];
   mount(downloadOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = await requireTenantContentAccess(req, tenantId, 'doc.download', () =>
-      pdfBitsOf(lifecycle, tenantId, id),
+      permissionFlagsOfDocument(lifecycle, tenantId, id),
     );
     const bytes = await lifecycle.download(ctx.tenantId, id);
     return reply
@@ -282,7 +286,7 @@ export async function registerAdminDocumentsRoutes(
 
   const deleteOp = adminOperations['documents.delete'];
   mount(deleteOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireTenantAccess(req, tenantId, deleteOp.scope);
     await lifecycle.delete(ctx.tenantId, id);
     return reply.code(204).send();
@@ -296,29 +300,25 @@ export async function registerAdminDocumentsRoutes(
    */
   const thumbnailOp = adminOperations['documents.thumbnail'];
   mount(thumbnailOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = await requireTenantContentAccess(req, tenantId, 'doc.render', () =>
-      pdfBitsOf(lifecycle, tenantId, id),
+      permissionFlagsOfDocument(lifecycle, tenantId, id),
     );
     const doc = await lifecycle.get(ctx.tenantId, id);
     if (!storage || doc.thumbnailState !== 'ready' || !doc.thumbnailKey) {
-      return reply.code(404).send({
-        error: {
-          code: 'ThumbnailNotReady',
-          message: 'thumbnail is not ready to serve',
+      return reply.code(404).send(
+        errorBody('ThumbnailNotReady', 'thumbnail is not ready to serve', {
           state: doc.thumbnailState,
-        },
-      });
+        }),
+      );
     }
     const bytes = await storage.get(doc.thumbnailKey);
     if (!bytes) {
-      return reply.code(404).send({
-        error: {
-          code: 'ThumbnailNotReady',
-          message: 'thumbnail is not ready to serve',
-          state: 'pending',
-        },
-      });
+      return reply
+        .code(404)
+        .send(
+          errorBody('ThumbnailNotReady', 'thumbnail is not ready to serve', { state: 'pending' }),
+        );
     }
     return reply
       .type(doc.thumbnailKey.endsWith('.png') ? 'image/png' : 'image/webp')
@@ -347,11 +347,11 @@ function uploadTokenFiling(
     throw makeError('InvalidArg', 400, 'an upload token always makes a new document');
   }
   const { max_bytes: maxBytes } = ctx.upload;
-  if (maxBytes !== undefined && body.contentLength > maxBytes) {
+  if (maxBytes !== undefined && body.sizeBytes > maxBytes) {
     throw makeError(
       'InvalidArg',
       400,
-      `the file is ${body.contentLength} bytes; this upload token takes at most ${maxBytes}`,
+      `the file is ${body.sizeBytes} bytes; this upload token takes at most ${maxBytes}`,
     );
   }
   return { folderId: ctx.upload.folder_id, metadata: ctx.upload.metadata ?? null };
@@ -380,13 +380,13 @@ function parseCommitBody(req: FastifyRequest): AdminDocumentCommitRequest {
 }
 
 /** The document's PDF permission bits, which `pdf.permissions` in a scope expands against. */
-async function pdfBitsOf(
+async function permissionFlagsOfDocument(
   lifecycle: DocumentLifecycleService,
   tenantId: string,
   docId: string,
-): Promise<PdfBits> {
+): Promise<PdfPermissionFlags> {
   const doc = await lifecycle.get(tenantId, docId);
-  return decodePdfBits(doc.security.pdfPermissionsBits ?? null);
+  return permissionFlagsOf(doc.security.pdfPermissionsBits ?? null);
 }
 
 function parseUpdateBody(req: FastifyRequest): AdminDocumentUpdateRequest {
@@ -421,26 +421,26 @@ function docPublic(d: {
   tenantId: string;
   name: string;
   folderId: string | null;
-  state: string;
+  state: AdminDocumentRecord['state'];
   baseSha: string | null;
   storageSizeBytes: number | null;
   metadata: Record<string, unknown> | null;
   idempotencyKey: string | null;
   failureReason: string | null;
-  thumbnailState: string;
+  thumbnailState: AdminDocumentRecord['thumbnailState'];
   thumbnailKey: string | null;
   createdAt: number;
   updatedAt: number;
   createdBy: string | null;
-}): Record<string, unknown> {
+}): AdminDocumentRecord {
   return {
     id: d.id,
     tenantId: d.tenantId,
     name: d.name,
     folderId: placeOfFolderId(d.folderId),
     state: d.state,
-    baseSha: d.baseSha,
-    storageSizeBytes: d.storageSizeBytes,
+    baseSha256: d.baseSha,
+    sizeBytes: d.storageSizeBytes,
     metadata: d.metadata,
     idempotencyKey: d.idempotencyKey,
     failureReason: d.failureReason,
@@ -449,10 +449,19 @@ function docPublic(d: {
     thumbnailState: d.thumbnailState,
     thumbnailUrl:
       d.thumbnailState === 'ready' ? adminWirePaths.documentThumbnail(d.tenantId, d.id) : null,
-    createdAt: d.createdAt,
-    updatedAt: d.updatedAt,
+    createdAt: isoTime(d.createdAt),
+    updatedAt: isoTime(d.updatedAt),
     createdBy: d.createdBy,
   };
+}
+
+function uploadPublic(upload: InitUpload): AdminInitUpload {
+  return upload.kind === 'presigned'
+    ? {
+        ...upload,
+        presigned: { ...upload.presigned, expiresAt: isoTime(upload.presigned.expiresAt) },
+      }
+    : upload;
 }
 
 function makeError(code: string, status: number, message: string): Error {

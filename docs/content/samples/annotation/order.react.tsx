@@ -21,7 +21,7 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationP
 
 // [!doc-source layout]
 const layout = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/layout.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/layout.pdf');
   return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -38,7 +38,7 @@ function SelectMiddle() {
     done.current = true;
     const stack2 = annotation.list().find((each) => each.nm === 'stack-2');
     if (!stack2) return;
-    annotation.selection.set([stack2.ref]);
+    annotation.selection.select([stack2.ref]);
     stage.reveal(stack2.page, { rect: stack2.rect });
   }, [annotation, stage, ready]);
 

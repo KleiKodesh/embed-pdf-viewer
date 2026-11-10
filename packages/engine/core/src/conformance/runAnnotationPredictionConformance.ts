@@ -68,6 +68,16 @@ const CALLOUT: AnnotationDraft = {
   lineEnding: 'open-arrow',
 };
 
+/** One line of text, its top corners first, as a selection's quads are. */
+const QUADS = [
+  {
+    upperLeft: { x: 80, y: 160 },
+    upperRight: { x: 260, y: 160 },
+    lowerLeft: { x: 80, y: 176 },
+    lowerRight: { x: 260, y: 176 },
+  },
+];
+
 const TRIANGLE = [
   { x: 100, y: 300 },
   { x: 220, y: 300 },
@@ -86,6 +96,8 @@ const CASES: PredictionCase[] = [
     patch: { box: { ...BOX, x: BOX.x + 30 } },
   },
   { name: 'square: turned', draft: { subtype: 'square', box: BOX }, patch: { rotation: 30 } },
+  { name: 'square: renamed', draft: { subtype: 'square', box: BOX }, patch: { nm: 'renamed' } },
+  { name: 'square: its name removed', draft: { subtype: 'square', box: BOX }, patch: { nm: null } },
   {
     name: 'square: straightened',
     draft: { subtype: 'square', box: BOX, rotation: 30 },
@@ -100,6 +112,26 @@ const CASES: PredictionCase[] = [
     name: 'square: the whole read sent back with one change',
     draft: { subtype: 'square', box: BOX, interiorColor: '#ff0000' },
     patch: (created) => ({ ...created, contents: 'kept' }) as AnnotationPatch,
+  },
+  {
+    name: 'square: becomes a circle with a new color',
+    draft: { subtype: 'square', box: BOX, interiorColor: '#ff0000' },
+    patch: { subtype: 'circle', color: '#1a2b3c' },
+  },
+  {
+    name: 'square: the whole read sent back as a circle',
+    draft: { subtype: 'square', box: BOX },
+    patch: (created) => ({ ...created, subtype: 'circle' }) as AnnotationPatch,
+  },
+  {
+    name: 'highlight: becomes a squiggly line',
+    draft: { subtype: 'highlight', quadPoints: QUADS },
+    patch: { subtype: 'squiggly' },
+  },
+  {
+    name: 'highlight: becomes a strikeout, its intent read as null',
+    draft: { subtype: 'highlight', quadPoints: QUADS, contents: 'kept' },
+    patch: { subtype: 'strikeout' },
   },
   {
     name: 'line: new points',
@@ -284,6 +316,7 @@ const CASES: PredictionCase[] = [
  */
 const WIDGET_CASES: { name: string; patch: WidgetPatch }[] = [
   { name: 'hidden and locked', patch: { hidden: true, locked: true } },
+  { name: 'renamed', patch: { nm: 'renamed-widget' } },
   {
     name: 'moved and restyled',
     patch: { rect: { ...BOX, x: 300 }, color: '#1f6feb', strokeWidth: 2 },
@@ -520,18 +553,18 @@ function fieldDifferences(predicted: Annotation, actual: Annotation) {
  */
 export function runAnnotationPredictionConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationPredictionConformanceOptions,
+  options: AnnotationPredictionConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation prediction conformance: ${opts.label}`, () => {
+  describe(`annotation prediction conformance: ${options.label}`, () => {
     let engine: Engine;
     let doc: DocumentHandle;
     let page: PageHandle;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
-      doc = await opts.open(engine);
+      engine = await options.makeEngine();
+      doc = await options.open(engine);
       const { pages } = await doc.pages.list();
       page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
     });
@@ -559,7 +592,7 @@ export function runAnnotationPredictionConformance(
     for (const [at, scenario] of WIDGET_CASES.entries()) {
       test(`widget: ${scenario.name}`, async () => {
         const { widgets } = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: `predicted_${at}`,
           widgets: [{ page: page.ref, rect: BOX }],
         });

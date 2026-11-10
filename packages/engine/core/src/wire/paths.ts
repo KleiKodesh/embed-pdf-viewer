@@ -1,4 +1,5 @@
 import { encodePageKey, type PageRef } from '../identity/PageRef';
+import type { TokenPin } from './cachedReads';
 import type { ModificationLevel } from '../signature/types';
 import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
 import {
@@ -92,6 +93,7 @@ import {
   encodeTokenText,
   encodeWidgetAppearancesRenderToken,
   type DownloadToken,
+  type LayoutToken,
   type TokenInput,
 } from './tokens';
 
@@ -146,8 +148,8 @@ export const wirePaths = {
    * returns 404 — the SDK refetches `/head` to learn the new
    * version, then re-requests the manifest at the new URL.
    */
-  docManifest: (docId: string, docVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/manifest@${encodeDocToken(docVersion)}`,
+  docManifest: (docId: string, docVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/manifest@${encodeDocToken(docVersion, pin)}`,
 
   /**
    * GET: full layer manifest at a specific layer document version.
@@ -155,8 +157,8 @@ export const wirePaths = {
    * once a layer row exists, `layers.doc_version` and `layer_pages`
    * drive the response.
    */
-  layerManifest: (docId: string, layerName: string, docVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/manifest@${encodeDocToken(docVersion)}`,
+  layerManifest: (docId: string, layerName: string, docVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/manifest@${encodeDocToken(docVersion, pin)}`,
 
   /**
    * GET: page-geometry list for the whole layer at a specific
@@ -166,16 +168,16 @@ export const wirePaths = {
    * transparent retry walks `/head` -> `/manifest@docVersion=N` to learn
    * the new `layoutVersion`.
    */
-  layerLayout: (docId: string, layerName: string, layoutVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout@${encodeLayoutToken(layoutVersion)}`,
+  layerLayout: (docId: string, layerName: string, token: LayoutToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout@${encodeLayoutToken(token)}`,
 
   /**
    * Immutable base page-geometry list (plane-scope model): the shared-URL
    * variant a layout-inheriting layer resolves at — every visitor's page
    * list is one CDN object served from the base worker session.
    */
-  docLayout: (docId: string, layoutVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layout@${encodeLayoutToken(layoutVersion)}`,
+  docLayout: (docId: string, token: LayoutToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layout@${encodeLayoutToken(token)}`,
 
   layerLayoutCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/layout`,
@@ -188,31 +190,31 @@ export const wirePaths = {
    * transparent retry walks `/head` -> `/manifest@docVersion=N` to learn
    * the new `metadataVersion`.
    */
-  layerMetadata: (docId: string, layerName: string, metadataVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata@${encodeMetadataToken(metadataVersion)}`,
+  layerMetadata: (docId: string, layerName: string, metadataVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata@${encodeMetadataToken(metadataVersion, pin)}`,
 
   layerMetadataCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
 
   /** Immutable base metadata (plane-scope model): the shared-URL variant a
    *  metadata-inheriting layer resolves at. */
-  docMetadata: (docId: string, metadataVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/metadata@${encodeMetadataToken(metadataVersion)}`,
+  docMetadata: (docId: string, metadataVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/metadata@${encodeMetadataToken(metadataVersion, pin)}`,
 
   /**
    * GET: the Info dict's custom keys for the layer at a specific
    * `metadataVersion` — the same version pointer as `layerMetadata`, since
    * both halves live in one dict. Content-addressed like it.
    */
-  layerCustomMetadata: (docId: string, layerName: string, metadataVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata/custom@${encodeMetadataToken(metadataVersion)}`,
+  layerCustomMetadata: (docId: string, layerName: string, metadataVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata/custom@${encodeMetadataToken(metadataVersion, pin)}`,
 
   layerCustomMetadataCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata/custom`,
 
   /** Immutable base custom keys: the shared-URL twin of `layerCustomMetadata`. */
-  docCustomMetadata: (docId: string, metadataVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/metadata/custom@${encodeMetadataToken(metadataVersion)}`,
+  docCustomMetadata: (docId: string, metadataVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/metadata/custom@${encodeMetadataToken(metadataVersion, pin)}`,
 
   /**
    * GET: the layer's outline at its `outlineVersion` and `layoutVersion`
@@ -230,13 +232,13 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/outline@${encodeOutlineToken(token)}`,
 
   /** Immutable catalog-owned actions, independently pinned in the manifest. */
-  layerActions: (docId: string, layerName: string, actionsVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/actions@${encodeActionsToken(actionsVersion)}`,
+  layerActions: (docId: string, layerName: string, actionsVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/actions@${encodeActionsToken(actionsVersion, pin)}`,
 
   /** Immutable base catalog actions (plane-scope model): the shared-URL
    *  variant an actions-inheriting layer resolves at. */
-  docActions: (docId: string, actionsVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/actions@${encodeActionsToken(actionsVersion)}`,
+  docActions: (docId: string, actionsVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/actions@${encodeActionsToken(actionsVersion, pin)}`,
 
   // ---------------------------------------------------------------------
   // Digital signatures. Layer reads pin `docVersion` (a signature is a
@@ -246,8 +248,8 @@ export const wirePaths = {
   // ---------------------------------------------------------------------
 
   /** Immutable layer signature snapshot (base signatures + the layer's fields + protection). */
-  layerSignatures: (docId: string, layerName: string, docVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures@${encodeDocToken(docVersion)}`,
+  layerSignatures: (docId: string, layerName: string, docVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures@${encodeDocToken(docVersion, pin)}`,
   layerSignaturesCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures`,
   /** Immutable: the layer's working copy judged against the base, pinned by `docVersion`. */
@@ -336,39 +338,39 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/fonts/resolve`,
 
   /** GET: a program's facts (`doc.fonts.getProgram()`), content-addressed by its display hash. */
-  layerFontProgram: (docId: string, layerName: string, displayHash: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/font-programs/${encodeURIComponent(displayHash)}`,
+  layerFontProgram: (docId: string, layerName: string, displaySha256: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/font-programs/${encodeURIComponent(displaySha256)}`,
 
   /**
    * GET: a program's bytes (`doc.fonts.downloadProgram()`), for a token that
    * may write text in the document. Private: never cached on a shared CDN.
    */
-  layerFontProgramFile: (docId: string, layerName: string, displayHash: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/font-program-files/${encodeURIComponent(displayHash)}`,
+  layerFontProgramFile: (docId: string, layerName: string, displaySha256: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/font-program-files/${encodeURIComponent(displaySha256)}`,
 
   /**
    * GET: a served server font's bytes, one URL for every document, so a
    * browser keeps one copy. Any valid token; private.
    */
-  fontProgramFile: (displayHash: string) =>
-    `/v1/font-program-files/${encodeURIComponent(displayHash)}`,
+  fontProgramFile: (displaySha256: string) =>
+    `/v1/font-program-files/${encodeURIComponent(displaySha256)}`,
 
   /**
    * Immutable base /EmbeddedFiles listing: the shared-URL variant an
    * attachments-undiverged layer resolves at — every visitor's sidebar list
    * is one CDN object served from the base worker session.
    */
-  docAttachments: (docId: string, attachmentsVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/attachments@${encodeAttachmentsToken(attachmentsVersion)}`,
+  docAttachments: (docId: string, attachmentsVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/attachments@${encodeAttachmentsToken(attachmentsVersion, pin)}`,
 
   /** Immutable base decoded bytes of one embedded file (twin of
    *  `layerAttachmentFile` — same capability tier split). */
-  docAttachmentFile: (docId: string, key: string, attachmentsVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/attachment-files/${encodeTokenText(key)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
+  docAttachmentFile: (docId: string, key: string, attachmentsVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/attachment-files/${encodeTokenText(key)}/data@${encodeAttachmentsToken(attachmentsVersion, pin)}`,
 
   /** Immutable /EmbeddedFiles listing, pinned by `attachmentsVersion`. */
-  layerAttachments: (docId: string, layerName: string, attachmentsVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachments@${encodeAttachmentsToken(attachmentsVersion)}`,
+  layerAttachments: (docId: string, layerName: string, attachmentsVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachments@${encodeAttachmentsToken(attachmentsVersion, pin)}`,
 
   /**
    * Immutable decoded bytes of one document-level embedded file. Lives
@@ -381,8 +383,9 @@ export const wirePaths = {
     layerName: string,
     key: string,
     attachmentsVersion: number,
+    pin: TokenPin,
   ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/${encodeTokenText(key)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/${encodeTokenText(key)}/data@${encodeAttachmentsToken(attachmentsVersion, pin)}`,
 
   /** Immutable decoded bytes of a FileAttachment annotation's embedded file. */
   layerAnnotationFile: (
@@ -391,8 +394,9 @@ export const wirePaths = {
     page: PageRef,
     annotKey: string,
     attachmentsVersion: number,
+    pin: TokenPin,
   ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/attachment-files/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion, pin)}`,
 
   /**
    * Immutable base bytes of a FileAttachment annotation's embedded file
@@ -400,8 +404,14 @@ export const wirePaths = {
    * exists in this view) and the `attachments` plane (the pin); the origin
    * guard requires both inherited.
    */
-  docAnnotationFile: (docId: string, page: PageRef, annotKey: string, attachmentsVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/attachment-files/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion)}`,
+  docAnnotationFile: (
+    docId: string,
+    page: PageRef,
+    annotKey: string,
+    attachmentsVersion: number,
+    pin: TokenPin,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/attachment-files/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(annotKey)}/data@${encodeAttachmentsToken(attachmentsVersion, pin)}`,
 
   /**
    * GET: full plain-text extraction for a single page at a specific
@@ -410,17 +420,23 @@ export const wirePaths = {
    * retry walks `/head` → `/manifest@docVersion=N` to learn the new
    * `contentVersion`.
    */
-  docPageText: (docId: string, page: PageRef, contentVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/text/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
+  docPageText: (docId: string, page: PageRef, contentVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/text/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion, pin)}`,
 
-  layerPageText: (docId: string, layerName: string, page: PageRef, contentVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/text/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
+  layerPageText: (
+    docId: string,
+    layerName: string,
+    page: PageRef,
+    contentVersion: number,
+    pin: TokenPin,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/text/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion, pin)}`,
 
   layerPageTextCurrent: (docId: string, layerName: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/text/pages/${encodeURIComponent(encodePageKey(page))}/data`,
 
-  docPageGeometry: (docId: string, page: PageRef, contentVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
+  docPageGeometry: (docId: string, page: PageRef, contentVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion, pin)}`,
 
   docPageGeometryCurrent: (docId: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data`,
@@ -471,8 +487,14 @@ export const wirePaths = {
   docPageThumbnailCurrent: (docId: string, family: PageRenderFamily, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/${PAGE_THUMBNAIL_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
 
-  layerPageGeometry: (docId: string, layerName: string, page: PageRef, contentVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
+  layerPageGeometry: (
+    docId: string,
+    layerName: string,
+    page: PageRef,
+    contentVersion: number,
+    pin: TokenPin,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion, pin)}`,
 
   layerPageGeometryCurrent: (docId: string, layerName: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data`,
@@ -539,12 +561,12 @@ export const wirePaths = {
    * through every pristine layer, so 1,000 visitors' sidebars are one CDN
    * object served from the base worker session.
    */
-  docPageAnnotations: (docId: string, page: PageRef, annotationVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion)}`,
+  docPageAnnotations: (docId: string, page: PageRef, annotationVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion, pin)}`,
 
   /** Immutable base whole-document annotation listing (bulk hydration). */
-  docAnnotationsAll: (docId: string, annotationsVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion)}`,
+  docAnnotationsAll: (docId: string, annotationsVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion, pin)}`,
 
   /** Immutable base appearance batch (twin of
    *  `layerPageAnnotationAppearances` — same `annotations` plane gate). */
@@ -562,8 +584,9 @@ export const wirePaths = {
     layerName: string,
     page: PageRef,
     annotationVersion: number,
+    pin: TokenPin,
   ) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion)}`,
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items@${encodeAnnotationToken(annotationVersion, pin)}`,
 
   /** Immutable base annotation export: a bundle as multipart, needing
    *  `doc.annotate.read` and `doc.download`. */
@@ -590,8 +613,13 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/import`,
 
   /** Immutable layer whole-document annotation listing (bulk hydration). */
-  layerAnnotationsAll: (docId: string, layerName: string, annotationsVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion)}`,
+  layerAnnotationsAll: (
+    docId: string,
+    layerName: string,
+    annotationsVersion: number,
+    pin: TokenPin,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/items@${encodeAnnotationsAllToken(annotationsVersion, pin)}`,
 
   layerPageAnnotationsCurrent: (docId: string, layerName: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items`,
@@ -652,12 +680,12 @@ export const wirePaths = {
    * `doc.forms.read`, under its own prefix, so the CDN signs it apart from
    * the annotations.
    */
-  docForm: (docId: string, formsVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/form@${encodeFormToken(formsVersion)}`,
+  docForm: (docId: string, formsVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/form@${encodeFormToken(formsVersion, pin)}`,
 
   /** Immutable layer form (twin of `docForm`). */
-  layerForm: (docId: string, layerName: string, formsVersion: number) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form@${encodeFormToken(formsVersion)}`,
+  layerForm: (docId: string, layerName: string, formsVersion: number, pin: TokenPin) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form@${encodeFormToken(formsVersion, pin)}`,
 
   /** GET: the layer's form as it is now — for API callers, served `no-store`. */
   layerFormCurrent: (docId: string, layerName: string) =>
@@ -865,8 +893,8 @@ export const wireTemplates = {
   layerOutline: '/v1/docs/:docId/layers/:layerName/outline',
   layerFonts: '/v1/docs/:docId/layers/:layerName/fonts',
   layerFontsResolve: '/v1/docs/:docId/layers/:layerName/fonts/resolve',
-  layerFontProgram: '/v1/docs/:docId/layers/:layerName/font-programs/:displayHash',
-  layerFontProgramFile: '/v1/docs/:docId/layers/:layerName/font-program-files/:displayHash',
+  layerFontProgram: '/v1/docs/:docId/layers/:layerName/font-programs/:displaySha256',
+  layerFontProgramFile: '/v1/docs/:docId/layers/:layerName/font-program-files/:displaySha256',
   layerAttachments: '/v1/docs/:docId/layers/:layerName/attachments',
   layerAttachmentFile: '/v1/docs/:docId/layers/:layerName/attachment-files/:fileKey/data',
   layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pageKey/data',
@@ -874,7 +902,7 @@ export const wireTemplates = {
   layerAnnotationItemsAll: '/v1/docs/:docId/layers/:layerName/annotations/items',
   layerAnnotationItems: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items',
   layerAnnotationItem:
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey',
   layerAnnotationItemsReorder:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/reorder',
   layerAnnotationItemsFlatten:
@@ -882,11 +910,11 @@ export const wireTemplates = {
   layerAnnotationItemsAppearance:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/appearance',
   layerAnnotationItemAppearanceResource:
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey/resources/appearance',
   layerAnnotationItemFileResource:
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/file',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey/resources/file',
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
-  layerFormWidget: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
+  layerFormWidget: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotationKey',
   layerFormWidgetsReorder: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/reorder',
   layerFormCalculationsReorder: '/v1/docs/:docId/layers/:layerName/form/calculations/reorder',
   layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
@@ -910,12 +938,12 @@ export const wireTemplates = {
   layerSignatureComplete: '/v1/docs/:docId/layers/:layerName/signatures/:signingId/complete',
   layerSignatureCancel: '/v1/docs/:docId/layers/:layerName/signatures/:signingId',
   layerVersions: '/v1/docs/:docId/layers/:layerName/versions',
-  layerVersionSignatures: '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha',
+  layerVersionSignatures: '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256',
   layerVersionSignatureContents:
-    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/contents',
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256/:fieldKey/contents',
   layerVersionSignatureDigest:
-    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/digest/:algorithm',
-  layerVersionAnalysis: '/v1/docs/:docId/layers/:layerName/versions/analysis/:sha',
-  layerVersionDownload: '/v1/docs/:docId/layers/:layerName/versions/download/:sha',
-  layerVersionRevision: '/v1/docs/:docId/layers/:layerName/versions/revisions/:sha/:index',
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256/:fieldKey/digest/:algorithm',
+  layerVersionAnalysis: '/v1/docs/:docId/layers/:layerName/versions/analysis/:sha256',
+  layerVersionDownload: '/v1/docs/:docId/layers/:layerName/versions/download/:sha256',
+  layerVersionRevision: '/v1/docs/:docId/layers/:layerName/versions/revisions/:sha256/:index',
 } as const;

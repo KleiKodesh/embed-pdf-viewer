@@ -13,17 +13,17 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// Something to see on load: the title on the cover, selected from code.
+// Something to see on load: "Documents", the first word on the cover, selected from code.
 function SelectTitle() {
   const selection = useSelection();
   const cover = usePageList()[0]?.ref;
 
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    if (cover) selection.select({ page: cover, start: 28, count: 9 });
   }, [selection, cover]);
 
   return null;

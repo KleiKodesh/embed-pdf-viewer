@@ -1,12 +1,18 @@
 import { createReadStream } from 'node:fs';
 
 import { EngineError, EngineErrorCode, type AttachmentRef } from '@embedpdf/engine-core/runtime';
-import { decodeAttachmentsToken, decodeTokenText, wireTemplates } from '@embedpdf/engine-core/wire';
+import {
+  decodeAttachmentsToken,
+  decodeTokenText,
+  wireTemplates,
+  type TokenPin,
+} from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import {
   abortSignalOf,
   parseTokenOrInvalidArg,
+  readAtPins,
   resolvePageKeyParam,
   setImmutableCache,
   setNoStore,
@@ -18,7 +24,11 @@ import {
   requireLayerResource,
 } from '../app/jwt-plugin';
 import { requireSharedDocRead } from './_planeGuard';
-import type { DocumentService, SavedAttachmentFile } from '../services/DocumentService';
+import type {
+  DocumentService,
+  OpenContext,
+  SavedAttachmentFile,
+} from '../services/DocumentService';
 
 export interface AttachmentRouteDeps {
   documentService: DocumentService;
@@ -68,19 +78,14 @@ export async function registerAttachmentRoutes(
       'attachments',
     ]);
     const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
-    const manifest = await documentService.getManifest(ctx, docId);
-    if (requested !== manifest.attachmentsVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
-      );
-    }
-    const items = await documentService.listAttachments(
+    const items = await atAttachmentsVersion(
+      documentService,
+      reply,
       ctx,
       docId,
       undefined,
-      abortSignalOf(reply),
+      requested,
+      () => documentService.listAttachments(ctx, docId, undefined, abortSignalOf(reply)),
     );
     setImmutableCache(reply);
     return items;
@@ -96,32 +101,32 @@ export async function registerAttachmentRoutes(
       'attachments',
     ]);
     const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
-    const manifest = await documentService.getManifest(ctx, docId);
-    if (requested !== manifest.attachmentsVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
-      );
-    }
     const ref = attachmentRefFromPath(fileKey);
-    const file = await documentService.readAttachmentFileToTemp(
+    const file = await fileAtAttachmentsVersion(
+      documentService,
+      reply,
       ctx,
       docId,
       undefined,
-      ref,
-      abortSignalOf(reply),
+      requested,
+      () =>
+        documentService.readAttachmentFileToTemp(ctx, docId, undefined, ref, abortSignalOf(reply)),
     );
     return sendAttachmentFile(reply, file, 'immutable');
   });
 
   app.get(
-    '/v1/docs/:docId/attachment-files/pages/:pageKey/items/:annotKey/data@:token',
+    '/v1/docs/:docId/attachment-files/pages/:pageKey/items/:annotationKey/data@:token',
     async (req, reply) => {
-      const { docId, pageKey, annotKey, token } = req.params as {
+      const {
+        docId,
+        pageKey,
+        annotationKey: annotKey,
+        token,
+      } = req.params as {
         docId: string;
         pageKey: string;
-        annotKey: string;
+        annotationKey: string;
         token: string;
       };
       // A FileAttachment annotation's bytes depend on both planes: the
@@ -134,25 +139,26 @@ export async function registerAttachmentRoutes(
         'attachments',
       ]);
       const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
-      const manifest = await documentService.getManifest(ctx, docId);
-      if (requested !== manifest.attachmentsVersion) {
-        setNoStore(reply);
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
-        );
-      }
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       // Durable keys only, mirroring the layer route: weak index refs need
       // a revision-validated body, which a cacheable GET does not have.
       const ref = refFromKey(annotKey, pageObjectNumber);
-      const file = await documentService.readAnnotationFileToTemp(
+      const file = await fileAtAttachmentsVersion(
+        documentService,
+        reply,
         ctx,
         docId,
         undefined,
-        pageObjectNumber,
-        ref,
-        abortSignalOf(reply),
+        requested,
+        () =>
+          documentService.readAnnotationFileToTemp(
+            ctx,
+            docId,
+            undefined,
+            pageObjectNumber,
+            ref,
+            abortSignalOf(reply),
+          ),
       );
       return sendAttachmentFile(reply, file, 'immutable');
     },
@@ -165,22 +171,21 @@ export async function registerAttachmentRoutes(
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-attachments', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-attachments', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
-    const manifest = await documentService.getLayerManifest(ctx, docId, layerName);
-    if (requested !== manifest.attachmentsVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
-      );
-    }
-    const items = await documentService.listAttachments(
+    const items = await atAttachmentsVersion(
+      documentService,
+      reply,
       ctx,
       docId,
       layerName,
-      abortSignalOf(reply),
+      requested,
+      () => documentService.listAttachments(ctx, docId, layerName, abortSignalOf(reply)),
     );
     setImmutableCache(reply);
     return items;
@@ -196,63 +201,91 @@ export async function registerAttachmentRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-attachment-files', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-attachment-files',
+        permissionFlags,
+      );
       const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
-      const manifest = await documentService.getLayerManifest(ctx, docId, layerName);
-      if (requested !== manifest.attachmentsVersion) {
-        setNoStore(reply);
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
-        );
-      }
       const ref = attachmentRefFromPath(fileKey);
-      const file = await documentService.readAttachmentFileToTemp(
+      const file = await fileAtAttachmentsVersion(
+        documentService,
+        reply,
         ctx,
         docId,
         layerName,
-        ref,
-        abortSignalOf(reply),
+        requested,
+        () =>
+          documentService.readAttachmentFileToTemp(
+            ctx,
+            docId,
+            layerName,
+            ref,
+            abortSignalOf(reply),
+          ),
       );
       return sendAttachmentFile(reply, file, 'immutable');
     },
   );
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/attachment-files/pages/:pageKey/items/:annotKey/data@:token',
+    '/v1/docs/:docId/layers/:layerName/attachment-files/pages/:pageKey/items/:annotationKey/data@:token',
     async (req, reply) => {
-      const { docId, layerName, pageKey, annotKey, token } = req.params as {
+      const {
+        docId,
+        layerName,
+        pageKey,
+        annotationKey: annotKey,
+        token,
+      } = req.params as {
         docId: string;
         layerName: string;
         pageKey: string;
-        annotKey: string;
+        annotationKey: string;
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-attachment-files', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-attachment-files',
+        permissionFlags,
+      );
       const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
-      const manifest = await documentService.getLayerManifest(ctx, docId, layerName);
-      if (requested !== manifest.attachmentsVersion) {
-        setNoStore(reply);
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
-        );
-      }
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       // Only durable keys are addressable on this content-addressed leaf:
       // weak index refs need a revision-validated request body, which a
       // cacheable GET deliberately does not have.
       const ref = refFromKey(annotKey, pageObjectNumber);
-      const file = await documentService.readAnnotationFileToTemp(
+      const file = await fileAtAttachmentsVersion(
+        documentService,
+        reply,
         ctx,
         docId,
         layerName,
-        pageObjectNumber,
-        ref,
-        abortSignalOf(reply),
+        requested,
+        () =>
+          documentService.readAnnotationFileToTemp(
+            ctx,
+            docId,
+            layerName,
+            pageObjectNumber,
+            ref,
+            abortSignalOf(reply),
+          ),
       );
       return sendAttachmentFile(reply, file, 'immutable');
     },
@@ -265,8 +298,12 @@ export async function registerAttachmentRoutes(
   app.get(wireTemplates.layerAttachments, async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-attachments', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-attachments', permissionFlags);
     const list = await documentService.listAttachments(ctx, docId, layerName, abortSignalOf(reply));
     setNoStore(reply);
     return list;
@@ -279,8 +316,18 @@ export async function registerAttachmentRoutes(
       fileKey: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-attachment-files', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-attachment-files',
+      permissionFlags,
+    );
     const file = await documentService.readAttachmentFileToTemp(
       ctx,
       docId,
@@ -294,16 +341,25 @@ export async function registerAttachmentRoutes(
   // An annotation's `file` resource, the twin of its `appearance` resource
   // (routes/annotations.ts): gated by `doc.download` the same way.
   app.get(wireTemplates.layerAnnotationItemFileResource, async (req, reply) => {
-    const { docId, layerName, pageKey, annotKey } = req.params as {
+    const {
+      docId,
+      layerName,
+      pageKey,
+      annotationKey: annotKey,
+    } = req.params as {
       docId: string;
       layerName: string;
       pageKey: string;
-      annotKey: string;
+      annotationKey: string;
     };
     const pageObjectNumber = resolvePageKeyParam(pageKey);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', permissionFlags);
     const file = await documentService.readAnnotationFileToTemp(
       ctx,
       docId,
@@ -335,6 +391,67 @@ function attachmentRefFromPath(fileKey: string): AttachmentRef {
  * a browser's save. Its name and type as the document has them are what the
  * listing says. A zero-byte attachment is a valid empty stream.
  */
+/** Reads at the token's `attachmentsVersion` (see `readAtPins`). */
+function atAttachmentsVersion<T>(
+  documentService: DocumentService,
+  reply: FastifyReply,
+  ctx: OpenContext,
+  docId: string,
+  layerName: string | undefined,
+  requested: { attachmentsVersion: number; pin: TokenPin },
+  read: () => Promise<T>,
+): Promise<T> {
+  return readAtPins({
+    documentService,
+    reply,
+    docId,
+    layerName,
+    assertCurrent: async () => {
+      const manifest =
+        layerName === undefined
+          ? await documentService.getManifest(ctx, docId)
+          : await documentService.getLayerManifest(ctx, docId, layerName);
+      if (requested.attachmentsVersion === manifest.attachmentsVersion) return;
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `attachments version ${requested.attachmentsVersion} no longer current (current=${manifest.attachmentsVersion})`,
+      );
+    },
+    read,
+    token: { kind: 'attachments', pin: requested.pin },
+  });
+}
+
+/** {@link atAttachmentsVersion} for a file read to disk, removed again when its pin is refused. */
+async function fileAtAttachmentsVersion(
+  documentService: DocumentService,
+  reply: FastifyReply,
+  ctx: OpenContext,
+  docId: string,
+  layerName: string | undefined,
+  requested: { attachmentsVersion: number; pin: TokenPin },
+  read: () => Promise<SavedAttachmentFile>,
+): Promise<SavedAttachmentFile> {
+  let file: SavedAttachmentFile | undefined;
+  try {
+    return await atAttachmentsVersion(
+      documentService,
+      reply,
+      ctx,
+      docId,
+      layerName,
+      requested,
+      async () => {
+        file = await read();
+        return file;
+      },
+    );
+  } catch (err) {
+    await file?.cleanup();
+    throw err;
+  }
+}
+
 function sendAttachmentFile(
   reply: FastifyReply,
   file: SavedAttachmentFile,

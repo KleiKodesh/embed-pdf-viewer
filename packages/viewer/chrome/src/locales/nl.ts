@@ -71,6 +71,7 @@ export const nl: Locale = {
         group: 'Schuiven',
         vertical: 'Verticaal',
         horizontal: 'Horizontaal',
+        paged: 'Per pagina',
       },
       rotate: {
         group: 'Draaien',
@@ -114,6 +115,13 @@ export const nl: Locale = {
         copy: 'Kopiëren',
         strip: 'Acties voor tekstselectie',
       },
+      snapshot: {
+        tool: 'Momentopname maken',
+        copy: 'Kopiëren',
+        save: 'Afbeelding opslaan',
+        clear: 'Momentopname wissen',
+        strip: 'Acties voor momentopname',
+      },
       shapes: {
         rectangle: 'Rechthoek',
         circle: 'Ellips',
@@ -142,6 +150,7 @@ export const nl: Locale = {
       redact: {
         mark: 'Markeren voor redactie',
         applyAll: 'Redacties toepassen',
+        apply: { one: 'Redactie toepassen', other: '{count} redacties toepassen' },
         clearAll: 'Markeringen wissen',
       },
       undo: 'Ongedaan maken',
@@ -161,6 +170,7 @@ export const nl: Locale = {
         'doc-annotate-modify': 'Annotaties wijzigen is niet toegestaan',
         'doc-annotate-read': 'Annotaties bekijken is niet toegestaan',
         'doc-attachments-modify': 'Bestanden toevoegen is niet toegestaan',
+        'doc-content-copy': 'Momentopnamen zijn niet toegestaan',
         'doc-download': 'Downloaden is niet toegestaan',
         'doc-forms-modify': 'Formuliervelden bewerken is niet toegestaan',
         'doc-outline-modify': 'Bladwijzers wijzigen is niet toegestaan',
@@ -347,6 +357,7 @@ export const nl: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'Type',
         opacity: 'Dekking',
         stroke: 'Lijn',
         fill: 'Vulling',
@@ -494,7 +505,7 @@ export const nl: Locale = {
       lineStart: 'Begin',
       lineEnd: 'Einde',
       empty: 'Kies een tekengereedschap of selecteer een annotatie om de stijl ervan te bewerken.',
-      selected: '{count} geselecteerd',
+      selected: { one: '{count} geselecteerd', other: '{count} geselecteerd' },
       toolDefaults: 'Standaardwaarden voor {tool}',
       defaults: 'Standaardwaarden',
       fontGroups: {
@@ -517,20 +528,6 @@ export const nl: Locale = {
         other: 'Er kan geen nieuwe tekst in worden geschreven',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Vlaggen (/F)',
-      print: 'Opnemen wanneer de pagina wordt afgedrukt',
-      hidden: 'Overal weg: scherm, klikken, afdrukken',
-      noView: 'Verborgen op het scherm, kan nog worden afgedrukt',
-      toggleNoView: 'Een niet-weergegeven annotatie tonen zolang deze is geselecteerd',
-      readOnly: 'Zichtbaar maar niet klikbaar',
-      locked: 'Niet verplaatsen / formaat wijzigen / verwijderen / opmaak wijzigen',
-      lockedContents: 'Tekst kan niet veranderen; geometrie wel',
-      noZoom: 'Vaste grootte op het scherm (verankerd linksboven)',
-      noRotate: 'Blijft rechtop staan als de pagina draait',
-      invisible: 'Verouderd: onbekende subtypen verbergen',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Bijlagen laden…',
@@ -540,8 +537,7 @@ export const nl: Locale = {
       dropHint: 'Of zet bestanden hier neer',
       adding: 'Toevoegen…',
       onPage: 'Pagina {page}',
-      count: '{count} bestand',
-      countPlural: '{count} bestanden',
+      count: { one: '{count} bestand', other: '{count} bestanden' },
     },
     outline: {
       filter: 'Bladwijzers filteren',
@@ -595,10 +591,9 @@ export const nl: Locale = {
       retry: 'Opnieuw proberen',
       empty: 'Nog geen opmerkingen. Gebruik het notitiegereedschap om een discussie te starten.',
       emptyReadOnly: 'Dit document heeft geen opmerkingen.',
-      anonymous: 'Onbekend',
+      anonymous: 'Gast',
       page: 'Pagina {page}',
-      count: '{count} opmerking',
-      countPlural: '{count} opmerkingen',
+      count: { one: '{count} opmerking', other: '{count} opmerkingen' },
       reply: 'Antwoorden',
       replyPlaceholder: 'Antwoorden…',
       addPlaceholder: 'Opmerking toevoegen…',
@@ -625,7 +620,7 @@ export const nl: Locale = {
       searchWholeWord: 'Hele woorden',
       searchRegex: 'Reguliere expressie',
       searchSearching: 'Zoeken…',
-      searchResults: 'Resultaten gevonden: {count}',
+      searchResults: { one: '{count} resultaat gevonden', other: '{count} resultaten gevonden' },
       searchNoResults: 'Geen resultaten',
       searchPrevious: 'Vorig resultaat',
       searchNext: 'Volgend resultaat',
@@ -641,10 +636,16 @@ export const nl: Locale = {
       redactionArea: 'Gebiedsmarkering',
       redactionText: 'Tekstmarkering',
       redactionRemove: 'Markering verwijderen',
-      redactConfirmTitle: 'Redacties toepassen?',
-      redactConfirmBody:
-        'De inhoud onder de redactiemarkeringen ({count}) definitief verwijderen. Dit kan niet ongedaan worden gemaakt.',
-      redactConfirmCollateral: 'Ook andere annotaties worden verwijderd: {count}.',
+      redactConfirmTitle: { one: 'Redactie toepassen?', other: 'Redacties toepassen?' },
+      redactConfirmBody: {
+        one: 'De inhoud onder {count} redactiemarkering definitief verwijderen. Dit kan niet ongedaan worden gemaakt.',
+        other:
+          'De inhoud onder {count} redactiemarkeringen definitief verwijderen. Dit kan niet ongedaan worden gemaakt.',
+      },
+      redactConfirmCollateral: {
+        one: 'Ook {count} andere annotatie wordt verwijderd.',
+        other: 'Ook {count} andere annotaties worden verwijderd.',
+      },
       redactApply: 'Toepassen',
       redactApplying: 'Toepassen…',
       formatLabel: 'Opmaak',

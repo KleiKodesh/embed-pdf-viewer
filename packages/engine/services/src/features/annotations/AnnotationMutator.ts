@@ -20,6 +20,7 @@ import {
   type AnnotationReplyType,
   type AnnotationUpdateResult,
   type PageObjectNumber,
+  PDF_SUBTYPE_TO_CODE,
   PdfAnnotationSubtypeCode,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -43,12 +44,17 @@ import {
 } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
-import { applyPatch, preflightPatch } from './internal/write/annotationWriterRegistry';
+import {
+  applyPatch,
+  drawAppearanceResource,
+  preflightPatch,
+} from './internal/write/annotationWriterRegistry';
 import { settleAnnotationTurn } from './internal/write/writeAnnotationTransformMetadata';
 import { RawAnnotationReader } from './RawAnnotationReader';
 import { generateAppearance } from './internal/write/generateAppearance';
 import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
 import { promoteInlineAnnotations } from './internal/write/promoteInlineAnnotations';
+import { assertMarkKeepsItsLook } from './internal/write/writeWidgetAnnotation';
 import {
   writeAnnotationRelationship,
   writeLinkedOpen,
@@ -175,7 +181,7 @@ export class AnnotationMutator {
     try {
       throwIfAborted(signal);
 
-      const writeCtx = this.writeContext(resources);
+      const writeContext = this.writeContext(resources);
 
       // Blend mode lives inside the existing /AP graphics state rather than in
       // the annotation dictionary. Capture it before re-baking so an unrelated
@@ -208,10 +214,11 @@ export class AnnotationMutator {
       // exactly this.
       assertCaptionMetadataWritable(fn, annotPtr, currentDto, patch);
       patch = pdfResolveAnnotationPatch(currentDto, patch, {
-        describeFont: writeCtx.describeFont,
+        describeFont: writeContext.describeFont,
       });
+      assertMarkKeepsItsLook(currentDto, patch);
       assertAnnotationResources(currentDto.subtype, resources, 'update');
-      preflightPatch(patch, writeCtx);
+      preflightPatch(patch, writeContext);
 
       // Apply boundary: validation and cancellation are complete before the
       // first document write.
@@ -223,8 +230,16 @@ export class AnnotationMutator {
       const impact = resources?.appearance ? 'regenerate' : appearanceImpactOf(currentDto, patch);
       if (impact !== 'inert') settleAnnotationTurn(fn, mem, annotPtr);
 
+      // A sibling kind (the resolver allows no other) is named first: its
+      // fields are then written as its own, and its appearance drawn below.
+      if (patch.subtype !== undefined && patch.subtype !== currentDto.subtype) {
+        if (!fn.EPDFAnnot_SetSubtype(annotPtr, PDF_SUBTYPE_TO_CODE[patch.subtype])) {
+          throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetSubtype returned false');
+        }
+      }
+
       // Apply caller-supplied subtype-specific writes.
-      applyPatch(fn, mem, annotPtr, patch, writeCtx);
+      applyPatch(fn, mem, annotPtr, patch, writeContext);
       // A derived plain label supersedes imported rich contents; retaining stale /RC
       // would show a different value in consumers that prefer rich text.
       if (
@@ -236,7 +251,7 @@ export class AnnotationMutator {
       }
       // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Only this
       // annotation is written; a popup relink and a shared `/Open` also write
-      // the other annotation, which `meta.changed` names after this one.
+      // the other annotation, which `meta.changedRefs` names after this one.
       let linkedParent: AnnotationRef | null = null;
       if (patch.reply !== undefined && !sameReply(patch.reply, currentDto.reply)) {
         writeAnnotationRelationship(
@@ -312,16 +327,26 @@ export class AnnotationMutator {
       } else {
         const ok =
           currentDto.subtype === 'widget'
-            ? // Drawn as its field's family draws it; a widget in no field has none.
-              fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)
+            ? // Drawn as its field's family draws it: a signature field's and
+              // one in no field, their box. A mark in the widget stays: the
+              // file places it in the moved or resized box.
+              !currentDto.hasMark && fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)
             : generateAppearance(fn, annotPtr, patch.blendMode ?? previousBlendMode);
-        appearance = ok
-          ? { action: 'regenerated', changed: true }
-          : // No generator for this annotation (a widget in no field). The
-            // dictionary still changed when the patch was appearance-relevant,
-            // so `changed` stays true in that case — form-layer renderers may
-            // paint differently even though no /AP was written.
-            { action: 'generation-unavailable', changed: impact === 'regenerate' };
+        const drawn = drawAppearanceResource(
+          fn,
+          mem,
+          annotPtr,
+          patch.subtype ?? currentDto.subtype,
+          writeContext,
+        );
+        appearance =
+          ok || drawn
+            ? { action: 'regenerated', changed: true }
+            : // Not drawn (a mark kept, a field type with no generator). The
+              // dictionary still changed when the patch was appearance-relevant,
+              // so `changed` stays true in that case — form-layer renderers may
+              // paint differently even though no /AP was written.
+              { action: 'generation-unavailable', changed: impact === 'regenerate' };
       }
 
       // PDFium caches the parsed appearance form on an annotation context. A

@@ -24,7 +24,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // [!doc-source notice]
 const notice = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/notice.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/notice.pdf');
   return { kind: 'bytes', id: 'notice', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -115,7 +115,7 @@ export class App {
       untracked(() => {
         const textBox = this.annotation.list().find((each) => each.nm === 'text-box');
         if (!textBox) return;
-        this.annotation.selection.set([textBox.ref]);
+        this.annotation.selection.select([textBox.ref]);
         stage.reveal(textBox.page, { rect: textBox.rect });
       });
     });

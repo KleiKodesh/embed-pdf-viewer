@@ -19,12 +19,12 @@ import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/a
 import { localEngine } from '@embedpdf/engine';
 
 const article = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/article.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/article.pdf');
   return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // On page 1: the characters of the title's first line, and where it is.
-const SENTENCE = { start: 6, count: 33 };
+const SENTENCE = { start: 18, count: 33 };
 const SENTENCE_BOX = { x: 60, y: 102, width: 363, height: 31 };
 
 const MARKUP = [

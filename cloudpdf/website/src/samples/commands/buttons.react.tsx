@@ -23,11 +23,11 @@ function CommandButton({ id }: { id: string }) {
       className="button"
       title={command.label}
       disabled={!command.enabled}
-      aria-pressed={command.active}
+      aria-pressed={command.pressable ? command.active : undefined}
       onClick={command.run}
     >
       {command.label}
-      {command.shortcut && <kbd className="shortcut">{command.shortcut}</kbd>}
+      {command.shortcutLabel && <kbd className="shortcut">{command.shortcutLabel}</kbd>}
     </button>
   );
 }

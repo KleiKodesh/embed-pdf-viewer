@@ -99,7 +99,7 @@ export class CloudEngine implements Engine {
         ...(input.passphrase !== undefined ? { passphrase: input.passphrase } : {}),
         ...(input.restart ? { restart: true } : {}),
         ...(answers ? { identity: answers } : {}),
-        visitorStore: this.visitorStore,
+        ...(this.visitorStore ? { visitorStore: this.visitorStore } : {}),
         fetch: this.http.fetchImpl,
       });
       const token = async () => {
@@ -198,7 +198,12 @@ export class CloudEngine implements Engine {
     options: OpenOptions | undefined,
   ): AbortablePromise<DocumentHandle> {
     return AbortablePromise.run<DocumentHandle>(async (signal) => {
-      const docHttp = this.http.forDocument({ sessionId: newSessionId(), token: tokenSource });
+      // A grant session keeps and renews its own token, so its client asks it every time.
+      const docHttp = this.http.forDocument({
+        sessionId: newSessionId(),
+        token: tokenSource,
+        ...(grantSession ? { keepToken: false } : {}),
+      });
       const token = await docHttp.currentToken();
       const claims = decodeUnverifiedClaims(token);
       const docId = claims.doc_id;

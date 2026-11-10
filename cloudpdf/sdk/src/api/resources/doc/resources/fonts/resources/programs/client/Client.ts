@@ -44,12 +44,15 @@ export class ProgramsClient {
         request: CloudPDF.doc.fonts.DownloadProgramsRequest,
         requestOptions?: ProgramsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, displayHash, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, displaySha256, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher<core.BinaryResponse>({
@@ -57,7 +60,7 @@ export class ProgramsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/font-program-files/${core.url.encodePathParam(displayHash)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/font-program-files/${core.url.encodePathParam(displaySha256)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -76,9 +79,15 @@ export class ProgramsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -92,7 +101,7 @@ export class ProgramsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/font-program-files/{displayHash}",
+            "/v1/docs/{docId}/layers/{layerName}/font-program-files/{displaySha256}",
         );
     }
 
@@ -108,26 +117,29 @@ export class ProgramsClient {
      *     await client.doc.fonts.programs.get({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         displayHash: "displayHash"
+     *         displaySha256: "displaySha256"
      *     })
      */
     public get(
         request: CloudPDF.doc.fonts.GetProgramsRequest,
         requestOptions?: ProgramsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFontsProgramsGet200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFontsProgramsGetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
     }
 
     private async __get(
         request: CloudPDF.doc.fonts.GetProgramsRequest,
         requestOptions?: ProgramsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFontsProgramsGet200Response>> {
-        const { docId, layerName, displayHash, "X-Document-Password": documentPassword } = request;
+    ): Promise<core.WithRawResponse<CloudPDF.DocFontsProgramsGetResponse>> {
+        const { docId, layerName, displaySha256, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -135,7 +147,7 @@ export class ProgramsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/font-programs/${core.url.encodePathParam(displayHash)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/font-programs/${core.url.encodePathParam(displaySha256)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -147,16 +159,16 @@ export class ProgramsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocFontsProgramsGet200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocFontsProgramsGetResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -170,7 +182,7 @@ export class ProgramsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/font-programs/{displayHash}",
+            "/v1/docs/{docId}/layers/{layerName}/font-programs/{displaySha256}",
         );
     }
 }

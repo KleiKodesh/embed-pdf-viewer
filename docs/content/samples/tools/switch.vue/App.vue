@@ -2,7 +2,7 @@
 import { DocumentGate, Viewer } from '@embedpdf/vue/runtime';
 import type { OpenInput } from '@embedpdf/vue/runtime';
 import { Stage, stagePlugin } from '@embedpdf/vue/stage';
-import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
+import { RenderLayer, SnapshotLayer, renderPlugin } from '@embedpdf/vue/render';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { SelectionLayer, selectionPlugin } from '@embedpdf/vue/selection';
 import { localEngine } from '@embedpdf/engine';
@@ -21,7 +21,7 @@ const plugins = [
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -36,6 +36,7 @@ const welcome = async (): Promise<OpenInput> => {
         <template #page>
           <RenderLayer />
           <SelectionLayer />
+          <SnapshotLayer />
         </template>
       </Stage>
     </DocumentGate>

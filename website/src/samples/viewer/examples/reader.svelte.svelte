@@ -7,7 +7,7 @@
     type ViewerConfig,
   } from '@embedpdf/viewer-svelte';
 
-  const article = '/pdfs/article.pdf';
+  const article = 'https://www.embedpdf.com/pdfs/article.pdf';
 
   // Paper by day and a warm dark at night, with a book's serif for the viewer's own words in both.
   const book: ThemeConfig = {
@@ -60,7 +60,8 @@
     layout: {
       bars: {
         reader: {
-          place: { float: 'bottom' },
+          // Stays on screen: a bar with the page number would otherwise fade while nothing moves.
+          place: { float: 'bottom', hideWhenIdle: false },
           center: [
             ['panel:outline', 'panel:thumbnails'],
             { items: ['page:previous', { custom: 'page-number' }, 'page:next'], importance: 5 },

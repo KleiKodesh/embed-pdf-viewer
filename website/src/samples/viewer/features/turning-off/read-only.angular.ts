@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { EpdfPdfViewer, type ViewerConfig } from '@embedpdf/viewer-angular';
 
-const report = '/pdfs/report.pdf';
+const report = 'https://www.embedpdf.com/pdfs/report.pdf';
 
 @Component({
   selector: 'demo-root',
@@ -12,6 +12,6 @@ export class App {
   readonly report = report;
   readonly config: ViewerConfig = {
     readOnly: true,
-    disable: ['documents.download', 'documents.print'],
+    features: { 'documents.download': false, 'documents.print': false },
   };
 }

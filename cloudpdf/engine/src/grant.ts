@@ -3,6 +3,7 @@ import {
   AbortError,
   EngineError,
   EngineErrorCode,
+  isEngineErrorCode,
   type DocumentGrant,
   type Identity,
   type GrantOpenRequest,
@@ -11,6 +12,7 @@ import {
   type VisitorIdentityRequest,
   visitorIdentityRequestOf,
 } from '@embedpdf/engine-core/runtime';
+import { API_VERSION } from '@embedpdf/engine-core/wire';
 
 import type { WriteGate } from './document/CloudWrites';
 
@@ -59,8 +61,8 @@ export interface GrantSession {
     /** What the grant asks before this visitor's first change, unanswered; `null` when nothing. */
     identityRequest: VisitorIdentityRequest | null;
   };
-  /** Unix seconds when `token` expires. */
-  expiresAt: number;
+  /** When `token` expires: ISO 8601. */
+  expiresAt: string;
 }
 
 export interface GrantExchangeOptions {
@@ -139,20 +141,20 @@ export class GrantExchangeError extends Error {
 export async function exchangeGrant(
   baseUrl: string,
   grant: string,
-  opts: GrantExchangeOptions = {},
+  options: GrantExchangeOptions = {},
 ): Promise<GrantSession> {
-  const doFetch = opts.fetch ?? globalThis.fetch;
+  const doFetch = options.fetch ?? globalThis.fetch;
   const res = await doFetch(`${baseUrl.replace(/\/$/, '')}/v1/grant-sessions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'EmbedPDF-Version': API_VERSION },
     body: JSON.stringify({
       grant,
-      ...(opts.passphrase !== undefined ? { passphrase: opts.passphrase } : {}),
-      ...(opts.visitorHandle !== undefined ? { visitorHandle: opts.visitorHandle } : {}),
-      ...(opts.restart ? { restart: true } : {}),
-      ...(opts.visitorIdentity ? { visitorIdentity: opts.visitorIdentity } : {}),
+      ...(options.passphrase !== undefined ? { passphrase: options.passphrase } : {}),
+      ...(options.visitorHandle !== undefined ? { visitorHandle: options.visitorHandle } : {}),
+      ...(options.restart ? { restart: true } : {}),
+      ...(options.visitorIdentity ? { visitorIdentity: options.visitorIdentity } : {}),
     }),
-    ...(opts.signal ? { signal: opts.signal } : {}),
+    ...(options.signal ? { signal: options.signal } : {}),
   });
   if (!res.ok) {
     let code = 'Unknown';
@@ -179,29 +181,23 @@ export async function exchangeGrant(
  * `EngineError` family as all other engine calls. The wire code and HTTP
  * status survive in `details`; the original error rides as `cause`.
  *
- * `GrantPassphraseRequired` and `VisitorIdentityRequired` keep their own
- * engine codes — the outcomes callers branch on programmatically (prompt for
- * the passphrase or the grant's questions, and retry); the latter's `details`
- * are the questions. Everything else maps by meaning, with the HTTP status as
- * the fallback discriminator.
+ * The server's code is the error's code: `GrantPassphraseRequired` and
+ * `VisitorIdentityRequired` are the outcomes callers branch on (prompt for
+ * the passphrase or the grant's questions, and retry); the latter's
+ * `details` are the questions. A code this client doesn't know falls back
+ * to the HTTP status.
  */
 export function engineErrorFromGrantExchange(error: GrantExchangeError): EngineError {
   const code =
-    error.code === 'GrantPassphraseRequired'
-      ? EngineErrorCode.GrantPassphraseRequired
-      : error.code === 'VisitorIdentityRequired'
-        ? EngineErrorCode.VisitorIdentityRequired
-        : error.code === 'NotFound'
-          ? EngineErrorCode.NotFound
-          : error.code === 'GrantExpired' ||
-              error.code === 'OriginNotAllowed' ||
-              error.code === 'OriginRequired'
-            ? EngineErrorCode.Forbidden
-            : error.status === 401
-              ? EngineErrorCode.Unauthenticated
-              : error.status === 400
-                ? EngineErrorCode.InvalidArg
-                : EngineErrorCode.Unknown;
+    isEngineErrorCode(error.code) && error.code !== EngineErrorCode.Unknown
+      ? error.code
+      : error.status === 401
+        ? EngineErrorCode.Unauthenticated
+        : error.status === 403
+          ? EngineErrorCode.Forbidden
+          : error.status === 400
+            ? EngineErrorCode.InvalidArg
+            : EngineErrorCode.Unknown;
   return new EngineError(code, `grant exchange failed: ${error.message}`, {
     details: { ...error.details, grantCode: error.code, status: error.status },
     cause: error,
@@ -211,6 +207,11 @@ export function engineErrorFromGrantExchange(error: GrantExchangeError): EngineE
 /** The exchange's failure as an engine error; any other error as it is. */
 function asEngineError(error: unknown): unknown {
   return error instanceof GrantExchangeError ? engineErrorFromGrantExchange(error) : error;
+}
+
+/** Seconds until `session`'s token expires. */
+function secondsLeft(session: GrantSession): number {
+  return (Date.parse(session.expiresAt) - Date.now()) / 1000;
 }
 
 /** Renew this many seconds before `expiresAt` so in-flight requests never race expiry. */
@@ -228,7 +229,7 @@ export interface GrantSessionOptions {
   /** The visitor's answers, sent with the first exchange: what the page knows (`OpenOptions.identity`). */
   identity?: VisitorAnswers;
   /** Where a kept visitor waits for the next visit; none keeps the visitor for this session only. */
-  visitorStore?: VisitorStore | null;
+  visitorStore?: VisitorStore;
   fetch?: typeof globalThis.fetch;
 }
 
@@ -242,11 +243,11 @@ export interface GrantSessionOptions {
  *
  * When the grant asks before the first change and the visitor hasn't
  * answered, the document's writes wait at {@link writeGate} while someone
- * listens (`grant.onIdentityRequest`), until `grant.identify` exchanges again
+ * listens (`grant.onIdentityRequested`), until `grant.identify` exchanges again
  * with the answers or `grant.decline` lets them fail.
  *
  * When a renewal is refused for a passphrase or questions on open (the grant
- * got them after this open), the open asks once (`grant.onOpenRequest`) and
+ * got them after this open), the open asks once (`grant.onOpenRequested`) and
  * exchanges nothing more: the session serves until it runs out, then
  * requests wait while someone listens, until `grant.resume` exchanges again
  * with what the visitor gave.
@@ -283,11 +284,11 @@ export class GrantSessionSource {
   constructor(
     private readonly baseUrl: string,
     private readonly grantId: string,
-    private readonly opts: GrantSessionOptions = {},
+    private readonly options: GrantSessionOptions = {},
   ) {
-    this.restart = opts.restart === true;
-    this.answers = opts.identity;
-    this.passphrase = opts.passphrase;
+    this.restart = options.restart === true;
+    this.answers = options.identity;
+    this.passphrase = options.passphrase;
   }
 
   /**
@@ -299,7 +300,7 @@ export class GrantSessionSource {
     if (this.lost) throw this.lost;
     if (!this.asked) {
       const session = this.session;
-      if (session && session.expiresAt - Date.now() / 1000 > RENEW_MARGIN_SECONDS) {
+      if (session && secondsLeft(session) > RENEW_MARGIN_SECONDS) {
         return session.token;
       }
       this.inflight ??= this.exchange().finally(() => {
@@ -373,7 +374,7 @@ export class GrantSessionSource {
   }
 
   /** Called when a write waits for the visitor's answers. Returns the unsubscriber. */
-  onIdentityRequest(listener: (request: VisitorIdentityRequest) => void): () => void {
+  onIdentityRequested(listener: (request: VisitorIdentityRequest) => void): () => void {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
@@ -386,7 +387,7 @@ export class GrantSessionSource {
   }
 
   /** Called when the grant asks before this open goes on. Returns the unsubscriber. */
-  onOpenRequest(listener: (request: GrantOpenRequest) => void): () => void {
+  onOpenRequested(listener: (request: GrantOpenRequest) => void): () => void {
     this.openListeners.add(listener);
     return () => {
       this.openListeners.delete(listener);
@@ -399,14 +400,14 @@ export class GrantSessionSource {
    * the refusal says) and rejects.
    */
   async resume(
-    given: { readonly passphrase?: string; readonly identity?: VisitorAnswers },
+    given: { readonly passphrase?: string; readonly visitorIdentity?: VisitorAnswers },
     signal?: AbortSignal,
   ): Promise<void> {
     const asked = this.asked;
     if (!asked) return;
     await this.inflight?.catch(() => undefined);
     if (given.passphrase !== undefined) this.passphrase = given.passphrase;
-    const exchanged = this.exchange(given.identity, signal).finally(() => {
+    const exchanged = this.exchange(given.visitorIdentity, signal).finally(() => {
       this.inflight = null;
     });
     this.inflight = exchanged;
@@ -451,7 +452,7 @@ export class GrantSessionSource {
     const asked = this.asked;
     const session = this.session;
     if (!asked || !session) return this.token();
-    if (session.expiresAt - Date.now() / 1000 > LAST_USE_MARGIN_SECONDS) return session.token;
+    if (secondsLeft(session) > LAST_USE_MARGIN_SECONDS) return session.token;
     if (this.openListeners.size === 0) throw asked.refusal;
     await asked.resumed;
     return this.token();
@@ -461,7 +462,7 @@ export class GrantSessionSource {
   private untilRenewalMs(): number {
     const session = this.session;
     if (!session) return 0;
-    const renewAt = (session.expiresAt - RENEW_MARGIN_SECONDS + 1) * 1000;
+    const renewAt = Date.parse(session.expiresAt) - (RENEW_MARGIN_SECONDS - 1) * 1000;
     return Math.max(1_000, renewAt - Date.now());
   }
 
@@ -515,7 +516,7 @@ export class GrantSessionSource {
   }
 
   private async exchange(answers?: VisitorAnswers, signal?: AbortSignal): Promise<GrantSession> {
-    const store = this.opts.visitorStore ?? null;
+    const store = this.options.visitorStore ?? null;
     if (this.handle === undefined) {
       this.handle = store ? await store.get(this.grantId) : null;
     }
@@ -525,7 +526,7 @@ export class GrantSessionSource {
       ...(this.handle ? { visitorHandle: this.handle } : {}),
       ...(this.restart ? { restart: true } : {}),
       ...(visitorIdentity ? { visitorIdentity } : {}),
-      ...(this.opts.fetch ? { fetch: this.opts.fetch } : {}),
+      ...(this.options.fetch ? { fetch: this.options.fetch } : {}),
       ...(signal ? { signal } : {}),
     });
     this.restart = false;
@@ -572,8 +573,8 @@ class SessionGrant implements DocumentGrant {
     return AbortablePromise.run((signal) => this.source.identify(answers, signal));
   }
 
-  onIdentityRequest(listener: (request: VisitorIdentityRequest) => void): () => void {
-    return this.source.onIdentityRequest(listener);
+  onIdentityRequested(listener: (request: VisitorIdentityRequest) => void): () => void {
+    return this.source.onIdentityRequested(listener);
   }
 
   decline(): void {
@@ -584,13 +585,13 @@ class SessionGrant implements DocumentGrant {
     return this.source.openRequest;
   }
 
-  onOpenRequest(listener: (request: GrantOpenRequest) => void): () => void {
-    return this.source.onOpenRequest(listener);
+  onOpenRequested(listener: (request: GrantOpenRequest) => void): () => void {
+    return this.source.onOpenRequested(listener);
   }
 
   resume(given: {
     readonly passphrase?: string;
-    readonly identity?: VisitorAnswers;
+    readonly visitorIdentity?: VisitorAnswers;
   }): AbortablePromise<void> {
     return AbortablePromise.run((signal) => this.source.resume(given, signal));
   }
@@ -658,8 +659,8 @@ function untilAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 export function grantSessionSource(
   baseUrl: string,
   grant: string,
-  opts: GrantSessionOptions = {},
+  options: GrantSessionOptions = {},
 ): () => Promise<string> {
-  const source = new GrantSessionSource(baseUrl, grant, opts);
+  const source = new GrantSessionSource(baseUrl, grant, options);
   return () => source.token();
 }

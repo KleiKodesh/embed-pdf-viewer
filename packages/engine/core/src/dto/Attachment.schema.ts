@@ -1,8 +1,5 @@
 import { z } from 'zod';
 
-import { IsoDateTimeSchema } from './IsoDateTime.schema';
-import { FileResourceKeysSchema } from '../wire/resourceKeys';
-
 import type {
   Attachment,
   AttachmentFileBase,
@@ -10,6 +7,9 @@ import type {
   AttachmentRef,
   WireAttachmentFile,
 } from './Attachment';
+import { IsoDateTimeSchema } from './IsoDateTime.schema';
+import { closed } from '../wire/reading';
+import { FileResourceKeysSchema } from '../wire/resourceKeys';
 
 /**
  * Wire schemas for the attachment vocabulary (see `Attachment.ts`). The
@@ -35,25 +35,25 @@ export const AttachmentFileInfoSchema: z.ZodType<AttachmentFileInfo> = z.object(
   name: z.string(),
   mimeType: z.string().nullable(),
   description: z.string().nullable(),
-  size: z.number().int().nonnegative().nullable(),
-  checksum: z.string().nullable(),
+  sizeBytes: z.number().int().nonnegative().nullable(),
+  md5: z.string().nullable(),
   createdAt: IsoDateTimeSchema.nullable(),
   modifiedAt: IsoDateTimeSchema.nullable(),
 });
 
 export const AttachmentRefSchema: z.ZodType<AttachmentRef> = z.object({
-  kind: z.literal('key'),
+  kind: closed(z.literal('key')),
   key: z.string().min(1),
 });
 
 export const AttachmentSchema: z.ZodType<Attachment> = z.object({
   // A foreign tree entry whose key can't be read lists with an empty key.
-  ref: z.object({ kind: z.literal('key'), key: z.string() }),
+  ref: z.object({ kind: closed(z.literal('key')), key: z.string() }),
   name: z.string(),
   mimeType: z.string().nullable(),
   description: z.string().nullable(),
-  size: z.number().int().nonnegative().nullable(),
-  checksum: z.string().nullable(),
+  sizeBytes: z.number().int().nonnegative().nullable(),
+  md5: z.string().nullable(),
   createdAt: IsoDateTimeSchema.nullable(),
   modifiedAt: IsoDateTimeSchema.nullable(),
   index: z.number().int().nonnegative(),

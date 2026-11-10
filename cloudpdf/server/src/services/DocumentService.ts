@@ -9,7 +9,7 @@ import { Readable } from 'node:stream';
 import {
   EngineError,
   EngineErrorCode,
-  decodePdfBits,
+  permissionFlagsOf,
   securityStateFromProbe,
   toPageRef,
   wirePack,
@@ -24,7 +24,7 @@ import {
   type DocumentSecurityProbeInfo,
   type PageListSnapshot,
   type PageRef,
-  type PdfBits,
+  type PdfPermissionFlags,
   type PdfSaveMode,
   type WorkerJobId,
   type WorkerResultPayload,
@@ -39,7 +39,7 @@ import {
   type DocumentProtection,
 } from '@embedpdf/engine-core/runtime';
 import { DEFAULT_LAYER_NAME, wirePaths } from '@embedpdf/engine-core/wire';
-import type { DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
+import type { DocumentHead, DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
 
 import type { LayerStateService } from './LayerStateService';
 import type { EditRequest } from './LayerWriteObjectNumbers';
@@ -63,48 +63,13 @@ import { StorageKeys } from '../storage/keys';
 import { readLayerArtifactHeader } from '../storage/layerArtifact';
 import type { ObjectStore } from '../storage/ObjectStore';
 import type { ServerFonts } from './ServerFonts';
+import { EngineValues } from './EngineValues';
 
-/**
- * Public head shape returned by `GET /v1/docs/:docId/head`.
- *
- * `docVersion` is the single monotonic integer per document — bumps
- * on any mutation that could change the manifest's content (page
- * list, per-page content, per-page annotations, per-page weak-flag).
- * That makes `/manifest@docVersion=N` content-addressed and CDN-cacheable for
- * a year. `LayerService`'s mutation handlers are what bump it.
- */
-export interface DocumentHead {
-  id: string;
-  baseSha: string;
-  storageSizeBytes: number;
-  /** Cache-busting integer; bumps on every content-changing mutation. */
-  docVersion: number;
-  /** Lifecycle state, exposed so the SDK can render "deleting" / "failed" UI. */
-  state: DocumentRow['state'];
-  encryption: {
-    state: DocumentRow['security']['encryptionState'];
-    requiresPassword: boolean | null;
-  };
-  permissions: {
-    known: boolean;
-    bits: number | null;
-    allAllowed: boolean | null;
-    openedAs: NonNullable<DocumentRow['security']['pdfOpenedAs']> | null;
-    securityHandlerRevision: number | null;
-    canUpgradeToOwner: boolean;
-  };
-  access: {
-    required: boolean;
-    reasons: Array<'password' | 'cdn' | 'permissions-unknown'>;
-    endpoint?: string;
-  };
-}
-
-// The manifest shape is owned by engine-core (the wire contract). Re-export
-// it here so existing `@cloudpdf/server` consumers keep their import path,
-// but there is a single source of truth — no server-local shadow that can
-// drift from the wire type (e.g. miss `layoutVersion`).
-export type { DocumentManifest } from '@embedpdf/engine-core/wire';
+// The head and manifest shapes are owned by engine-core (the wire contract).
+// Re-export them here so existing `@cloudpdf/server` consumers keep their
+// import path, but there is a single source of truth — no server-local shadow
+// that can drift from the wire type (e.g. miss `layoutVersion`).
+export type { DocumentHead, DocumentManifest } from '@embedpdf/engine-core/wire';
 
 export interface DocumentServiceOptions {
   /** The base version catalog (migration 030): the head's row supplies the manifest's pointers and byte length. */
@@ -239,6 +204,8 @@ export class DocumentService {
   private readonly layerState: LayerStateService;
   /** The server's fonts (see {@link DocumentServiceOptions.serverFonts}). */
   readonly serverFonts: ServerFonts;
+  /** This server's engine values, which its fonts are one input of. */
+  readonly engineValues: EngineValues;
   private readonly passwordVerifications: PdfPasswordVerificationsRepo | null;
   private readonly passwordSessions: PdfPasswordSessionsRepo | null;
   private readonly passwordSessionServerSecret: { id: string; secret: string | Buffer } | null;
@@ -289,6 +256,13 @@ export class DocumentService {
    */
   private readonly layerWritesInFlight = new Map<string, Promise<void>>();
   /**
+   * Per layer session, the number {@link layerWriteMark} answers: drawn from
+   * `layerWriteCount` when a write begins, so it never repeats, even after
+   * the entry is forgotten and written again.
+   */
+  private readonly layerWriteMarks = new Map<string, number>();
+  private layerWriteCount = 0;
+  /**
    * Engine generation captured at write-alignment time (the
    * `forWrite` door of {@link ensureLayerFreshOnPool}), consumed by
    * {@link advanceLayerSession}. Correct without per-write threading
@@ -324,6 +298,7 @@ export class DocumentService {
     this.pool = opts.pool;
     this.layerState = opts.layerState;
     this.serverFonts = opts.serverFonts;
+    this.engineValues = new EngineValues(opts.serverFonts);
     this.passwordVerifications = opts.passwordVerifications ?? null;
     this.passwordSessions = opts.passwordSessions ?? null;
     this.passwordSessionServerSecret = opts.passwordSessionServerSecret ?? null;
@@ -449,15 +424,15 @@ export class DocumentService {
    * anonymous probe at ingest, so it reflects either "no permissions"
    * (probe rejected by password) or restrictive user-mode bits, never
    * the actual bits the caller sees with their unlocked session. Route
-   * guards should prefer {@link getEffectivePdfBits} which consults the
+   * guards should prefer {@link getEffectivePermissionFlags} which consults the
    * active password session first.
    *
    * Kept exposed as a focused primitive for cases that genuinely want
    * the document-row state regardless of session (e.g. /head's advisory
    * display before any unlock happens).
    */
-  async getPdfBits(tenantId: string, docId: string) {
-    return this.documents.getPdfBits(docId, tenantId);
+  async getPermissionFlags(tenantId: string, docId: string) {
+    return this.documents.getPermissionFlags(docId, tenantId);
   }
 
   /**
@@ -484,15 +459,15 @@ export class DocumentService {
    * hand from `unlockLayerAccess`, which is the authoritative source
    * for the moment it just unlocked. Use that probe directly.
    */
-  async getEffectivePdfBits(
+  async getEffectivePermissionFlags(
     ctx: OpenContext,
     docId: string,
     // Default to the token's pinned layer: doc-level shared routes
     // must evaluate the claimed layer's post-unlock bits, not 'default''s.
     layerName: string = pinnedLayerName(ctx),
-  ): Promise<PdfBits> {
+  ): Promise<PdfPermissionFlags> {
     const row = await this.requireReadyRow(ctx, docId);
-    const fromRow = decodePdfBits(row.security.pdfPermissionsBits ?? null);
+    const fromRow = permissionFlagsOf(row.security.pdfPermissionsBits ?? null);
 
     // Only encrypted documents have per-caller (post-unlock) bits. This
     // includes permission-only docs (empty user password), where an owner
@@ -512,7 +487,7 @@ export class DocumentService {
     const binding = this.passwordSessionBinding(ctx, row, layerName);
     const session = await this.passwordSessions.findActive(binding);
     if (session) {
-      return decodePdfBits(session.pdfPermissionsBits);
+      return permissionFlagsOf(session.pdfPermissionsBits);
     }
     return fromRow;
   }
@@ -524,7 +499,7 @@ export class DocumentService {
    */
   async getHead(ctx: OpenContext, docId: string): Promise<DocumentHead> {
     const row = await this.requireReadyRow(ctx, docId);
-    const head = buildHead(row, this.cdnAccessRequired);
+    const head = buildHead(row, this.cdnAccessRequired, await this.engineValues.values());
     void this.warm(ctx, docId).catch(() => undefined);
     return head;
   }
@@ -555,7 +530,7 @@ export class DocumentService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${result.tag}`);
       }
       this.recordOpened(baseSha, result);
-      const head = buildHead(row, this.cdnAccessRequired);
+      const head = buildHead(row, this.cdnAccessRequired, await this.engineValues.values());
       this.replaceBaseHandle(docId, baseSha, handle);
       handle = null;
       return head;
@@ -575,23 +550,13 @@ export class DocumentService {
     const pages = await this.layerState.ensureBasePages(docId, () =>
       this.loadBasePages(ctx, docId),
     );
-    const version = await this.layerState.baseVersionFacts(
-      docId,
-      head.baseSha,
-      head.storageSizeBytes,
-    );
+    const version = await this.layerState.baseVersionFacts(docId, head.baseSha256, head.sizeBytes);
     const protection = await this.protectionOf(
       ctx,
       await this.requireReadyRow(ctx, docId),
-      head.baseSha,
+      head.baseSha256,
     );
-    return this.layerState.buildBaseManifest(
-      head,
-      pages,
-      version,
-      protection,
-      await this.serverFonts.fingerprint(),
-    );
+    return this.layerState.buildBaseManifest(head, pages, version, protection);
   }
 
   async getLayerHead(ctx: OpenContext, docId: string, layerName: string): Promise<DocumentHead> {
@@ -606,14 +571,14 @@ export class DocumentService {
     if (!layer) return head;
     // A layer's head is over its own base: the upload, or the version its
     // last signature made.
-    if (layer.baseSha === null || layer.baseSha === head.baseSha) {
+    if (layer.baseSha === null || layer.baseSha === head.baseSha256) {
       return { ...head, docVersion: layer.docVersion };
     }
     const base = await this.layerState.baseVersionFacts(docId, layer.baseSha, null);
     return {
       ...head,
-      baseSha: base.sha256,
-      storageSizeBytes: base.byteLength,
+      baseSha256: base.sha256,
+      sizeBytes: base.byteLength,
       docVersion: layer.docVersion,
     };
   }
@@ -647,8 +612,8 @@ export class DocumentService {
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
     const headVersion = await this.layerState.baseVersionFacts(
       docId,
-      head.baseSha,
-      head.storageSizeBytes,
+      head.baseSha256,
+      head.sizeBytes,
     );
     if (!layer) {
       const pages = await this.layerState.ensureBasePages(docId, () =>
@@ -662,7 +627,7 @@ export class DocumentService {
       return this.layerState.buildLayerManifest(
         docId,
         headVersion,
-        await this.protectionOf(ctx, row, head.baseSha),
+        await this.protectionOf(ctx, row, head.baseSha256),
         layerName,
         {
           docVersion: head.docVersion,
@@ -673,13 +638,14 @@ export class DocumentService {
           formsVersion: headVersion.formsVersion,
           outlineVersion: headVersion.outlineVersion,
           fontsVersion: headVersion.fontsVersion,
+          contentsVersion: headVersion.contentsVersion,
+          viewportsVersion: headVersion.viewportsVersion,
           lastAuditId: 0,
           currentVersion: 0,
           currentArtifactKey: null,
         },
         pages,
         this.layerState.computeLayerScopes(null, [], []),
-        await this.serverFonts.fingerprint(),
       );
     }
 
@@ -689,9 +655,9 @@ export class DocumentService {
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
     // The layer's own base version (law 2): the upload, or the version its
     // last signature made.
-    const layerBaseSha = layer.baseSha ?? head.baseSha;
+    const layerBaseSha = layer.baseSha ?? head.baseSha256;
     const layerVersion =
-      layerBaseSha === head.baseSha
+      layerBaseSha === head.baseSha256
         ? headVersion
         : await this.layerState.baseVersionFacts(docId, layerBaseSha, null);
     // Plane scopes: annotation writes own `annotations` only (renders/
@@ -706,7 +672,6 @@ export class DocumentService {
       layer,
       pages,
       this.layerState.computeLayerScopes(layer, pages, basePages, headVersion),
-      await this.serverFonts.fingerprint(),
     );
   }
 
@@ -880,14 +845,14 @@ export class DocumentService {
   ): Promise<{ baseSha: string; lastObjectNumber: number }> {
     const row = await this.requireReadyRow(ctx, docId);
     const head = await this.openOnPool(ctx, docId, await this.passwordForOpen(ctx, row, layerName));
-    const known = this.baseObjectNumbers.get(head.baseSha);
-    if (known !== undefined) return { baseSha: head.baseSha, lastObjectNumber: known };
+    const known = this.baseObjectNumbers.get(head.baseSha256);
+    if (known !== undefined) return { baseSha: head.baseSha256, lastObjectNumber: known };
     await this.ensureLayerOnPool(ctx, docId, layerName);
     const opened = this.lastObjectNumberAtOpen(docId, layerName);
     if (opened === undefined) {
       throw new EngineError(EngineErrorCode.Unknown, `layer ${layerName} of ${docId} is not open`);
     }
-    return { baseSha: head.baseSha, lastObjectNumber: opened };
+    return { baseSha: head.baseSha256, lastObjectNumber: opened };
   }
 
   /**
@@ -901,6 +866,7 @@ export class DocumentService {
     await this.awaitLayerWriteSettled(key);
     await this.layerOpens.get(key)?.catch(() => undefined);
     this.layerTouches.delete(key);
+    this.layerWriteMarks.delete(key);
     await this.closeLayerOnPool(docId, layerName);
   }
 
@@ -920,6 +886,7 @@ export class DocumentService {
     let settle!: () => void;
     const marker = new Promise<void>((resolve) => (settle = resolve));
     this.layerWritesInFlight.set(key, marker);
+    this.layerWriteMarks.set(key, ++this.layerWriteCount);
     this.touchLayer(docId, layerName);
     return () => {
       if (this.layerWritesInFlight.get(key) === marker) {
@@ -932,12 +899,22 @@ export class DocumentService {
   }
 
   /**
+   * Which write began last on the layer's session on this replica, as a
+   * number that changes whenever a write begins. A pinned read takes it
+   * before it reads and compares after (`readAtPins` in
+   * `routes/_helpers.ts`): the same number means no write began meanwhile.
+   */
+  layerWriteMark(docId: string, layerName: string): number {
+    return this.layerWriteMarks.get(layerSessionKey(docId, layerName)) ?? 0;
+  }
+
+  /**
    * Park until no layer write is in flight — bounded to two rounds so a
-   * continuous write stream cannot starve reads: after the bound, the
-   * request-time freshness check plus the routes' pinned-read
-   * re-validation still guarantee no uncommitted content is served under
-   * a version pin; the barrier exists to make that the rare path, not the
-   * only defense.
+   * continuous write stream cannot starve reads. The layer's writes run one
+   * at a time, so a read that started while one write was in flight runs
+   * after it settles. Past the bound, a read can run on uncommitted state:
+   * a pinned read then sees that another write began and refuses its pins
+   * (`readAtPins` in `routes/_helpers.ts`).
    */
   private async awaitLayerWriteSettled(key: string): Promise<void> {
     for (let round = 0; round < 2; round++) {
@@ -1202,7 +1179,7 @@ export class DocumentService {
     ctx: OpenContext,
     docId: string,
     layerName: string,
-    displayHash: string,
+    displaySha256: string,
     part: 'info' | 'data',
     signal?: AbortSignal,
   ): Promise<Extract<WorkerResultPayload, { tag: 'document.fonts.program' }>> {
@@ -1210,7 +1187,7 @@ export class DocumentService {
       ctx,
       docId,
       layerName,
-      { kind: 'document.fonts.program', displayHash, part },
+      { kind: 'document.fonts.program', displaySha256, part },
       'document.fonts.program',
       signal,
     );
@@ -1414,7 +1391,7 @@ export class DocumentService {
       // no grant means "baseline". Revoke any active (owner) session so the
       // anonymous response we return matches what reads will now enforce —
       // otherwise the session would keep granting elevated bits via
-      // getEffectivePdfBits while this response claims a downgrade.
+      // getEffectivePermissionFlags while this response claims a downgrade.
       if (this.passwordSessions && ctx.jwt?.jti) {
         await this.passwordSessions.revoke(this.passwordSessionBinding(ctx, row, layerName));
       }
@@ -2337,7 +2314,7 @@ export class DocumentService {
     // Law 2: a layer session materializes over the layer's base version:
     // the upload, or the version its last signature made. Its file is held
     // beside the upload's, keyed by sha, until the document closes.
-    const layerBaseSha = layer?.baseSha ?? head.baseSha;
+    const layerBaseSha = layer?.baseSha ?? head.baseSha256;
     const handle = await this.baseHandleFor(row, layerBaseSha);
     let layerHandle: LocalFileHandle | null = null;
     const layerOpen = layer
@@ -2435,6 +2412,9 @@ export class DocumentService {
     }
     for (const key of Array.from(this.layerOpens.keys())) {
       if (key.startsWith(`${docId}::`)) this.layerOpens.delete(key);
+    }
+    for (const key of Array.from(this.layerWriteMarks.keys())) {
+      if (key.startsWith(`${docId}::`)) this.layerWriteMarks.delete(key);
     }
   }
 
@@ -2674,11 +2654,18 @@ function layerSessionKey(docId: string, layerName: string): string {
   return `${docId}::${layerName}`;
 }
 
-function buildHead(row: DocumentRow, cdnAccessRequired: boolean): DocumentHead {
+function buildHead(
+  row: DocumentRow,
+  cdnAccessRequired: boolean,
+  engine: DocumentHead['engine'],
+): DocumentHead {
   const baseSha = requireBaseSha(row);
   const permissions = {
     known: row.security.pdfPermissionsBits !== null,
-    bits: row.security.pdfPermissionsBits,
+    flags:
+      row.security.pdfPermissionsBits === null
+        ? null
+        : permissionFlagsOf(row.security.pdfPermissionsBits),
     allAllowed: row.security.pdfPermissionsAllAllowed,
     openedAs: row.security.pdfOpenedAs,
     securityHandlerRevision: row.security.securityHandlerRevision,
@@ -2697,8 +2684,8 @@ function buildHead(row: DocumentRow, cdnAccessRequired: boolean): DocumentHead {
 
   return {
     id: row.id,
-    baseSha,
-    storageSizeBytes: row.storageSizeBytes ?? 0,
+    baseSha256: baseSha,
+    sizeBytes: row.storageSizeBytes ?? 0,
     docVersion: row.docVersion,
     state: row.state,
     encryption: {
@@ -2711,6 +2698,7 @@ function buildHead(row: DocumentRow, cdnAccessRequired: boolean): DocumentHead {
       reasons,
       ...(reasons.length > 0 ? { endpoint: wirePaths.access(row.id, DEFAULT_LAYER_NAME) } : {}),
     },
+    engine,
   };
 }
 
@@ -2734,6 +2722,8 @@ function legacyVersionRow(row: DocumentRow, sha: string): BaseVersionRow {
     formsVersion: 1,
     outlineVersion: 1,
     fontsVersion: 1,
+    contentsVersion: 1,
+    viewportsVersion: 1,
     createdAt: row.createdAt,
   };
 }

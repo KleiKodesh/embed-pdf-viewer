@@ -73,6 +73,7 @@ export const zhTW: Locale = {
         group: '捲動',
         vertical: '垂直',
         horizontal: '水平',
+        paged: '逐頁',
       },
       rotate: {
         group: '旋轉',
@@ -116,6 +117,13 @@ export const zhTW: Locale = {
         copy: '複製',
         strip: '文字選取動作',
       },
+      snapshot: {
+        tool: '拍快照',
+        copy: '複製',
+        save: '儲存影像',
+        clear: '清除快照',
+        strip: '快照動作',
+      },
       shapes: {
         rectangle: '矩形',
         circle: '橢圓形',
@@ -144,6 +152,7 @@ export const zhTW: Locale = {
       redact: {
         mark: '標記為要編修',
         applyAll: '套用編修',
+        apply: { other: '套用 {count} 處編修' },
         clearAll: '清除標記',
       },
       undo: '復原',
@@ -163,6 +172,7 @@ export const zhTW: Locale = {
         'doc-annotate-modify': '不允許變更註解',
         'doc-annotate-read': '不允許檢視註解',
         'doc-attachments-modify': '不允許新增檔案',
+        'doc-content-copy': '不允許拍快照',
         'doc-download': '不允許下載',
         'doc-forms-modify': '不允許編輯表單欄位',
         'doc-outline-modify': '不允許變更書籤',
@@ -347,6 +357,7 @@ export const zhTW: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: '類型',
         opacity: '不透明度',
         stroke: '筆畫',
         fill: '填色',
@@ -494,7 +505,7 @@ export const zhTW: Locale = {
       lineStart: '起點',
       lineEnd: '終點',
       empty: '選擇繪圖工具或選取註解以編輯其樣式。',
-      selected: '已選取 {count} 項',
+      selected: { other: '已選取 {count} 項' },
       toolDefaults: '{tool} 預設值',
       defaults: '預設值',
       fontGroups: {
@@ -517,20 +528,6 @@ export const zhTW: Locale = {
         other: '無法用它書寫新文字',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: '旗標 (/F)',
-      print: '列印頁面時包含',
-      hidden: '在螢幕、按一下和列印中皆隱藏',
-      noView: '在螢幕上隱藏，但仍可能列印',
-      toggleNoView: '選取時顯示設為「不顯示」的註解',
-      readOnly: '可見但無法按一下',
-      locked: '無法移動、調整大小、刪除或變更樣式',
-      lockedContents: '文字無法變更；幾何形狀可以變更',
-      noZoom: '螢幕上大小固定（錨定於左上角）',
-      noRotate: '頁面旋轉時保持直立',
-      invisible: '舊版：隱藏未知的子類型',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: '正在載入附件…',
@@ -540,8 +537,7 @@ export const zhTW: Locale = {
       dropHint: '或將檔案拖放到這裡',
       adding: '正在新增…',
       onPage: '第 {page} 頁',
-      count: '{count} 個檔案',
-      countPlural: '{count} 個檔案',
+      count: { other: '{count} 個檔案' },
     },
     outline: {
       filter: '篩選書籤',
@@ -594,10 +590,9 @@ export const zhTW: Locale = {
       retry: '重試',
       empty: '尚無註解。使用註解工具開始討論。',
       emptyReadOnly: '此文件沒有註解。',
-      anonymous: '未知',
+      anonymous: '訪客',
       page: '第 {page} 頁',
-      count: '{count} 則註解',
-      countPlural: '{count} 則註解',
+      count: { other: '{count} 則註解' },
       reply: '回覆',
       replyPlaceholder: '回覆…',
       addPlaceholder: '新增註解…',
@@ -624,7 +619,7 @@ export const zhTW: Locale = {
       searchWholeWord: '全字拼寫須相符',
       searchRegex: '規則運算式',
       searchSearching: '正在搜尋…',
-      searchResults: '找到 {count} 個結果',
+      searchResults: { other: '找到 {count} 個結果' },
       searchNoResults: '沒有結果',
       searchPrevious: '上一個結果',
       searchNext: '下一個結果',
@@ -639,9 +634,9 @@ export const zhTW: Locale = {
       redactionArea: '區域標記',
       redactionText: '文字標記',
       redactionRemove: '移除標記',
-      redactConfirmTitle: '要套用編修嗎？',
-      redactConfirmBody: '永久移除 {count} 個編修標記下的內容。此動作無法復原。',
-      redactConfirmCollateral: '另有 {count} 個註解也會被移除。',
+      redactConfirmTitle: { other: '要套用編修嗎？' },
+      redactConfirmBody: { other: '永久移除 {count} 個編修標記下的內容。此動作無法復原。' },
+      redactConfirmCollateral: { other: '另有 {count} 個註解也會被移除。' },
       redactApply: '套用',
       redactApplying: '正在套用…',
       formatLabel: '格式',

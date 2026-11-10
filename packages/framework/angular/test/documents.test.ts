@@ -258,13 +258,12 @@ describe('EpdfPageEdit', () => {
 const websiteLink: PdfActionTree = {
   root: { type: 'uri', subtype: 'URI', uri: 'https://www.embedpdf.com', isMap: false, next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 };
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 /** An app's own service that the handlers of `withActionsUi()` use. */

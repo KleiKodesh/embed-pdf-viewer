@@ -1,7 +1,7 @@
 /**
  * `widgetDrawing`: what a widget looks like for its facts, as the engine's
  * appearance generator draws it. The widget row gives the look (`/MK`, `/BS`,
- * `/DA`) and the box, the field gives the family and its flags, `shown` what
+ * `/DA`) and the box, the field gives the kind and its flags, `shown` what
  * to show now (a value this session formatted, a toggle's state), and `fonts`
  * what its text is drawn in: the widget's font, the fallbacks and the last
  * resort, as the viewer knows them.
@@ -9,14 +9,14 @@
 import { defaultPaintFonts, type PaintFonts } from '@embedpdf/core-text';
 import {
   isStandardFontName,
-  type FormFieldDTO,
+  type FormField,
   type WidgetAnnotation,
   type Coordinates,
   type PageCoordinates,
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 
-import { borderStyleInfo, rgbOf } from './border';
+import { borderStyleInfo, fieldBoxOps, rgbOf } from './border';
 import { comboBoxOps, listBoxOps, pushButtonOps, textFieldOps, type TextLook } from './text';
 import { checkboxOps, radioOps } from './toggle';
 import type { DrawOp, WidgetDrawing } from './types';
@@ -66,9 +66,8 @@ export function textLookOf<C extends Coordinates = PageCoordinates>(
   };
 }
 
-/** Whether the painter draws this field's widgets: not a signature, nor a family the engine doesn't know. */
-export const paints = (field: Pick<FormFieldDTO, 'family'>): boolean =>
-  PAINTED_FAMILIES.has(field.family);
+/** Whether the painter draws this field's widgets: not a kind the engine doesn't know. */
+export const paints = (field: Pick<FormField, 'kind'>): boolean => PAINTED_FAMILIES.has(field.kind);
 
 const PAINTED_FAMILIES: ReadonlySet<string> = new Set([
   'checkbox',
@@ -77,6 +76,7 @@ const PAINTED_FAMILIES: ReadonlySet<string> = new Set([
   'combobox',
   'listbox',
   'pushbutton',
+  'signature',
 ]);
 
 /**
@@ -86,10 +86,10 @@ const PAINTED_FAMILIES: ReadonlySet<string> = new Set([
  */
 export function widgetText<C extends Coordinates = PageCoordinates>(
   widget: WidgetAnnotation<C>,
-  field: FormFieldDTO<C>,
+  field: FormField<C>,
   shown: ShownValue = {},
 ): string {
-  switch (field.family) {
+  switch (field.kind) {
     case 'text': {
       const value = shown.text ?? field.value;
       return field.password && value ? '*' : value;
@@ -106,12 +106,12 @@ export function widgetText<C extends Coordinates = PageCoordinates>(
 }
 
 /**
- * The drawing, or `null` for a widget the painter doesn't draw (a signature,
- * a family the engine doesn't know).
+ * The drawing, or `null` for a widget the painter doesn't draw: a kind the
+ * engine doesn't know. A signature field's is its box, with no mark in it.
  */
 export function widgetDrawing<C extends Coordinates = PageCoordinates>(
   widget: WidgetAnnotation<C>,
-  field: FormFieldDTO<C>,
+  field: FormField<C>,
   shown: ShownValue = {},
   fonts?: PaintFonts,
 ): WidgetDrawing | null {
@@ -129,7 +129,11 @@ export function widgetDrawing<C extends Coordinates = PageCoordinates>(
     approximate,
   });
 
-  if (field.family === 'checkbox' || field.family === 'radio') {
+  if (field.kind === 'signature') {
+    return drawing(fieldBoxOps(bbox, border, background, borderColor));
+  }
+
+  if (field.kind === 'checkbox' || field.kind === 'radio') {
     const look = {
       bbox,
       border,
@@ -141,7 +145,7 @@ export function widgetDrawing<C extends Coordinates = PageCoordinates>(
     const checked =
       shown.checked ?? (widget.appearanceState !== null && widget.appearanceState !== 'Off');
     return drawing(
-      field.family === 'checkbox' ? checkboxOps(look, checked) : radioOps(look, checked),
+      field.kind === 'checkbox' ? checkboxOps(look, checked) : radioOps(look, checked),
     );
   }
 
@@ -149,7 +153,7 @@ export function widgetDrawing<C extends Coordinates = PageCoordinates>(
   const look = text.look;
   let approximate = text.approximate;
   const drawn =
-    field.family === 'text'
+    field.kind === 'text'
       ? textFieldOps(look, {
           value: shown.text ?? field.value,
           multiline: field.multiline,
@@ -157,9 +161,9 @@ export function widgetDrawing<C extends Coordinates = PageCoordinates>(
           comb: field.comb,
           maxLength: field.maxLength,
         })
-      : field.family === 'combobox'
+      : field.kind === 'combobox'
         ? comboBoxOps(look, { value: shown.text ?? field.value })
-        : field.family === 'listbox'
+        : field.kind === 'listbox'
           ? listBoxOps(look, { options: field.options, topIndex: field.topIndex })
           : pushButtonOps(look, widget.caption ?? null);
   // A box the painter drew may be a character a font it wasn't given has.

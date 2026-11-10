@@ -17,9 +17,15 @@ describe("OutlineClient", () => {
                     title: "title",
                     target: {
                         kind: "goto",
-                        destination: { kind: "xyz", page: { kind: "objectNumber", objectNumber: 1 } },
+                        destination: {
+                            kind: "xyz",
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            x: null,
+                            y: null,
+                            zoom: null,
+                        },
                     },
-                    action: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    action: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
                     open: true,
                     color: "color",
                     bold: true,
@@ -48,7 +54,7 @@ describe("OutlineClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

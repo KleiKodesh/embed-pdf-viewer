@@ -4,8 +4,8 @@ import * as S from '../src';
 const vp = { width: 1000, height: 700 };
 const GAP = 16;
 
-/** Build a PageGeom from intrinsic dimensions (the layout fns take `size`, not bare w/h). */
-const pg = (width: number, height: number, rotation?: S.PageRotation): S.PageGeom => ({
+/** Build a PageGeometry from intrinsic dimensions (the layout fns take `size`, not bare w/h). */
+const pg = (width: number, height: number, rotation?: S.Rotation): S.PageGeometry => ({
   size: { width, height },
   ...(rotation !== undefined ? { rotation } : {}),
 });
@@ -556,11 +556,11 @@ describe('direction: rtl (a layout property, not a navigation one)', () => {
 });
 
 describe('pageFrame: reserved chrome space around each PAGE', () => {
-  const pageGeom = pg(600, 800);
+  const pageGeometry = pg(600, 800);
   const frame = { top: 10, right: 8, bottom: 20, left: 6 };
 
   it('linear vertical: pages sit inside their slots; bands reserved between pages', () => {
-    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'none'), {
+    const scene = S.linearLayout([pageGeometry, pageGeometry], S.groupPages(2, 'none'), {
       axis: 'y',
       gap: 16,
       pageFrame: frame,
@@ -575,7 +575,7 @@ describe('pageFrame: reserved chrome space around each PAGE', () => {
   });
 
   it('SPREADS: each page keeps its OWN flanks — left/right chrome works (the fix)', () => {
-    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'odd'), {
+    const scene = S.linearLayout([pageGeometry, pageGeometry], S.groupPages(2, 'odd'), {
       axis: 'y',
       gap: 16,
       pageFrame: frame,
@@ -587,7 +587,7 @@ describe('pageFrame: reserved chrome space around each PAGE', () => {
   });
 
   it('RTL spread: slots mirror but margins stay PHYSICAL (left room stays mL)', () => {
-    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'odd'), {
+    const scene = S.linearLayout([pageGeometry, pageGeometry], S.groupPages(2, 'odd'), {
       axis: 'y',
       gap: 16,
       pageFrame: frame,
@@ -681,6 +681,31 @@ describe('groupPages', () => {
       [2, 3],
     ]);
     expect(S.groupPages(4, 'even')).toEqual([[0], [1, 2], [3]]);
+  });
+});
+
+describe('itemOfPage', () => {
+  const pages = Array.from({ length: 4 }, () => pg(600, 800));
+
+  it('finds the item holding the page when groups are out of page order', () => {
+    const linear = S.linearLayout(pages.slice(0, 3), [[1], [2], [0]]);
+    expect([0, 1, 2].map((pi) => linear.itemOfPage(pi))).toEqual([2, 0, 1]);
+    const grid = S.gridLayout(pages.slice(0, 3), [[1], [2], [0]], { columns: 2 });
+    expect([0, 1, 2].map((pi) => grid.itemOfPage(pi))).toEqual([2, 0, 1]);
+  });
+
+  it('finds either page of a spread out of order', () => {
+    const scene = S.linearLayout(pages, [
+      [2, 3],
+      [0, 1],
+    ]);
+    expect([0, 1, 2, 3].map((pi) => scene.itemOfPage(pi))).toEqual([1, 1, 0, 0]);
+  });
+
+  it('keeps the nearest item before a page the layout leaves out', () => {
+    const scene = S.linearLayout(pages, [[0], [2], [3]]);
+    expect(scene.itemOfPage(1)).toBe(0);
+    expect(scene.itemOfPage(9)).toBe(2);
   });
 });
 

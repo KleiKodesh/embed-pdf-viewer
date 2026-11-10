@@ -12,7 +12,7 @@ import {
   AttachmentRestoreResultSchema,
   CustomMetadataPatchSchema,
   CustomMetadataUpdateResultSchema,
-  EngineErrorPayloadSchema,
+  EngineErrorSchema,
   FieldPositionSchema,
   FormCalculationsReorderResultSchema,
   FormFieldCreateResultSchema,
@@ -42,7 +42,9 @@ import {
   PageReorderResultSchema,
   PageRestoreResultSchema,
   PageRotateResultSchema,
+  PageScaleResultSchema,
 } from './schemas';
+import { PdfMeasureSchema, PdfMeasureWriteSchema } from '../dto/Measure.schema';
 import { AnnotationRefSchema } from '../annotation/base.schema';
 import {
   AnnotationDraftSchema,
@@ -70,6 +72,7 @@ import {
   FileResourceKeysSchema,
   SourceResourceKeysSchema,
 } from './resourceKeys';
+import { closed } from './reading';
 
 /**
  * `POST /v1/docs/{docId}/layers/{layerName}/changes`: a request's changes and
@@ -227,6 +230,11 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     rotation: PdfRotationSchema,
   }),
   z.object({
+    type: z.literal('pages.setScale'),
+    pages: z.array(PageRefSchema).min(1),
+    measure: PdfMeasureWriteSchema.nullable(),
+  }),
+  z.object({
     type: z.literal('pages.reorder'),
     pages: z.array(PageRefSchema).min(1),
     position: PagePositionSchema,
@@ -296,15 +304,17 @@ export const ChangeRequestSchema = z.object({
 });
 
 /** What an item can be: an op's type, or a restore (only in an undo). */
-const ChangeItemTypeSchema = z.enum([
-  ...ChangeOpWireSchema.options.map((op) => op.shape.type.value),
-  'annotations.restore',
-  'forms.restore',
-  'forms.restoreWidget',
-  'outline.restore',
-  'pages.restore',
-  'attachments.restore',
-] as unknown as [ChangeItemType, ...ChangeItemType[]]);
+const ChangeItemTypeSchema = closed(
+  z.enum([
+    ...ChangeOpWireSchema.options.map((op) => op.shape.type.value),
+    'annotations.restore',
+    'forms.restore',
+    'forms.restoreWidget',
+    'outline.restore',
+    'pages.restore',
+    'attachments.restore',
+  ] as unknown as [ChangeItemType, ...ChangeItemType[]]),
+);
 
 /** What an undo left alone, by name. */
 const SkippedFieldsSchema = z.array(z.string()).optional();
@@ -322,70 +332,76 @@ function itemOf<T extends ChangeItemType>(
  * One item of a change's result: what one op did, or that an undo left it
  * alone (`skipped`). Every item names itself by `type`.
  */
-export const ChangeItemSchema = z.union([
-  z.object({
-    type: z.literal('skipped'),
-    /** The item it would have been. */
-    op: ChangeItemTypeSchema,
-    meta: MutationMetaSchema,
-  }),
-  itemOf('annotations.create', AnnotationCreateResultSchema, { page: PageRefSchema }),
-  itemOf('annotations.update', AnnotationUpdateResultSchema, {
-    page: PageRefSchema,
-    skipped: SkippedFieldsSchema,
-  }),
-  itemOf('annotations.delete', AnnotationDeleteResultSchema, { page: PageRefSchema }),
-  itemOf('annotations.reorder', AnnotationReorderResultSchema, { page: PageRefSchema }),
-  z.object({
-    type: z.literal('annotations.restore'),
-    page: PageRefSchema,
-    annotations: z.array(AnnotationSchema),
-    meta: AnnotationListMutationMetaSchema,
-  }),
-  itemOf('forms.setValue', FormSetValueResultSchema),
-  itemOf('forms.setDisplay', FormFieldUpdateResultSchema),
-  itemOf('forms.setAppearanceText', FormFieldUpdateResultSchema),
-  itemOf('forms.reset', FormResetResultSchema, { skipped: SkippedFieldsSchema }),
-  itemOf('forms.create', FormFieldCreateResultSchema),
-  itemOf('forms.update', FormFieldUpdateResultSchema, { skipped: SkippedFieldsSchema }),
-  itemOf('forms.delete', FormFieldDeleteResultSchema),
-  z.object({
-    type: z.literal('forms.restore'),
-    field: FormFieldDTOSchema,
-    widgets: z.array(WidgetDTOSchema),
-    meta: FormMutationMetaSchema,
-  }),
-  itemOf('forms.setSignatureAppearance', FormFieldUpdateResultSchema),
-  itemOf('forms.addWidget', FormWidgetLinkResultSchema),
-  itemOf('forms.removeWidget', FormWidgetLinkResultSchema),
-  itemOf('forms.deleteWidget', FormWidgetDeleteResultSchema),
-  itemOf('forms.restoreWidget', FormWidgetRestoreResultSchema),
-  itemOf('forms.reorderWidgets', FormWidgetsReorderResultSchema),
-  itemOf('forms.reorderCalculations', FormCalculationsReorderResultSchema),
-  itemOf('forms.updateWidget', FormWidgetUpdateResultSchema, { skipped: SkippedFieldsSchema }),
-  itemOf('metadata.update', MetadataUpdateResultSchema, { skipped: SkippedFieldsSchema }),
-  itemOf('metadata.updateCustom', CustomMetadataUpdateResultSchema, {
-    skipped: SkippedFieldsSchema,
-  }),
-  itemOf('outline.create', OutlineCreateResultSchema),
-  itemOf('outline.update', OutlineUpdateResultSchema, { skipped: SkippedFieldsSchema }),
-  itemOf('outline.move', OutlineMoveResultSchema),
-  itemOf('outline.delete', OutlineDeleteResultSchema),
-  itemOf('outline.restore', OutlineRestoreResultSchema),
-  itemOf('pages.rotate', PageRotateResultSchema, {
-    pages: z.array(PageRefSchema),
-    rotation: PdfRotationSchema,
-  }),
-  itemOf('pages.reorder', PageReorderResultSchema),
-  itemOf('pages.delete', PageDeleteResultSchema, { pages: z.array(PageRefSchema) }),
-  itemOf('pages.insertBlank', PageInsertResultSchema),
-  itemOf('pages.insert', PageInsertResultSchema),
-  itemOf('pages.copy', PageInsertResultSchema),
-  itemOf('pages.restore', PageRestoreResultSchema),
-  itemOf('attachments.create', AttachmentCreateResultSchema),
-  itemOf('attachments.delete', AttachmentDeleteResultSchema),
-  itemOf('attachments.restore', AttachmentRestoreResultSchema),
-]);
+export const ChangeItemSchema = closed(
+  z.union([
+    z.object({
+      type: z.literal('skipped'),
+      /** The item it would have been. */
+      op: ChangeItemTypeSchema,
+      meta: MutationMetaSchema,
+    }),
+    itemOf('annotations.create', AnnotationCreateResultSchema, { page: PageRefSchema }),
+    itemOf('annotations.update', AnnotationUpdateResultSchema, {
+      page: PageRefSchema,
+      skipped: SkippedFieldsSchema,
+    }),
+    itemOf('annotations.delete', AnnotationDeleteResultSchema, { page: PageRefSchema }),
+    itemOf('annotations.reorder', AnnotationReorderResultSchema, { page: PageRefSchema }),
+    z.object({
+      type: z.literal('annotations.restore'),
+      page: PageRefSchema,
+      annotations: z.array(AnnotationSchema),
+      meta: AnnotationListMutationMetaSchema,
+    }),
+    itemOf('forms.setValue', FormSetValueResultSchema),
+    itemOf('forms.setDisplay', FormFieldUpdateResultSchema),
+    itemOf('forms.setAppearanceText', FormFieldUpdateResultSchema),
+    itemOf('forms.reset', FormResetResultSchema, { skipped: SkippedFieldsSchema }),
+    itemOf('forms.create', FormFieldCreateResultSchema),
+    itemOf('forms.update', FormFieldUpdateResultSchema, { skipped: SkippedFieldsSchema }),
+    itemOf('forms.delete', FormFieldDeleteResultSchema),
+    z.object({
+      type: z.literal('forms.restore'),
+      field: FormFieldDTOSchema,
+      widgets: z.array(WidgetDTOSchema),
+      meta: FormMutationMetaSchema,
+    }),
+    itemOf('forms.setSignatureAppearance', FormFieldUpdateResultSchema),
+    itemOf('forms.addWidget', FormWidgetLinkResultSchema),
+    itemOf('forms.removeWidget', FormWidgetLinkResultSchema),
+    itemOf('forms.deleteWidget', FormWidgetDeleteResultSchema),
+    itemOf('forms.restoreWidget', FormWidgetRestoreResultSchema),
+    itemOf('forms.reorderWidgets', FormWidgetsReorderResultSchema),
+    itemOf('forms.reorderCalculations', FormCalculationsReorderResultSchema),
+    itemOf('forms.updateWidget', FormWidgetUpdateResultSchema, { skipped: SkippedFieldsSchema }),
+    itemOf('metadata.update', MetadataUpdateResultSchema, { skipped: SkippedFieldsSchema }),
+    itemOf('metadata.updateCustom', CustomMetadataUpdateResultSchema, {
+      skipped: SkippedFieldsSchema,
+    }),
+    itemOf('outline.create', OutlineCreateResultSchema),
+    itemOf('outline.update', OutlineUpdateResultSchema, { skipped: SkippedFieldsSchema }),
+    itemOf('outline.move', OutlineMoveResultSchema),
+    itemOf('outline.delete', OutlineDeleteResultSchema),
+    itemOf('outline.restore', OutlineRestoreResultSchema),
+    itemOf('pages.rotate', PageRotateResultSchema, {
+      pages: z.array(PageRefSchema),
+      rotation: PdfRotationSchema,
+    }),
+    itemOf('pages.setScale', PageScaleResultSchema, {
+      pages: z.array(PageRefSchema),
+      measure: PdfMeasureSchema.nullable(),
+    }),
+    itemOf('pages.reorder', PageReorderResultSchema),
+    itemOf('pages.delete', PageDeleteResultSchema, { pages: z.array(PageRefSchema) }),
+    itemOf('pages.insertBlank', PageInsertResultSchema),
+    itemOf('pages.insert', PageInsertResultSchema),
+    itemOf('pages.copy', PageInsertResultSchema),
+    itemOf('pages.restore', PageRestoreResultSchema),
+    itemOf('attachments.create', AttachmentCreateResultSchema),
+    itemOf('attachments.delete', AttachmentDeleteResultSchema),
+    itemOf('attachments.restore', AttachmentRestoreResultSchema),
+  ]),
+);
 
 /** What a change did: one item per op (per step of an undo), and its meta. */
 export const ChangeResultSchema = z.object({
@@ -394,10 +410,12 @@ export const ChangeResultSchema = z.object({
 });
 
 /** One change's answer: applied with its result, or refused with the error. */
-export const ChangeAnswerSchema = z.discriminatedUnion('status', [
-  z.object({ opId: z.string(), status: z.literal('applied'), result: ChangeResultSchema }),
-  z.object({ opId: z.string(), status: z.literal('refused'), error: EngineErrorPayloadSchema }),
-]);
+export const ChangeAnswerSchema = closed(
+  z.discriminatedUnion('status', [
+    z.object({ opId: z.string(), status: z.literal('applied'), result: ChangeResultSchema }),
+    z.object({ opId: z.string(), status: z.literal('refused'), error: EngineErrorSchema }),
+  ]),
+);
 
 /** A `POST …/changes` response: one answer per change, in order. */
 export const ChangeResponseSchema = z.object({ changes: z.array(ChangeAnswerSchema) });

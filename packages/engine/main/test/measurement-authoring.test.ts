@@ -25,7 +25,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       const page = pages[0];
       const pageObjectNumber = page.ref.objectNumber;
       const { ctx, annotation } = await annotationShell(doc, pages);
-      cleanups.push(() => ctx.dispose());
+      cleanups.push(() => ctx.destroy());
       const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
       await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
       annotation.setPageViewports(
@@ -41,12 +41,14 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       annotation.createPointer('distance', 'down', page.ref, { x: 50, y: 100 });
       annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 100 });
       annotation.createPointer('distance', 'up', page.ref, { x: 250, y: 100 });
-      expect(annotation.selection.list()).toHaveLength(0);
+      expect(annotation.selection.getSelected()).toHaveLength(0);
       annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 88 });
       annotation.createPointer('distance', 'down', page.ref, { x: 250, y: 88 });
       // Written and confirmed: its ref is the engine's.
-      await vi.waitFor(() => expect(annotation.selection.list()[0]?.ref.kind).toBe('objectNumber'));
-      const created = annotation.selection.list()[0]!;
+      await vi.waitFor(() =>
+        expect(annotation.selection.getSelected()[0]?.ref.kind).toBe('objectNumber'),
+      );
+      const created = annotation.selection.getSelected()[0]!;
       const createdId = annotationKey(created.ref);
       const expectVector = () => {
         expect(
@@ -93,13 +95,16 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expectVector();
       const newScale = measureFromKnownLength(100, { value: 8, unit: 'ft' });
       await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(newScale);
-      const report = await annotation.remeasurePage(page.ref, newScale);
-      expect(report.failed).toEqual([]);
+      await annotation.whenRemeasurable();
+      const report = annotation.stageRemeasure(page.ref, newScale);
       expect(report.error).toBeUndefined();
-      expect(annotation.get(created.ref)).toMatchObject({
-        contents: '16.00 ft',
-        captionOffset: { along: 15, perpendicular: 25 },
-      });
+      expect(report.updated).toEqual([created.ref]);
+      await vi.waitFor(() =>
+        expect(annotation.get(created.ref)).toMatchObject({
+          contents: '16.00 ft',
+          captionOffset: { along: 15, perpendicular: 25 },
+        }),
+      );
       expectVector();
 
       // A turn pivots about the middle of the line, as the engine turns it,

@@ -31,7 +31,9 @@ describe("RedactionsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    viewportsVersion: 1,
                     fontsVersion: 1,
+                    contentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -67,7 +69,7 @@ describe("RedactionsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -90,7 +92,7 @@ describe("RedactionsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

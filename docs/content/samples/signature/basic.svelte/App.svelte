@@ -25,7 +25,7 @@
     formPlugin(),
     stampPlugin({ assetEngine }),
     signaturePlugin({
-      key: () => signer,
+      signingKey: () => signer,
       // Trust the demo key itself, so its signatures check out as 'valid'.
       trust: { anchors: async () => [(await signer).certificate] },
     }),
@@ -33,7 +33,7 @@
 
   // [!doc-source agreement]
   const agreement = async (): Promise<OpenInput> => {
-    const response = await fetch('/pdfs/agreement.pdf');
+    const response = await fetch('https://www.embedpdf.com/pdfs/agreement.pdf');
     return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]

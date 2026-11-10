@@ -69,19 +69,25 @@ export interface DocumentManifest {
    */
   outlineVersion: number;
   /**
+   * Doc-level pin for the pages' scales (their `/VP` viewports), which the
+   * layout carries: `/layout@{layoutVersion, viewportsVersion}`. Bumps on a
+   * scale change only, so the outline, search and exports, which pin
+   * `layoutVersion`, stay warm. Absent from a server without it (before
+   * 3.1): its layout carries no viewports.
+   */
+  viewportsVersion?: number;
+  /**
    * Doc-level pin for the fonts that can be named in the document
-   * (`/fonts@{fontsVersion,serverFonts}`). Bumps on a write that changes
-   * the fonts the list shows: one that embeds a font, or removes the last
-   * use of one.
+   * (`/fonts@{fontsVersion}`). Bumps on a write that changes the fonts the
+   * list shows: one that embeds a font, or removes the last use of one.
    */
   fontsVersion: number;
   /**
-   * The server's fonts, as a fingerprint of their setup (keys, programs,
-   * `serve`, fallbacks and their order). The font list's URL and every
-   * picture's carry it, since fallback fonts draw page text: a change of the
-   * server's fonts re-keys them, and a server answers only its own.
+   * Doc-level pin for a read across every page's content (search). Moves with
+   * any write that moves a page's `contentVersion`, inserts a page or deletes
+   * one, and never on an annotation or form write.
    */
-  serverFonts: string;
+  contentsVersion: number;
   /**
    * Audit-log head at this manifest's state — written in the same
    * transaction as the version bumps, so an event subscriber that starts
@@ -89,7 +95,7 @@ export interface DocumentManifest {
    * stream open (the gapless-subscribe cursor).
    */
   auditHead: number;
-  baseSha: string;
+  baseSha256: string;
   /**
    * The layer's write serial (`layers.current_version`; 0 for the base view
    * and for a never-written layer) — the `editsVersion` half of the
@@ -102,8 +108,8 @@ export interface DocumentManifest {
    * while `layerVersion` keeps counting, so this is the only honest signal.
    */
   working: boolean;
-  /** Byte length of `baseSha`'s file — with the sha, the `BaseVersionInfo` a client signs. */
-  baseByteLength: number;
+  /** Size of `baseSha256`'s file — with the sha, the `BaseVersionInfo` a client signs. */
+  baseSizeBytes: number;
   /**
    * Plane scopes (layer manifests only; absent on base manifests and
    * on pre-plane servers = all-`'layer'`). Whole-layer by design — edge

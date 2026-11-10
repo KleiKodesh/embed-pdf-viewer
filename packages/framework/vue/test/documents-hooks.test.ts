@@ -72,7 +72,7 @@ const engine = {
   open: (input: { id?: string }) =>
     Promise.resolve({
       id: input.id ?? 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
       security: { allows: () => true, allowsAnnotation: () => true },
       metadata: {
@@ -240,13 +240,12 @@ describe('useActionsUiAdapter', () => {
   const websiteLink: PdfActionTree = {
     root: { type: 'uri', subtype: 'URI', uri: 'https://example.com', isMap: false, next: [] },
     incomplete: false,
-    warningFlags: 0,
     warnings: [],
   };
   const click: ActionContext = {
     origin: 'user',
     source: { kind: 'api' },
-    event: { scope: 'activate' },
+    event: { type: 'activate' },
   };
 
   it('installs the adapter for the document, reads the handlers late, and removes it on unmount', async () => {

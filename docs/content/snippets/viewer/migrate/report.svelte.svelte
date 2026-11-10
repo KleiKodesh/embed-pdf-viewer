@@ -8,7 +8,7 @@
 
 <PDFViewer
   config={{
-    src: '/report.pdf',
+    src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
     theme: { preference: 'dark' },
     disabledCategories: ['redaction', 'document-print'],
   }}
@@ -24,9 +24,9 @@
 </script>
 
 <PDFViewer
-  src="/report.pdf"
+  src="https://www.embedpdf.com/pdfs/welcome.pdf"
   theme="dark"
-  disable={['redaction', 'documents.print']}
+  features={{ 'documents.print': false }}
   style="height: 100vh"
   {onready}
 />

@@ -19,7 +19,7 @@ import { commandsPlugin } from '@embedpdf/plugin-commands';
 import {
   CommandsToken,
   type CommandContext as PluginCommandContext,
-  type CommandDef as PluginCommandDef,
+  type CommandDefinition as PluginCommandDef,
   type ResolvedCommand,
 } from '@embedpdf/plugin-commands/contract/host';
 import { describe, expect, it, vi } from 'vitest';
@@ -32,7 +32,7 @@ import {
   mergeCommand,
   resolveViewerCommands,
   toPluginCommand,
-  type CommandDef as ViewerCommandDef,
+  type CommandDefinition as ViewerCommandDef,
   type CommandScope,
 } from '../../../chrome/src/config/viewer-commands';
 import type { PluginTokens, Viewer } from '../../../chrome/src/handle';
@@ -93,6 +93,21 @@ describe('a command of yours', () => {
     command.run?.(pluginContext({ page: 2 }));
     expect(stage.zoomIn).toHaveBeenCalledTimes(1);
     expect(heard).toEqual([{ viewer: true, documentId: 'doc', args: { page: 2 }, token: stage }]);
+  });
+
+  it('gives labelParams the same context, so a label reads a plugin by its name', () => {
+    const command = toPluginCommand(
+      {
+        id: 'acme:count',
+        label: 'Zoom {count} times',
+        labelParams: ({ get, documentId }) => ({
+          count: (get('stage') as unknown) === stage ? 3 : 0,
+          document: documentId ?? 'none',
+        }),
+      },
+      scope,
+    );
+    expect(command.labelParams?.(pluginContext())).toEqual({ count: 3, document: 'doc' });
   });
 
   it("gets your app's state, typed by the command, and runs what it gives", () => {
@@ -310,6 +325,7 @@ describe('the built-in commands', () => {
         'tool:stamp',
         'tool:redact',
         'redaction:apply',
+        'annotation:apply-redaction',
         'measurement:calibrate',
         'selection:copy',
         'selection:highlight',
@@ -348,6 +364,7 @@ describe('the built-in commands', () => {
           'view:cover-page',
           'view:scroll-vertical',
           'view:scroll-horizontal',
+          'view:scroll-paged',
           'view:rotate-clockwise',
           'view:rotate-counterclockwise',
         ].map((id) => [id, holderOf(id)]),
@@ -356,13 +373,48 @@ describe('the built-in commands', () => {
       'view:single-page': 'spread',
       'view:two-pages': 'spread',
       'view:cover-page': 'spread',
-      'view:scroll-vertical': 'layout',
-      'view:scroll-horizontal': 'layout',
+      'view:scroll-vertical': 'flow',
+      'view:scroll-horizontal': 'flow',
+      'view:scroll-paged': 'flow',
       'view:rotate-clockwise': 'viewRotation',
       'view:rotate-counterclockwise': 'viewRotation',
     });
     // The zoom can't be locked: its commands say nothing of locks.
     expect(defaultCommands.find((command) => command.id === 'zoom:in')?.locked).toBeUndefined();
+  });
+
+  it('pick how the pages come: down, across or one at a time', () => {
+    const settings = { flow: 'continuous', layout: 'vertical' } as Record<string, unknown>;
+    const locks: Record<string, { by: string }> = {};
+    const fakeStage = {
+      getSettings: () => settings,
+      updateSettings: (changes: Record<string, unknown>) => Object.assign(settings, changes),
+      getLock: (setting: string) => locks[setting] ?? null,
+    };
+    const context = {
+      documentId: 'doc',
+      tryGet: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? fakeStage : null),
+      get: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? fakeStage : null),
+    } as unknown as PluginCommandContext;
+    const command = (id: string) => defaultCommands.find((candidate) => candidate.id === id)!;
+    const active = () =>
+      ['view:scroll-vertical', 'view:scroll-horizontal', 'view:scroll-paged'].filter((id) =>
+        command(id).active?.(context),
+      );
+
+    expect(active()).toEqual(['view:scroll-vertical']);
+    void command('view:scroll-paged').run?.(context);
+    // Paged flow leaves the layout alone, and down is no longer the choice.
+    expect(settings).toEqual({ flow: 'paged', layout: 'vertical' });
+    expect(active()).toEqual(['view:scroll-paged']);
+    void command('view:scroll-horizontal').run?.(context);
+    expect(settings).toEqual({ flow: 'continuous', layout: 'horizontal' });
+    expect(active()).toEqual(['view:scroll-horizontal']);
+
+    // Down and across change both settings, so a lock on either holds them.
+    locks.layout = { by: 'kiosk' };
+    expect(command('view:scroll-vertical').locked?.(context)?.by).toBe('kiosk');
+    expect(command('view:scroll-paged').locked?.(context)).toBeNull();
   });
 
   it('are every one the page lists, with the panels and modes the default layout brings', () => {

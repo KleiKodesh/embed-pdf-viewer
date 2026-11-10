@@ -23,7 +23,7 @@ function engineThat(canOpenFiles: boolean) {
       count += 1;
       return {
         id: `doc-${count}`,
-        events: { subscribe: () => () => {}, lastServerId: () => null },
+        events: { subscribe: () => () => {}, lastServerSequence: () => null },
         pages: { list: () => Promise.resolve({ pageCount: 0, labels: [], pages: [] }) },
         security: { allows: () => true },
         close: () => Promise.resolve(),
@@ -106,6 +106,7 @@ describe('document:open', () => {
       'document:open',
       'document:download',
       'document:print',
+      'tool:snapshot',
     ]);
   });
 });

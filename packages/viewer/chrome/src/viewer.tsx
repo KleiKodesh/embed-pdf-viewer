@@ -14,7 +14,7 @@
  * The engine stays a prop — choosing local-wasm vs cloud is the host's
  * decision, and each delivery wires its own. The chrome — toolbars,
  * translations, theme — renders at t≈0; only the pages wait on the engine.
- * Customization is mount-time, except `theme`, `locale`, `disable`,
+ * Customization is mount-time, except `theme`, `locale`, `features`, `disable`,
  * `readOnly` and `appState`, which follow their props (see {@link FollowProps});
  * changing any other prop on a mounted viewer does not rebuild the workspace.
  */
@@ -49,7 +49,6 @@ import { signaturePlugin } from '@embedpdf/react/signature';
 import { linkPlugin } from '@embedpdf/react/link';
 import { searchPlugin } from '@embedpdf/react/search';
 import { I18nToken, i18nPlugin, useT } from '@embedpdf/react/i18n';
-import type { TranslationDictionary } from '@embedpdf/react/i18n';
 import { CommandsToken, commandsPlugin } from '@embedpdf/react/commands';
 import type { NotAllowedMode } from '@embedpdf/react/commands';
 import { historyPlugin } from '@embedpdf/react/history';
@@ -57,8 +56,8 @@ import { shellPlugin } from '@embedpdf/react/shell';
 import type { LayoutOption, ViewerSize } from '@embedpdf/core-ui';
 import { ThumbsStageToken } from './config/stage';
 import { defaultCommands, toolCommandsFor } from './config/commands';
-import { resolveViewerCommands, type CommandDef } from './config/viewer-commands';
-import { localeCodeOf, localesOf } from './locales';
+import { resolveViewerCommands, type CommandDefinition } from './config/viewer-commands';
+import { fallbackCodeOf, localeCodeOf, localesOf, type LanguageStrings } from './locales';
 import {
   ViewerConfigProvider,
   type PanelResizeEvent,
@@ -70,9 +69,12 @@ import {
   byHandSettingsOf,
   disabledSettingsOf,
   sameByHand,
+  unknownFeaturesOf,
   type ByHandSettings,
   type DisabledSettings,
   type Feature,
+  type FeatureChoices,
+  type Features,
   type ReadOnlyExceptions,
 } from './features';
 import {
@@ -107,7 +109,7 @@ export interface ViewerCustomization<AppState = any> {
    * field: what it leaves out stays. A shortcut of yours wins over a built-in one with the same
    * keys.
    */
-  commands?: readonly CommandDef<AppState>[];
+  commands?: readonly CommandDefinition<AppState>[];
   /**
    * Your app's state, which your commands' functions get as `appState`: values, and functions
    * that change them. Follows its prop: a new value, and every button asks its command again.
@@ -119,30 +121,43 @@ export interface ViewerCustomization<AppState = any> {
   /**
    * Words by language code, over the viewer's own: a built-in button's label under its command's
    * id (`'document:download'`), your own keys (`labelKey`, `titleKey`), dotted keys expanded. A
-   * code the viewer has no language for becomes one, falling back to English, and reads right to
-   * left when its code's script does (`fa`, `ur`).
+   * language's words, or a function that loads them the first time the viewer shows the language
+   * (`sv: () => import('./sv.json')`). A code the viewer has no language for becomes one, falling
+   * back to the fallback language, and reads right to left when its code's script does (`fa`,
+   * `ur`). Read once.
    */
-  strings?: Readonly<Record<string, TranslationDictionary>>;
-  /** 'auto' (default) negotiates from the browser languages. Follows its prop. */
+  strings?: Readonly<Record<string, LanguageStrings>>;
+  /**
+   * 'auto' (default) negotiates from the browser languages, and shows the fallback language
+   * (`plugins.i18n.fallbackLocale`, English unless you set another) when none matches. Follows its
+   * prop.
+   */
   locale?: 'auto' | (string & {});
   /**
-   * What this viewer doesn't have, everywhere at once: features (`'annotations'`), their parts
-   * (`'annotations.highlight'`) and single commands (`'tool:highlight'`: a name with a colon).
+   * What people can do in this viewer, everywhere at once: a feature (`annotations`) or a part
+   * (`'annotations.highlight'`) on or off. One left out keeps its default: everything is on but
+   * `measurement`, `redaction`, `snapshots` and `'forms.building'`. A part wins over its feature.
    * Follows its prop.
+   */
+  features?: Features;
+  /**
+   * What this viewer doesn't have: features, their parts and single commands (`'tool:highlight'`:
+   * a name with a colon). A feature in it counts as `false` under `features`. Follows its prop.
+   * @deprecated Use `features` (`{ forms: false }`), and the layout for a button's place; goes in 4.0.
    */
   disable?: readonly (Feature | (string & {}))[];
   /**
-   * Every feature that changes the document off, or all of them but `except`, on top of
-   * `disable`. Only the interface: plugins keep working for your code. Follows its prop.
+   * Every feature that changes the document off, or all of them but `except`, after `features`:
+   * `readOnly` wins. Only the interface: plugins keep working for your code. Follows its prop.
    */
   readOnly?: boolean | ReadOnlyExceptions;
   /**
    * What the user may do: the permissions the engine checks on every call, from a button or
-   * from code. Left out, they may do everything. Documents opened after a change use the new one.
+   * from code. Left out or `null`, they may do everything. Documents opened after a change use the new one.
    */
-  scope?: readonly string[];
-  /** Who the user is: the author of what they write. */
-  identity?: Identity;
+  scope?: readonly string[] | null;
+  /** Who the user is: the author of what they write. Left out or `null`: nobody. */
+  identity?: Identity | null;
   /** What the scope doesn't allow: `'hide'` it (default), or `'disable'` it with the reason. */
   notAllowed?: NotAllowedMode;
   /**
@@ -170,8 +185,9 @@ export interface ViewerCustomization<AppState = any> {
    * Where the viewer's own keys set a plugin's settings too, both count and each only takes
    * away: the plugin's `disabledCategories` and `disabledCommands` add to what `disable` and
    * `readOnly` turn off, and its `editable` and `fillable` keep only what both allow. A list of
-   * definitions (`annotation.tools`, `commands.commands`, `i18n.locales`) adds to the viewer's.
-   * The language is `locale`'s, and `notAllowed`, when given, wins over the plugin's. `stamp`
+   * definitions (`annotation.tools`, `commands.commands`) adds to the viewer's. The i18n plugin
+   * takes only `fallbackLocale`: the languages are `locale`'s and `strings`'. `notAllowed`, when
+   * given, wins over the plugin's. `stamp`
    * and `signature` also take settings only the viewer has: the standard and quick stamps, and
    * which marks people keep and their fonts. Read once.
    */
@@ -268,20 +284,23 @@ function HandleBridge({
   return null;
 }
 
+/** The unknown feature names already warned about, so each warns once. */
+const warnedFeatures = new Set<string>();
+
 const sameList = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((name, index) => name === right[index]);
 
 /**
- * What `disable` and `readOnly` turn off, with what the app's `plugins` settings turn off too:
- * each only takes away.
+ * What `features`, `disable` and `readOnly` turn off, with what the app's `plugins` settings turn
+ * off too, which only take away. `yours` are your commands' categories.
  */
 function turnedOffOf(
-  disable: ViewerCustomization['disable'],
-  readOnly: ViewerCustomization['readOnly'],
+  choices: FeatureChoices,
+  yours: readonly string[],
   settings: PluginsConfigRead['settings'],
 ): { readonly disabled: DisabledSettings; readonly byHand: ByHandSettings } {
-  const disabled = disabledSettingsOf(disable, readOnly);
-  const byHand = byHandSettingsOf(disable, readOnly);
+  const disabled = disabledSettingsOf(choices, yours);
+  const byHand = byHandSettingsOf(choices, yours);
   const union = (viewers: readonly string[], apps: readonly string[] | undefined) =>
     apps?.length ? [...new Set([...viewers, ...apps])] : viewers;
   return {
@@ -289,9 +308,10 @@ function turnedOffOf(
       disabledCategories: union(disabled.disabledCategories, settings.commands?.disabledCategories),
       disabledCommands: union(disabled.disabledCommands, settings.commands?.disabledCommands),
     },
+    // In the app's order: its list, less what the viewer has frozen.
     byHand: {
-      editable: bothAllow(byHand.editable, settings.annotation?.editable ?? true),
-      fillable: bothAllow(byHand.fillable, settings.form?.fillable ?? true),
+      editable: bothAllow(settings.annotation?.editable ?? true, byHand.editable),
+      fillable: bothAllow(settings.form?.fillable ?? true, byHand.fillable),
     },
   };
 }
@@ -305,7 +325,9 @@ function turnedOffOf(
 function FollowProps({
   registered,
   settings,
+  yours,
   locale,
+  features,
   disable,
   readOnly,
   appState,
@@ -317,7 +339,9 @@ function FollowProps({
     readonly appState: unknown;
   };
   settings: PluginsConfigRead['settings'];
+  yours: readonly string[];
   locale: string;
+  features: ViewerCustomization['features'];
   disable: ViewerCustomization['disable'];
   readOnly: ViewerCustomization['readOnly'];
   appState: unknown;
@@ -327,7 +351,7 @@ function FollowProps({
   const applied = useRef(registered);
   // In the render that brought the change, so the plugin has it when the prop's setter returns.
   useLayoutEffect(() => {
-    const { disabled, byHand } = turnedOffOf(disable, readOnly, settings);
+    const { disabled, byHand } = turnedOffOf({ features, disable, readOnly }, yours, settings);
     const previous = applied.current;
     applied.current = { locale, disabled, byHand, appState };
     // Your app's state, which the commands read: a new value, and every button asks again.
@@ -377,6 +401,7 @@ export function FullViewer({
   icons,
   strings,
   locale = 'auto',
+  features,
   disable,
   readOnly,
   scope,
@@ -403,11 +428,20 @@ export function FullViewer({
   // identities. Later prop changes are ignored, except the ones FollowProps
   // and ThemeProvider follow.
   const [resolved] = useState(() => {
-    // ── languages: the app's strings in the viewer's, and languages of its own ──
-    const { locales, loaders, codes } = localesOf(strings);
-
     // ── plugins: the app's settings for the built-ins, and its own plugins ──
     const pluginsRead = readPluginsConfig(pluginsConfig);
+
+    // ── languages: the app's strings in the viewer's, languages of its own, and the fallback ──
+    const { locales, loaders, codes } = localesOf(strings);
+    const askedFallback = pluginsRead.settings.i18n?.fallbackLocale;
+    const fallback = fallbackCodeOf(askedFallback, codes);
+    const languageProblems =
+      fallback === null
+        ? [
+            `the viewer has no language "${askedFallback}" to fall back to, so it falls back to ` +
+              'English: give its words in `strings`',
+          ]
+        : [];
     const tokens: Record<string, CapabilityToken<unknown>> = { ...VIEWER_PLUGINS };
     for (const { name, plugin } of pluginsRead.own) if (plugin.token) tokens[name] = plugin.token;
 
@@ -425,6 +459,8 @@ export function FullViewer({
       { plugins: tokens as PluginTokens, viewer: slot.current },
       { isMac: isMacPlatform() },
     );
+    // The features your commands add, which `features` turns on and off too.
+    const yourCategories = (commands ?? []).flatMap((command) => command.categories ?? []);
 
     return {
       slot,
@@ -439,10 +475,17 @@ export function FullViewer({
       fonts: fonts ?? [],
       warnBeforeLeaving: warnBeforeLeaving !== false,
       onPanelResize,
-      i18n: { locales, loaders, codes, initial: localeCodeOf(locale, codes) },
-      plugins: pluginsRead,
+      i18n: {
+        locales,
+        loaders,
+        codes,
+        fallback: fallback ?? 'en',
+        initial: localeCodeOf(locale, codes, fallback ?? 'en'),
+      },
+      plugins: { ...pluginsRead, problems: [...pluginsRead.problems, ...languageProblems] },
       tokens: tokens as PluginTokens,
-      ...turnedOffOf(disable, readOnly, pluginsRead.settings),
+      yourCategories,
+      ...turnedOffOf({ features, disable, readOnly }, yourCategories, pluginsRead.settings),
       appState,
     };
   });
@@ -462,6 +505,15 @@ export function FullViewer({
   useEffect(() => {
     for (const problem of resolved.plugins.problems) console.warn(`[embedpdf] plugins: ${problem}`);
   }, [resolved]);
+
+  // A misspelled feature quietly changes nothing: each name once, as `features` changes.
+  useEffect(() => {
+    for (const name of unknownFeaturesOf(features, resolved.yourCategories)) {
+      if (warnedFeatures.has(name)) continue;
+      warnedFeatures.add(name);
+      console.warn(`[embedpdf] features: no feature or part is called "${name}"`);
+    }
+  }, [features, resolved]);
 
   // The app's settings for each built-in plugin, from `plugins`.
   const { settings } = resolved.plugins;
@@ -584,11 +636,10 @@ export function FullViewer({
     measurementPlugin(settings.measurement),
     searchPlugin(settings.search),
     i18nPlugin({
-      fallbackLocale: 'en',
-      ...settings.i18n,
       locale: resolved.i18n.initial,
-      locales: [...resolved.i18n.locales, ...(settings.i18n?.locales ?? [])],
-      loaders: { ...resolved.i18n.loaders, ...settings.i18n?.loaders },
+      fallbackLocale: resolved.i18n.fallback,
+      locales: resolved.i18n.locales,
+      loaders: resolved.i18n.loaders,
     }),
     commandsPlugin({
       ...settings.commands,
@@ -626,7 +677,9 @@ export function FullViewer({
               appState: resolved.appState,
             }}
             settings={settings}
-            locale={localeCodeOf(locale, resolved.i18n.codes)}
+            yours={resolved.yourCategories}
+            locale={localeCodeOf(locale, resolved.i18n.codes, resolved.i18n.fallback)}
+            features={features}
             disable={disable}
             readOnly={readOnly}
             appState={appState}

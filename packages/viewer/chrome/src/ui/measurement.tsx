@@ -40,7 +40,7 @@ export function MeasurementSection() {
     AnnotationToken,
     (annotation) =>
       annotation.selection
-        .list()
+        .getSelected()
         .filter(
           (candidate) =>
             (candidate.subtype === 'polygon' || candidate.subtype === 'polyline') &&
@@ -55,7 +55,7 @@ export function MeasurementSection() {
     MeasurementToken,
     (measurement) =>
       anno.selection
-        .list()
+        .getSelected()
         .map((annotation) => measurement.getReadout(annotation.ref))
         .filter((readout): readout is MeasurementReadout => !('unavailable' in readout)),
     (left, right) => JSON.stringify(left) === JSON.stringify(right),
@@ -85,11 +85,6 @@ export function MeasurementSection() {
         <span className="text-fg-muted">{t('measurement.scale')}: </span>
         <strong>{rectilinear?.ratio ?? t('measurement.unavailable')}</strong>
       </div>
-      {scale?.error && (
-        <p role="alert" className="text-red-600">
-          {scale.error.message}
-        </p>
-      )}
       {scale && !scale.persistent && scale.ready && (
         <p className="text-fg-muted">{t('measurement.sessionOnly')}</p>
       )}

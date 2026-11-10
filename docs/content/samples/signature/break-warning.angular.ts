@@ -15,11 +15,7 @@ import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
-import {
-  EpdfAnnotation,
-  EpdfAnnotationLayer,
-  withAnnotation,
-} from '@embedpdf/angular/annotation';
+import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfForm, toFieldRef, withForm } from '@embedpdf/angular/form';
 import { EpdfSignature, withSignature } from '@embedpdf/angular/signature';
 import { localEngine } from '@embedpdf/engine';
@@ -29,13 +25,13 @@ const engine = localEngine();
 // The certificate Lanternfield signed the agreement with, published next to it. Trusting it is what
 // makes the signature read 'valid'; your app trusts its own certificates the same way.
 const lanternfieldCertificate = async () => {
-  const response = await fetch('/pdfs/agreement.cer');
+  const response = await fetch('https://www.embedpdf.com/pdfs/agreement.cer');
   return new Uint8Array(await response.arrayBuffer());
 };
 
 // [!doc-source agreement]
 const agreement = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/agreement.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/agreement.pdf');
   return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -157,7 +153,7 @@ export class App {
     if (!widget) return;
     const { rect } = widget;
     await this.form.create({
-      family: 'text',
+      kind: 'text',
       name: 'purchase_order',
       widgets: [
         {

@@ -71,6 +71,7 @@ export const ko: Locale = {
         group: '스크롤',
         vertical: '세로',
         horizontal: '가로',
+        paged: '한 페이지씩',
       },
       rotate: {
         group: '회전',
@@ -114,6 +115,13 @@ export const ko: Locale = {
         copy: '복사',
         strip: '텍스트 선택 작업',
       },
+      snapshot: {
+        tool: '스냅숏 찍기',
+        copy: '복사',
+        save: '이미지 저장',
+        clear: '스냅숏 지우기',
+        strip: '스냅숏 작업',
+      },
       shapes: {
         rectangle: '사각형',
         circle: '타원',
@@ -142,6 +150,7 @@ export const ko: Locale = {
       redact: {
         mark: '교정 표시',
         applyAll: '교정 적용',
+        apply: { other: '교정 {count}개 적용' },
         clearAll: '표시 지우기',
       },
       undo: '실행 취소',
@@ -161,6 +170,7 @@ export const ko: Locale = {
         'doc-annotate-modify': '주석 변경은 허용되지 않습니다',
         'doc-annotate-read': '주석 보기는 허용되지 않습니다',
         'doc-attachments-modify': '파일을 추가할 수 없습니다',
+        'doc-content-copy': '스냅숏은 허용되지 않습니다',
         'doc-download': '다운로드는 허용되지 않습니다',
         'doc-forms-modify': '양식 필드 편집은 허용되지 않습니다',
         'doc-outline-modify': '책갈피 변경은 허용되지 않습니다',
@@ -345,6 +355,7 @@ export const ko: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: '유형',
         opacity: '불투명도',
         stroke: '선',
         fill: '채우기',
@@ -492,7 +503,7 @@ export const ko: Locale = {
       lineStart: '시작',
       lineEnd: '끝',
       empty: '그리기 도구를 고르거나 주석을 선택하여 스타일을 편집하십시오.',
-      selected: '{count}개 선택됨',
+      selected: { other: '{count}개 선택됨' },
       toolDefaults: '{tool} 기본값',
       defaults: '기본값',
       fontGroups: {
@@ -515,20 +526,6 @@ export const ko: Locale = {
         other: '새 텍스트를 쓸 수 없습니다',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: '플래그 (/F)',
-      print: '페이지를 인쇄할 때 포함',
-      hidden: '모든 곳에서 숨김: 화면, 클릭, 인쇄',
-      noView: '화면에서는 숨김, 인쇄는 될 수 있음',
-      toggleNoView: '선택한 동안 보기 안 함 주석 표시',
-      readOnly: '표시되지만 클릭할 수 없음',
-      locked: '이동/크기 조정/삭제/스타일 변경 불가',
-      lockedContents: '텍스트는 변경 불가, 형태는 변경 가능',
-      noZoom: '화면에서 크기 고정(왼쪽 위 기준)',
-      noRotate: '페이지를 회전해도 똑바로 유지',
-      invisible: '레거시: 알 수 없는 하위 유형 숨김',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: '첨부 파일 불러오는 중…',
@@ -538,8 +535,7 @@ export const ko: Locale = {
       dropHint: '또는 여기에 파일을 놓으세요',
       adding: '추가 중…',
       onPage: '{page}페이지',
-      count: '파일 {count}개',
-      countPlural: '파일 {count}개',
+      count: { other: '파일 {count}개' },
     },
     outline: {
       filter: '책갈피 필터',
@@ -593,10 +589,9 @@ export const ko: Locale = {
       retry: '다시 시도',
       empty: '아직 댓글이 없습니다. 댓글 도구를 사용하여 스레드를 시작하십시오.',
       emptyReadOnly: '이 문서에는 댓글이 없습니다.',
-      anonymous: '알 수 없음',
+      anonymous: '게스트',
       page: '{page}페이지',
-      count: '댓글 {count}개',
-      countPlural: '댓글 {count}개',
+      count: { other: '댓글 {count}개' },
       reply: '답글',
       replyPlaceholder: '답글…',
       addPlaceholder: '댓글 추가…',
@@ -623,7 +618,7 @@ export const ko: Locale = {
       searchWholeWord: '전체 단어만',
       searchRegex: '정규식',
       searchSearching: '검색 중…',
-      searchResults: '{count}개의 결과를 찾았습니다',
+      searchResults: { other: '{count}개의 결과를 찾았습니다' },
       searchNoResults: '결과 없음',
       searchPrevious: '이전 결과',
       searchNext: '다음 결과',
@@ -639,10 +634,12 @@ export const ko: Locale = {
       redactionArea: '영역 표시',
       redactionText: '텍스트 표시',
       redactionRemove: '표시 제거',
-      redactConfirmTitle: '교정을 적용하시겠습니까?',
-      redactConfirmBody:
-        '교정 표시 {count}개 아래의 콘텐츠를 영구적으로 제거합니다. 이 작업은 실행 취소할 수 없습니다.',
-      redactConfirmCollateral: '다른 주석 {count}개도 제거됩니다.',
+      redactConfirmTitle: { other: '교정을 적용하시겠습니까?' },
+      redactConfirmBody: {
+        other:
+          '교정 표시 {count}개 아래의 콘텐츠를 영구적으로 제거합니다. 이 작업은 실행 취소할 수 없습니다.',
+      },
+      redactConfirmCollateral: { other: '다른 주석 {count}개도 제거됩니다.' },
       redactApply: '적용',
       redactApplying: '적용 중…',
       formatLabel: '형식',

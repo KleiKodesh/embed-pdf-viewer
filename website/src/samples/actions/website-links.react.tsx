@@ -16,11 +16,11 @@ const engine = localEngine();
 const plugins = [actionsPlugin()];
 
 const links = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/links.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/links.pdf');
   return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// A link to a website, as a PDF carries it: what getActionTree() reads from a link.
+// A link to a website, as a PDF carries it: what readActionTree() reads from a link.
 const websiteLink: PdfActionTree = {
   root: {
     type: 'uri',
@@ -30,13 +30,12 @@ const websiteLink: PdfActionTree = {
     next: [],
   },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 };
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 // Your UI decides how a website opens: here, it asks first.

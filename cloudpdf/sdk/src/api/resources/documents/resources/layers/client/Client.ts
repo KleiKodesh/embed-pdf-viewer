@@ -2,7 +2,7 @@
 
 import type { BaseClientOptions, BaseRequestOptions } from "../../../../../../BaseClient.js";
 import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } from "../../../../../../BaseClient.js";
-import { mergeHeaders } from "../../../../../../core/headers.js";
+import { mergeHeaders, mergeOnlyDefinedHeaders } from "../../../../../../core/headers.js";
 import * as core from "../../../../../../core/index.js";
 import * as environments from "../../../../../../environments.js";
 import { handleNonStatusCodeError } from "../../../../../../errors/handleNonStatusCodeError.js";
@@ -35,21 +35,21 @@ export class LayersClient {
      * @example
      *     await client.documents.layers.list({
      *         tenantId: "tenantId",
-     *         id: "id"
+     *         docId: "docId"
      *     })
      */
     public list(
         request: CloudPDF.documents.ListLayersRequest,
         requestOptions?: LayersClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocumentsLayersList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocumentsLayersListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.documents.ListLayersRequest,
         requestOptions?: LayersClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocumentsLayersList200Response>> {
-        const { tenantId, id, limit, cursor, grantId } = request;
+    ): Promise<core.WithRawResponse<CloudPDF.DocumentsLayersListResponse>> {
+        const { tenantId, docId, limit, cursor, grantId } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
             cursor,
@@ -59,6 +59,7 @@ export class LayersClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -66,7 +67,7 @@ export class LayersClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}/layers`,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(docId)}/layers`,
             ),
             method: "GET",
             headers: _headers,
@@ -82,20 +83,26 @@ export class LayersClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocumentsLayersList200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocumentsLayersListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -109,7 +116,7 @@ export class LayersClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/tenants/{tenantId}/documents/{id}/layers",
+            "/v1/tenants/{tenantId}/documents/{docId}/layers",
         );
     }
 
@@ -126,7 +133,7 @@ export class LayersClient {
      * @example
      *     await client.documents.layers.delete({
      *         tenantId: "tenantId",
-     *         id: "id",
+     *         docId: "docId",
      *         layerName: "layerName"
      *     })
      */
@@ -141,11 +148,12 @@ export class LayersClient {
         request: CloudPDF.documents.DeleteLayersRequest,
         requestOptions?: LayersClient.RequestOptions,
     ): Promise<core.WithRawResponse<void>> {
-        const { tenantId, id, layerName } = request;
+        const { tenantId, docId, layerName } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -153,7 +161,7 @@ export class LayersClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}/layers/${core.url.encodePathParam(layerName)}`,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}`,
             ),
             method: "DELETE",
             headers: _headers,
@@ -171,11 +179,20 @@ export class LayersClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -189,7 +206,7 @@ export class LayersClient {
             _response.error,
             _response.rawResponse,
             "DELETE",
-            "/v1/tenants/{tenantId}/documents/{id}/layers/{layerName}",
+            "/v1/tenants/{tenantId}/documents/{docId}/layers/{layerName}",
         );
     }
 }

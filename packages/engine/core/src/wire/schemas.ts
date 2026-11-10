@@ -1,35 +1,6 @@
-import type { Identity } from '../auth/scope/types';
-import { PageRefSchema } from '../identity/PageRef.schema';
 import { z } from 'zod';
 
-import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
-
-import type { AnnotationList } from '../annotation/AnnotationList';
 import type { AnnotationOrder } from '../annotation/AnnotationOrder';
-import { AnnotationRefSchema } from '../annotation/base.schema';
-import {
-  AnnotationDraftSchema,
-  AnnotationPatchSchema,
-  AnnotationSchema,
-  PdfLinkTargetSchema,
-  PdfLinkTargetWritableSchema,
-} from '../annotation/kinds';
-import { WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
-import {
-  ANNOTATION_APPEARANCE_MODES,
-  type AnnotationAppearanceImageOptions,
-  type AnnotationAppearanceBatch,
-  type AnnotationAppearanceMode,
-  type AnnotationAppearancesQuery,
-  type WidgetAppearancesQuery,
-} from '../dto/AnnotationRender';
-import {
-  AttachmentFileBaseSchema,
-  AttachmentFileInfoSchema,
-  AttachmentRefSchema,
-  AttachmentSchema,
-} from '../dto/Attachment.schema';
-import { AppearanceResourceKeysSchema, ImageResourceKeysSchema } from './resourceKeys';
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
@@ -39,8 +10,8 @@ import {
   type PageRenderFamilySpec,
   type PageRenderPin,
 } from './renderFamilies';
-import type { CachePins } from '../dto/CachePins';
-import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
+import { AppearanceResourceKeysSchema, ImageResourceKeysSchema } from './resourceKeys';
+import type { AnnotationList } from '../annotation/AnnotationList';
 import type {
   Font,
   FontList,
@@ -65,7 +36,7 @@ import type {
   PdfRevision,
   SignatureCancelResult,
   SignatureCompleteResult,
-  SignatureDTO,
+  Signature,
   SignaturePrepared,
   SignatureSeedValue,
   SignatureSnapshot,
@@ -79,19 +50,24 @@ import type { NamedPageEntry } from '../dto/NamedPage';
 import type { PageImageOptions, PageNetworkRenderFormat, PageRenderQuery } from '../dto/PageRender';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import { PdfPageActionsSchema } from '../dto/PdfAction.schema';
+import { RichTextDocumentInputSchema, RichTextDocumentSchema } from '../dto/RichText.schema';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
+import type { PdfPermissionFlags } from '../auth/scope';
 import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/DocumentSecurityService';
 import type { SerializedEngineError } from '../errors/EngineError';
+import { EngineValuesSchema } from './cachedReads';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import {
   FormFieldDraftSchema,
   FormFieldDTOSchema,
   FormFieldPatchSchema,
   FormFieldWidgetSchema,
+  FormValueEntrySchema,
   FormWidgetSchema,
   WidgetPlacementSchema,
 } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
+import { PageMeasurementViewportSchema, PdfMeasurementSchema } from '../dto/Measure.schema';
 import {
   PageBoxSchema,
   PageQuadSchema,
@@ -101,6 +77,53 @@ import {
   PdfSizeSchema,
 } from '../geometry/schemas';
 import type { AppearanceOutcome } from '../annotation/appearance';
+import { AnnotationRefSchema } from '../annotation/base.schema';
+import {
+  AnnotationDraftSchema,
+  AnnotationPatchSchema,
+  AnnotationSchema,
+  PdfLinkTargetSchema,
+  PdfLinkTargetWritableSchema,
+} from '../annotation/kinds';
+import { WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
+import type { Identity } from '../auth/scope/types';
+import {
+  ANNOTATION_APPEARANCE_MODES,
+  type AnnotationAppearanceImageOptions,
+  type AnnotationAppearanceBatch,
+  type AnnotationAppearanceMode,
+  type AnnotationAppearancesQuery,
+  type WidgetAppearancesQuery,
+} from '../dto/AnnotationRender';
+import type { AttachmentList } from '../dto/Attachment';
+import {
+  AttachmentFileBaseSchema,
+  AttachmentFileInfoSchema,
+  AttachmentRefSchema,
+  AttachmentSchema,
+} from '../dto/Attachment.schema';
+import type { CachePins } from '../dto/CachePins';
+import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
+import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
+import type { PageInsertResult } from '../mutation/PageInsertResult';
+import type { PageRestoreResult } from '../mutation/PageRestoreResult';
+import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
+import type { PageExtractInput } from '../dto/PageExtract';
+import {
+  DocumentOutlineSchema,
+  OutlineItemDraftSchema,
+  OutlineItemPatchSchema,
+  OutlineItemSchema,
+} from '../dto/DocumentOutline.schema';
+import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
+import { OutlineItemRefSchema } from '../identity/OutlineItemRef.schema';
+import { PageRefSchema } from '../identity/PageRef.schema';
+import type { PageReorderResult } from '../mutation/PageReorderResult';
+import type {
+  AnnotationAppearanceExportInput,
+  AnnotationFlattenInput,
+  AnnotationFlattenResult,
+} from '../mutation/AnnotationFlattenResult';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
 import type {
   AnnotationCreateResult,
@@ -114,7 +137,7 @@ import type {
   AttachmentRestoreResult,
   AttachmentMutationMeta,
 } from '../mutation/AttachmentMutationResults';
-import type { AttachmentList } from '../dto/Attachment';
+import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type {
   FormFieldCreateResult,
   FormCalculationsReorderResult,
@@ -130,30 +153,9 @@ import type {
   FormWidgetsReorderResult,
   FormWidgetUpdateResult,
 } from '../mutation/FormMutationResults';
-import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
+import type { ListPosition } from '../mutation/ListPosition';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
-import type { PageDeleteResult } from '../mutation/PageDeleteResult';
-import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
-import type { PageInsertResult } from '../mutation/PageInsertResult';
-import type { PageRestoreResult } from '../mutation/PageRestoreResult';
-import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
-import type { PageExtractInput } from '../dto/PageExtract';
-import {
-  DocumentOutlineSchema,
-  OutlineItemDraftSchema,
-  OutlineItemPatchSchema,
-  OutlineItemSchema,
-} from '../dto/DocumentOutline.schema';
-import { OutlineItemRefSchema } from '../identity/OutlineItemRef.schema';
-import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
-import type { ListPosition } from '../mutation/ListPosition';
-import type { PageReorderResult } from '../mutation/PageReorderResult';
-import type {
-  AnnotationAppearanceExportInput,
-  AnnotationFlattenInput,
-  AnnotationFlattenResult,
-} from '../mutation/AnnotationFlattenResult';
 import type {
   OutlineCreateResult,
   OutlineDeleteResult,
@@ -163,24 +165,11 @@ import type {
   OutlineRestoreResult,
   OutlineUpdateResult,
 } from '../mutation/OutlineMutationResults';
+import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInput';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
-import type {
-  AnnotationImportBody,
-  AnnotationImportOptions,
-  AnnotationImportResult,
-} from '../transfer/annotationImport';
-import type { FormExportSelection } from '../transfer/formExport';
-import type {
-  FormImportBody,
-  FormImportOptions,
-  FormImportResult,
-  FormValuesImportBody,
-  FormValuesImportOptions,
-  FormValuesImportResult,
-} from '../transfer/formImport';
-import type { AnnotationExportSelection } from '../transfer/exportSelection';
+import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import { fromBase64, toBase64 } from '../resource/base64';
 import type {
   SearchMatch,
@@ -190,20 +179,39 @@ import type {
   SearchSnippet,
 } from '../search/types';
 import type { PdfTextSegment } from '../text/layout';
+import type {
+  AnnotationImportBody,
+  AnnotationImportOptions,
+  AnnotationImportResult,
+} from '../transfer/annotationImport';
+import type { AnnotationExportSelection } from '../transfer/exportSelection';
+import type { FormExportSelection } from '../transfer/formExport';
+import type {
+  FormImportBody,
+  FormImportOptions,
+  FormImportResult,
+  FormValuesImportBody,
+  FormValuesImportOptions,
+  FormValuesImportResult,
+} from '../transfer/formImport';
+import { closed, readsUnknownAs } from './reading';
 export type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 
+const identityObject = z.object({
+  userId: z.string().min(1).max(256).optional(),
+  displayName: z.string().min(1).max(256).optional(),
+  email: z.string().min(1).max(256).optional(),
+  title: z.string().min(1).max(256).optional(),
+  organization: z.string().min(1).max(256).optional(),
+  organizationalUnit: z.string().min(1).max(256).optional(),
+  groupId: z.string().min(1).max(256).optional(),
+});
+
 /** Who a session acts for; see `Identity` in `auth/scope/types.ts`. */
-export const IdentitySchema: z.ZodType<Identity> = z
-  .object({
-    userId: z.string().min(1).max(256).optional(),
-    displayName: z.string().min(1).max(256).optional(),
-    email: z.string().min(1).max(256).optional(),
-    title: z.string().min(1).max(256).optional(),
-    organization: z.string().min(1).max(256).optional(),
-    organizationalUnit: z.string().min(1).max(256).optional(),
-    groupId: z.string().min(1).max(256).optional(),
-  })
-  .strict();
+export const IdentitySchema: z.ZodType<Identity> = identityObject;
+
+/** An identity a request names, which refuses a field it doesn't know. */
+export const IdentityInputSchema: z.ZodType<Identity> = identityObject.strict();
 
 export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
   title: z.string().nullable(),
@@ -214,7 +222,7 @@ export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
   creator: z.string().nullable(),
   createdAt: IsoDateTimeSchema.nullable(),
   modifiedAt: IsoDateTimeSchema.nullable(),
-  trapped: z.enum(['true', 'false', 'unknown']),
+  trapped: closed(z.enum(['true', 'false', 'unknown'])),
 });
 
 /**
@@ -253,6 +261,18 @@ export const OpenDocumentResponseSchema = z.object({
 });
 export type OpenDocumentResponse = z.infer<typeof OpenDocumentResponseSchema>;
 
+/** What a PDF's permissions allow, one flag per `/P` bit: `PdfPermissionFlags`. */
+export const PdfPermissionFlagsSchema: z.ZodType<PdfPermissionFlags> = z.object({
+  print: z.boolean(),
+  modifyContents: z.boolean(),
+  copy: z.boolean(),
+  modifyAnnotations: z.boolean(),
+  fillForms: z.boolean(),
+  copyForAccessibility: z.boolean(),
+  assemble: z.boolean(),
+  printHighQuality: z.boolean(),
+});
+
 /**
  * Wire shape of `GET /v1/docs/:docId/head`. Mirrors the server-side
  * `DocumentHead` interface; the schema is the source of truth so
@@ -267,27 +287,33 @@ export type OpenDocumentResponse = z.infer<typeof OpenDocumentResponseSchema>;
  */
 export const DocumentHeadSchema = z.object({
   id: z.string(),
-  baseSha: z.string(),
-  storageSizeBytes: z.number().int().nonnegative(),
+  baseSha256: z.string(),
+  sizeBytes: z.number().int().nonnegative(),
   docVersion: z.number().int().positive(),
-  state: z.enum(['pending', 'ready', 'failed', 'deleting']),
+  state: closed(z.enum(['pending', 'ready', 'failed', 'deleting'])),
   encryption: z.object({
-    state: z.enum(['unknown', 'none', 'encrypted', 'unsupported']),
+    state: closed(z.enum(['unknown', 'none', 'encrypted', 'unsupported'])),
     requiresPassword: z.boolean().nullable(),
   }),
   permissions: z.object({
     known: z.boolean(),
-    bits: z.number().int().nonnegative().nullable(),
+    flags: PdfPermissionFlagsSchema.nullable(),
     allAllowed: z.boolean().nullable(),
-    openedAs: z.enum(['none', 'user', 'owner']).nullable(),
+    openedAs: closed(z.enum(['none', 'user', 'owner'])).nullable(),
     securityHandlerRevision: z.number().int().nullable(),
     canUpgradeToOwner: z.boolean(),
   }),
   access: z.object({
     required: z.boolean(),
-    reasons: z.array(z.enum(['password', 'cdn', 'permissions-unknown'])),
+    reasons: z.array(closed(z.enum(['password', 'cdn', 'permissions-unknown']))),
     endpoint: z.string().optional(),
   }),
+  /**
+   * The server's engine value for each kind of cached read: what it computes
+   * that kind with, besides the document. Same for every document on a
+   * server; a client copies its kind's value into every cached URL.
+   */
+  engine: EngineValuesSchema,
 });
 export type DocumentHead = z.infer<typeof DocumentHeadSchema>;
 
@@ -317,15 +343,15 @@ export const ObjectNumberRangeSchema = z.object({
 
 /** See `EditSessionAccess`. */
 export const EditSessionAccessSchema = z.object({
-  session: z.enum(['new', 'revived', 'live']),
-  expiresIn: z.number().int().nonnegative(),
+  session: closed(z.enum(['new', 'revived', 'live'])),
+  expiresInSeconds: z.number().int().nonnegative(),
   objectNumbers: z.array(ObjectNumberRangeSchema),
 });
 
 /** See `EditSessionStatus`: the event stream's `session` event. */
 export const EditSessionStatusSchema = z.object({
   held: z.array(ObjectNumberRangeSchema),
-  expiresIn: z.number().int().nonnegative(),
+  expiresInSeconds: z.number().int().nonnegative(),
 });
 
 /** `POST …/object-numbers`: a bulk reservation. */
@@ -335,71 +361,35 @@ export const ObjectNumberReservationRequestSchema = z.object({
 
 export const ObjectNumberReservationResponseSchema = z.object({
   objectNumbers: z.array(ObjectNumberRangeSchema),
-  expiresIn: z.number().int().nonnegative(),
-});
-
-/**
- * Typed boolean view of the PDF user-access permission word. Names
- * mirror the `PdfBits` shape in @embedpdf/engine-core/auth/scope; ISO
- * bit numbers (3, 4, 5, 6, 9, 10, 11, 12).
- */
-const PdfBitsObjectSchema = z.object({
-  bit3: z.boolean(),
-  bit4: z.boolean(),
-  bit5: z.boolean(),
-  bit6: z.boolean(),
-  bit9: z.boolean(),
-  bit10: z.boolean(),
-  bit11: z.boolean(),
-  bit12: z.boolean(),
-});
-
-/**
- * Capability-shaped advisory for the client UI. Mirrors
- * `PdfPermissionAdvisory` in @embedpdf/engine-core/runtime; one
- * boolean per UI badge.
- */
-const PdfPermissionAdvisoryObjectSchema = z.object({
-  canPrint: z.boolean(),
-  canPrintHigh: z.boolean(),
-  canCopy: z.boolean(),
-  canAnnotate: z.boolean(),
-  canFillForms: z.boolean(),
-  canModifyForms: z.boolean(),
-  canModifyPages: z.boolean(),
-  canAssemble: z.boolean(),
+  expiresInSeconds: z.number().int().nonnegative(),
 });
 
 const PdfPermissionInfoObjectSchema: z.ZodType<PdfPermissionInfo> = z.object({
   known: z.boolean(),
   allAllowed: z.boolean().nullable(),
-  bits: z.number().int().nonnegative().nullable(),
-  openedAs: z.enum(['none', 'user', 'owner']).nullable(),
+  flags: PdfPermissionFlagsSchema,
+  openedAs: closed(z.enum(['none', 'user', 'owner'])).nullable(),
   securityHandlerRevision: z.number().int().nullable(),
-  // Enriched fields from /access (commit 14). Optional so /head, which
-  // doesn't always populate them, stays valid against this schema too.
-  flags: PdfBitsObjectSchema.optional(),
-  advisory: PdfPermissionAdvisoryObjectSchema.optional(),
 });
 
 const PdfPermissionInfoSchema = PdfPermissionInfoObjectSchema.nullable();
 
 export const DocumentSecurityStateSchema: z.ZodType<DocumentSecurityState> = z.object({
   encryption: z.object({
-    state: z.enum(['unknown', 'none', 'encrypted', 'unsupported']),
+    state: closed(z.enum(['unknown', 'none', 'encrypted', 'unsupported'])),
     requiresPassword: z.boolean().nullable(),
   }),
   permissions: z.object({
     known: z.boolean(),
-    bits: z.number().int().nonnegative().nullable(),
+    flags: PdfPermissionFlagsSchema.nullable(),
     allAllowed: z.boolean().nullable(),
-    openedAs: z.enum(['none', 'user', 'owner']).nullable(),
+    openedAs: closed(z.enum(['none', 'user', 'owner'])).nullable(),
     securityHandlerRevision: z.number().int().nullable(),
     canUpgradeToOwner: z.boolean(),
   }),
   access: z.object({
     required: z.boolean(),
-    reasons: z.array(z.enum(['password', 'cdn', 'permissions-unknown'])),
+    reasons: z.array(closed(z.enum(['password', 'cdn', 'permissions-unknown']))),
     endpoint: z.string().optional(),
   }),
 });
@@ -407,25 +397,26 @@ export const DocumentSecurityStateSchema: z.ZodType<DocumentSecurityState> = z.o
 const positiveCount = z.number().int().positive();
 
 /** See `BundleLimits`. */
-export const BundleLimitsSchema = z
-  .object({
-    bundleBytes: positiveCount,
-    manifestBytes: positiveCount,
-    items: positiveCount,
-    pages: positiveCount,
-    resources: positiveCount,
-    resourceBytes: positiveCount,
-    imagePixels: positiveCount,
-  })
-  .strict();
+export const BundleLimitsSchema = z.object({
+  bundleBytes: positiveCount,
+  manifestBytes: positiveCount,
+  items: positiveCount,
+  pages: positiveCount,
+  resources: positiveCount,
+  resourceBytes: positiveCount,
+  imagePixels: positiveCount,
+});
 
 export const AccessResponseSchema = z.object({
   security: DocumentSecurityStateSchema,
   cdn: z.object({
-    adapter: z.enum(['none', 'cloudfront', 'cloud-cdn', 'bunny', 'azure-fd', 'custom-hmac']),
-    expiresAt: z.number().int().positive(),
+    adapter: closed(
+      z.enum(['none', 'cloudfront', 'cloud-cdn', 'bunny', 'azure-fd', 'custom-hmac']),
+    ),
+    /** When the CDN's signing for this access expires. */
+    expiresAt: IsoDateTimeSchema,
     cache: z.object({
-      scope: z.enum(['browser-private', 'edge-shared']),
+      scope: closed(z.enum(['browser-private', 'edge-shared'])),
       immutableVersionedReads: z.boolean(),
     }),
     baseUrlOverrides: z.record(z.string(), z.string()).nullable(),
@@ -468,9 +459,10 @@ export const AccessResponseSchema = z.object({
   protection: z.lazy(() => DocumentProtectionSchema).nullable(),
   identity: IdentitySchema,
   originPasswordPolicy: z.object({
-    mode: z.enum(['not-needed', 'client-retry', 'server-session']),
+    mode: closed(z.enum(['not-needed', 'client-retry', 'server-session'])),
   }),
-  expiresAt: z.number().int().positive(),
+  /** When the token this access was given for expires. */
+  expiresAt: IsoDateTimeSchema,
   /**
    * The deployment's render lattice — the canonical parameter points the
    * server treats as durable, CDN-shared artifacts. Lives here and never in
@@ -516,8 +508,8 @@ export const AccessResponseSchema = z.object({
         .optional(),
       /** Worker-side output budget for degenerate page geometry. */
       maxRenderPixels: z.number().int().positive().optional(),
-      formats: z.array(z.enum(['webp', 'png'])),
-      background: z.enum(['white']),
+      formats: z.array(closed(z.enum(['webp', 'png']))),
+      background: closed(z.enum(['white'])),
       enforced: z.boolean(),
     })
     .optional(),
@@ -536,12 +528,22 @@ const engineErrorCodeValues = Object.values(EngineErrorCode) as [
   ...EngineErrorCode[],
 ];
 
-export const EngineErrorPayloadSchema: z.ZodType<SerializedEngineError> = z.object({
-  name: z.literal('EngineError'),
-  code: z.enum(engineErrorCodeValues),
+/** An error: the `error` of every error response, and of a refused change. */
+export const EngineErrorSchema: z.ZodType<SerializedEngineError> = z.object({
+  code: readsUnknownAs(z.enum(engineErrorCodeValues), EngineErrorCode.Unknown).describe(
+    "Why the request failed. A newer server can add codes: read one your client doesn't know " +
+      'as `Unknown`.',
+  ),
   message: z.string(),
-  details: z.record(z.string(), z.unknown()).optional(),
+  details: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('What a code carries besides its message, as each code says.'),
 });
+
+/** Every error response's body, whichever route answers. */
+export const ErrorResponseSchema = z.object({ error: EngineErrorSchema });
+export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 
 export const CachePinsSchema: z.ZodType<CachePins> = z.object({
   contentVersion: z.number().int().positive(),
@@ -554,7 +556,7 @@ export const CachePinsSchema: z.ZodType<CachePins> = z.object({
  * is built, never stored. Absent on base manifests: consumers treat absence
  * as all-'layer' (never wrong, only unshared).
  */
-const LayerScopeValueSchema = z.enum(['base', 'layer']);
+const LayerScopeValueSchema = closed(z.enum(['base', 'layer']));
 export const LayerScopesSchema: z.ZodType<LayerScopes> = z.object({
   content: LayerScopeValueSchema,
   annotations: LayerScopeValueSchema,
@@ -597,14 +599,16 @@ export const DocumentManifestSchema = z.object({
   annotationsVersion: z.number().int().positive().default(1),
   formsVersion: z.number().int().positive().default(1),
   outlineVersion: z.number().int().positive().default(1),
+  // Absent from a server without it: its layout has no viewports (see DocumentManifest).
+  viewportsVersion: z.number().int().positive().optional(),
   fontsVersion: z.number().int().positive().default(1),
-  serverFonts: z.string(),
+  contentsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
-  baseSha: z.string(),
+  baseSha256: z.string(),
   // Signing fences (absent on pre-signature servers: unwritten, unknown length).
   layerVersion: z.number().int().nonnegative().default(0),
   working: z.boolean().default(false),
-  baseByteLength: z.number().int().nonnegative().default(0),
+  baseSizeBytes: z.number().int().nonnegative().default(0),
   // Plane scopes: layer manifests only; absent = all-'layer'.
   scopes: LayerScopesSchema.optional(),
   // Defined further down; lazy so this schema can come first.
@@ -646,15 +650,15 @@ export const PageTextSnapshotSchema: z.ZodType<PageTextSnapshot> = z
 export const PageGeometryGlyphSchema = z.object({
   loose: PageBoxSchema,
   tight: PageBoxSchema.optional(),
-  space: z.literal(true).optional(),
-  empty: z.literal(true).optional(),
+  space: closed(z.literal(true)).optional(),
+  empty: closed(z.literal(true)).optional(),
 });
 
 export const RotatedGeometryGlyphSchema = z.object({
   loose: PageQuadSchema,
   tight: PageQuadSchema.optional(),
-  space: z.literal(true).optional(),
-  empty: z.literal(true).optional(),
+  space: closed(z.literal(true)).optional(),
+  empty: closed(z.literal(true)).optional(),
 });
 
 export const UprightGeometryRunSchema = z.object({
@@ -676,10 +680,9 @@ export const RotatedGeometryRunSchema = z.object({
 // Rotated first: in zod's default strip mode the upright shape would accept a
 // zero-glyph rotated run and silently drop its angle; the rotated shape can
 // never swallow an upright run (it requires `rotation`/`ascentFlip`).
-export const PageGeometryRunSchema: z.ZodType<PageGeometryRun> = z.union([
-  RotatedGeometryRunSchema,
-  UprightGeometryRunSchema,
-]);
+export const PageGeometryRunSchema: z.ZodType<PageGeometryRun> = closed(
+  z.union([RotatedGeometryRunSchema, UprightGeometryRunSchema]),
+);
 
 export const PageGeometrySnapshotSchema: z.ZodType<PageGeometrySnapshot> = z.object({
   runs: z.array(PageGeometryRunSchema),
@@ -722,7 +725,7 @@ export const SearchSnippetSchema: z.ZodType<SearchSnippet> = z.object({
 export const PdfTextSegmentSchema: z.ZodType<PdfTextSegment> = z.object({
   quad: PageQuadSchema,
   rect: PageBoxSchema,
-  advance: z.union([z.literal(1), z.literal(-1)]),
+  advance: closed(z.union([z.literal(1), z.literal(-1)])),
 });
 
 export const SearchMatchSchema: z.ZodType<SearchMatch> = z.object({
@@ -740,10 +743,9 @@ export const SearchSliceSchema: z.ZodType<SearchSlice> = z.object({
   pageCount: z.number().int().nonnegative(),
 });
 
-export const PageNetworkRenderFormatSchema: z.ZodType<PageNetworkRenderFormat> = z.enum([
-  'png',
-  'webp',
-]);
+export const PageNetworkRenderFormatSchema: z.ZodType<PageNetworkRenderFormat> = closed(
+  z.enum(['png', 'webp']),
+);
 
 /**
  * Wire schema for the cloud render endpoints, applied to the **nested**
@@ -805,10 +807,12 @@ const RenderBackgroundSchema = z.enum(['white', 'transparent']);
 /** WebP quality, 0 (smallest) to 1 (best) — the `canvas.toBlob` scale. */
 const RenderQualitySchema = z.coerce.number().min(0).max(1);
 
-const AppearanceModeSchema = z.enum(['normal', 'rollover', 'down']);
+const AppearanceModeSchema = closed(z.enum(['normal', 'rollover', 'down']));
 
-/** `DocumentManifest.serverFonts` in a picture's token: the fingerprint, in hex. */
-const ServerFontsSchema = z.string().regex(/^[0-9a-f]{1,64}$/);
+/** A token's engine value: opaque, in the token's value charset. */
+const EngineValueSchema = z.string().regex(/^[A-Za-z0-9.-]+$/);
+/** A token's shape: a positive integer. */
+const ShapeSchema = z.coerce.number().int().positive();
 
 /**
  * A token's `modes`: the modes it asks for, in the engine's mode order,
@@ -876,7 +880,8 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
   return z
     .object({
       ...pinFields,
-      serverFonts: ServerFontsSchema.optional(),
+      engine: EngineValueSchema.optional(),
+      shape: ShapeSchema.optional(),
       format: PageNetworkRenderFormatSchema.optional(),
       quality: RenderQualitySchema.optional(),
       ...screenFields,
@@ -902,11 +907,12 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
           message: 'versioned render requires format',
         });
       }
-      if (v.serverFonts === undefined) {
+      for (const field of ['engine', 'shape'] as const) {
+        if (v[field] !== undefined) continue;
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['serverFonts'],
-          message: 'versioned render requires serverFonts',
+          path: [field],
+          message: `versioned render requires ${field}`,
         });
       }
       for (const pin of pins) {
@@ -936,7 +942,9 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
       };
       const query: PageRenderQuery = {
         options,
-        ...(v.serverFonts !== undefined ? { serverFonts: v.serverFonts } : {}),
+        ...(v.engine !== undefined && v.shape !== undefined
+          ? { pin: { engine: v.engine, shape: v.shape } }
+          : {}),
       };
       for (const pin of pins) {
         if (pinned[pin] !== undefined) query[pin] = pinned[pin];
@@ -1004,7 +1012,8 @@ function buildAppearancesQuerySchema<Pin extends 'annotationVersion' | 'widgetVe
   return z
     .object({
       [pin]: z.coerce.number().int().positive().optional(),
-      serverFonts: ServerFontsSchema.optional(),
+      engine: EngineValueSchema.optional(),
+      shape: ShapeSchema.optional(),
       format: PageNetworkRenderFormatSchema.optional(),
       modes: AppearanceModesSchema.optional(),
       rotation: RenderRotationSchema.optional(),
@@ -1022,11 +1031,12 @@ function buildAppearancesQuerySchema<Pin extends 'annotationVersion' | 'widgetVe
           message: 'versioned appearance render requires format',
         });
       }
-      if (v[pin] !== undefined && v.serverFonts === undefined) {
+      for (const field of ['engine', 'shape'] as const) {
+        if (v[pin] === undefined || v[field] !== undefined) continue;
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['serverFonts'],
-          message: 'versioned appearance render requires serverFonts',
+          path: [field],
+          message: `versioned appearance render requires ${field}`,
         });
       }
     })
@@ -1041,7 +1051,9 @@ function buildAppearancesQuerySchema<Pin extends 'annotationVersion' | 'widgetVe
       return {
         options,
         ...(v[pin] !== undefined ? { [pin]: v[pin] } : {}),
-        ...(v.serverFonts !== undefined ? { serverFonts: v.serverFonts } : {}),
+        ...(v.engine !== undefined && v.shape !== undefined
+          ? { pin: { engine: v.engine as string, shape: v.shape as number } }
+          : {}),
       };
     });
 }
@@ -1073,7 +1085,7 @@ export const AnnotationAppearanceBatchSchema: z.ZodType<AnnotationAppearanceBatc
       width: z.number().int().positive(),
       height: z.number().int().positive(),
       format: PageNetworkRenderFormatSchema,
-      contentType: z.string().min(1),
+      mimeType: z.string().min(1),
     }),
   ),
 });
@@ -1087,7 +1099,9 @@ export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
   metadataVersion: z.number().int().positive().optional(),
   attachmentsVersion: z.number().int().positive().optional(),
   outlineVersion: z.number().int().positive().optional(),
+  viewportsVersion: z.number().int().positive().optional(),
   fontsVersion: z.number().int().positive().optional(),
+  contentsVersion: z.number().int().positive().optional(),
   layerVersion: z.number().int().nonnegative().optional(),
   working: z.boolean().optional(),
   pages: z.array(
@@ -1147,6 +1161,7 @@ export const DocumentWireComponents = {
   DocumentMetadata: DocumentMetadataSchema,
   MetadataPatch: MetadataPatchSchema,
   Identity: IdentitySchema,
+  PdfPermissionFlags: PdfPermissionFlagsSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
 
 /** Per-page side-effect envelope every annotation mutation returns. Mirrors `AnnotationListMutationMeta`. */
@@ -1156,7 +1171,7 @@ export const AnnotationListMutationMetaSchema: z.ZodType<AnnotationListMutationM
   opId: z.string(),
   undoable: z.boolean(),
   missingCharacters: z.array(z.string()).optional(),
-  changed: z.array(AnnotationRefSchema),
+  changedRefs: z.array(AnnotationRefSchema),
 });
 
 export const AnnotationCreateResultSchema: z.ZodType<AnnotationCreateResult> = z.object({
@@ -1171,18 +1186,20 @@ export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z
     z.object({
       ref: AnnotationRefSchema,
       field: z.string().optional(),
-      reason: z.enum([
-        'unsupported-kind',
-        'widget',
-        'geospatial',
-        'unknown-measure',
-        'unsupported-action',
-        'unsupported-value',
-        'name-conflict',
-        'parent-dropped',
-        'parent-missing',
-        'popup-taken',
-      ]),
+      reason: closed(
+        z.enum([
+          'unsupported-kind',
+          'widget',
+          'geospatial',
+          'unknown-measure',
+          'unsupported-action',
+          'unsupported-value',
+          'name-conflict',
+          'parent-dropped',
+          'parent-missing',
+          'popup-taken',
+        ]),
+      ),
     }),
   ),
   meta: AnnotationListMutationMetaSchema,
@@ -1191,7 +1208,7 @@ export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z
 /** The engine's `/AP` verdict riding every update result (see engine-core
  *  `annotation/appearance.ts`). `changed` drives client raster invalidation. */
 export const AppearanceOutcomeSchema: z.ZodType<AppearanceOutcome> = z.object({
-  action: z.enum(['preserved', 'regenerated', 'generation-unavailable', 'restored']),
+  action: closed(z.enum(['preserved', 'regenerated', 'generation-unavailable', 'restored'])),
   changed: z.boolean(),
 });
 
@@ -1217,9 +1234,12 @@ export const AnnotationWireComponents = {
   AnnotationPatch: AnnotationPatchSchema,
   PdfLinkTarget: PdfLinkTargetSchema,
   PdfLinkTargetWritable: PdfLinkTargetWritableSchema,
+  PdfMeasurement: PdfMeasurementSchema,
   AnnotationList: AnnotationListSchema,
   AnnotationMutationMeta: AnnotationListMutationMetaSchema,
   AnnotationPosition: AnnotationPositionSchema,
+  RichTextDocument: RichTextDocumentSchema,
+  RichTextDocumentInput: RichTextDocumentInputSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
 
 /** A page's `/Annots` in array order (`page.annotations.order()`). */
@@ -1261,6 +1281,7 @@ export const FormMutationMetaSchema: z.ZodType<FormMutationMeta> = z.object({
 export const FormWireComponents = {
   FormFieldRef: FormFieldRefSchema,
   FormField: FormFieldDTOSchema,
+  FormValueEntry: FormValueEntrySchema,
   FormFieldValue: FormFieldValueSchema,
   FormWidget: FormWidgetSchema,
   FormFieldDraft: FormFieldDraftSchema,
@@ -1301,13 +1322,15 @@ export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
       ref: FormFieldRefSchema.nullable(),
       widget: AnnotationRefSchema.optional(),
       field: z.string().optional(),
-      reason: z.enum([
-        'name-conflict',
-        'no-field',
-        'unsupported-family',
-        'script-not-allowed',
-        'unsupported-action',
-      ]),
+      reason: closed(
+        z.enum([
+          'name-conflict',
+          'no-field',
+          'unsupported-kind',
+          'script-not-allowed',
+          'unsupported-action',
+        ]),
+      ),
     }),
   ),
   calculationOrder: z.array(FormFieldRefSchema).optional(),
@@ -1320,13 +1343,9 @@ export const FormValuesImportResultSchema: z.ZodType<FormValuesImportResult> = z
   dropped: z.array(
     z.object({
       ref: FormFieldRefSchema,
-      reason: z.enum([
-        'no-field',
-        'wrong-family',
-        'value-not-allowed',
-        'locked',
-        'fill-not-allowed',
-      ]),
+      reason: closed(
+        z.enum(['no-field', 'wrong-kind', 'value-not-allowed', 'locked', 'fill-not-allowed']),
+      ),
     }),
   ),
   meta: FormMutationMetaSchema,
@@ -1437,19 +1456,20 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
   size: PdfSizeSchema,
   rotation: PdfRotationSchema,
   userUnit: z.number().positive(),
-  tabOrder: z.enum(['rows', 'columns', 'structure', 'annotations', 'widgets']).nullable(),
+  tabOrder: closed(z.enum(['rows', 'columns', 'structure', 'annotations', 'widgets'])).nullable(),
   boxes: PageBoxesSchema,
   pdfCropBox: PdfRectSchema,
   actions: PdfPageActionsSchema.optional(),
+  viewports: z.array(PageMeasurementViewportSchema).optional(),
 });
 
 export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
   pages: z.array(PageRefSchema),
-  usage: z.enum(['display', 'print']),
+  usage: closed(z.enum(['display', 'print'])),
   results: z.array(
     z.object({
       page: PageRefSchema,
-      status: z.enum(['applied', 'unchanged']),
+      status: closed(z.enum(['applied', 'unchanged'])),
     }),
   ),
   meta: MutationMetaSchema,
@@ -1458,11 +1478,11 @@ export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
 /** See `AnnotationFlattenResult`. */
 export const AnnotationFlattenResultSchema: z.ZodType<AnnotationFlattenResult> = z.object({
   page: PageRefSchema,
-  usage: z.enum(['display', 'print']),
+  usage: closed(z.enum(['display', 'print'])),
   results: z.array(
     z.object({
       ref: AnnotationRefSchema,
-      status: z.enum(['applied', 'unchanged']),
+      status: closed(z.enum(['applied', 'unchanged'])),
     }),
   ),
   meta: MutationMetaSchema,
@@ -1596,18 +1616,27 @@ export const PageFlattenInputSchema: z.ZodType<PageFlattenInput> = z.object({
   usage: z.enum(['display', 'print']),
 });
 
+const redactionApplyScopeObject = z.object({
+  pages: z.array(PageRefSchema).optional(),
+  annotations: z.array(AnnotationRefSchema).optional(),
+});
+
+const namesOneScope = (scope: z.infer<typeof redactionApplyScopeObject>): boolean =>
+  (scope.pages === undefined) !== (scope.annotations === undefined);
+
 /**
  * `{ pages }` or `{ annotations }`: one object with exactly one of the two,
  * so the wire has no untagged union (the API reference labels variants by a
  * discriminating literal, and a scope has none to add).
  */
-export const RedactionApplyScopeSchema: z.ZodType<RedactionApplyScope> = z
-  .object({
-    pages: z.array(PageRefSchema).optional(),
-    annotations: z.array(AnnotationRefSchema).optional(),
-  })
-  .strict()
-  .refine((scope) => (scope.pages === undefined) !== (scope.annotations === undefined), {
+export const RedactionApplyScopeSchema: z.ZodType<RedactionApplyScope> =
+  redactionApplyScopeObject.refine(namesOneScope, {
+    message: 'exactly one of pages or annotations',
+  }) as unknown as z.ZodType<RedactionApplyScope>;
+
+/** The scope a request names, which refuses a field it doesn't know. */
+export const RedactionApplyScopeInputSchema: z.ZodType<RedactionApplyScope> =
+  redactionApplyScopeObject.strict().refine(namesOneScope, {
     message: 'exactly one of pages or annotations',
   }) as unknown as z.ZodType<RedactionApplyScope>;
 
@@ -1616,7 +1645,7 @@ export const RedactionApplyResultSchema: z.ZodType<RedactionApplyResult> = z.obj
   results: z.array(
     z.object({
       page: PageRefSchema,
-      status: z.enum(['applied', 'unchanged']),
+      status: closed(z.enum(['applied', 'unchanged'])),
       removedAnnotationCount: z.number().int().nonnegative(),
     }),
   ),
@@ -1632,17 +1661,21 @@ export const RedactionApplyResultSchema: z.ZodType<RedactionApplyResult> = z.obj
 /** See `NamedPageEntry`: decoded key + what it resolves to. */
 export const NamedPageEntrySchema: z.ZodType<NamedPageEntry> = z.object({
   name: z.string(),
-  target: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('page'), page: PageRefSchema }),
-    z.object({ kind: z.literal('template'), objectNumber: z.number().int().positive() }),
-    z.object({ kind: z.literal('dangling') }),
-  ]),
+  target: closed(
+    z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('page'), page: PageRefSchema }),
+      z.object({ kind: z.literal('template'), objectNumber: z.number().int().positive() }),
+      z.object({ kind: z.literal('dangling') }),
+    ]),
+  ),
 });
 
 /** See `PageLabelSection`: pages numbered together. */
 export const PageLabelSectionSchema: z.ZodType<PageLabelSection> = z.object({
   firstPage: z.number().int().nonnegative(),
-  style: z.enum(['decimal', 'upperRoman', 'lowerRoman', 'upperLetters', 'lowerLetters']).nullable(),
+  style: closed(
+    z.enum(['decimal', 'upperRoman', 'lowerRoman', 'upperLetters', 'lowerLetters']),
+  ).nullable(),
   firstNumber: z.number().int(),
   prefix: z.string(),
 });
@@ -1653,6 +1686,15 @@ export const PageListSnapshotSchema: z.ZodType<PageListSnapshot> = z.object({
   labels: z.array(PageLabelSectionSchema),
   namedPages: z.array(NamedPageEntrySchema),
 });
+
+/**
+ * The page list and the viewport, named once: every page op's answer, a
+ * scale's and a page name's carry the whole list, like `OutlineWireComponents`.
+ */
+export const PageWireComponents = {
+  PageListSnapshot: PageListSnapshotSchema,
+  PageMeasurementViewport: PageMeasurementViewportSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
 
 /** `pages.setName` input — see `PageNameInput`. */
 export const PageNameInputSchema: z.ZodType<PageNameInput> = z.object({
@@ -1754,7 +1796,7 @@ export const AttachmentMutationMetaSchema: z.ZodType<AttachmentMutationMeta> = z
   opId: z.string(),
   undoable: z.boolean(),
   missingCharacters: z.array(z.string()).optional(),
-  changed: z.array(AttachmentRefSchema),
+  changedRefs: z.array(AttachmentRefSchema),
 });
 
 export const AttachmentCreateResultSchema: z.ZodType<AttachmentCreateResult> = z.object({
@@ -1807,7 +1849,7 @@ export const OutlineMutationMetaSchema: z.ZodType<OutlineMutationMeta> = z.objec
   opId: z.string(),
   undoable: z.boolean(),
   missingCharacters: z.array(z.string()).optional(),
-  changed: z.array(OutlineItemRefSchema),
+  changedRefs: z.array(OutlineItemRefSchema),
 });
 
 /** One parent's children as a write left them; `parent: null` is the top level. */
@@ -1862,11 +1904,11 @@ export const OutlineWireComponents = {
 // Fonts: a document's font list, a program's facts, and a resolve.
 
 const fontProgramShape = {
-  displayHash: z.string().nullable(),
-  sourceHash: z.string().nullable(),
-  embedded: z.enum(['whole', 'subset', 'none']),
-  format: z.enum(['truetype', 'opentype', 'cff', 'type1', 'type3']).nullable(),
-  embeddingPermission: z.enum(['installable', 'editable', 'preview-and-print']).nullable(),
+  displaySha256: z.string().nullable(),
+  sourceSha256: z.string().nullable(),
+  embedded: closed(z.enum(['whole', 'subset', 'none'])),
+  format: closed(z.enum(['truetype', 'opentype', 'cff', 'type1', 'type3'])).nullable(),
+  embeddingPermission: closed(z.enum(['installable', 'editable', 'preview-and-print'])).nullable(),
   canDownload: z.boolean(),
 };
 
@@ -1876,21 +1918,24 @@ const FontProgramSchema: z.ZodType<FontProgram> = z.object(fontProgramShape);
 /** A font that can be named in a document. */
 const FontSchema: z.ZodType<Font> = z.object({
   name: z.string(),
-  source: z.enum(['standard', 'engine', 'document']),
+  source: closed(z.enum(['standard', 'engine', 'document'])),
+  builtIn: z.boolean(),
   familyName: z.string(),
   weight: z.number().int(),
   italic: z.boolean(),
   postScriptName: z.string().nullable(),
   canChoose: z.boolean(),
   restrictions: z.array(
-    z.enum([
-      'subset',
-      'not-embedded',
-      'preview-and-print',
-      'unsupported-format',
-      'no-unicode-map',
-      'not-served',
-    ]),
+    closed(
+      z.enum([
+        'subset',
+        'not-embedded',
+        'preview-and-print',
+        'unsupported-format',
+        'no-unicode-map',
+        'not-served',
+      ]),
+    ),
   ),
   programs: z.array(FontProgramSchema),
 });
@@ -1902,7 +1947,7 @@ export const FontListSchema: z.ZodType<FontList> = z.object({
   lastResort: FontProgramSchema,
 });
 
-/** `GET …/font-programs/{displayHash}`: `doc.fonts.getProgram()`. */
+/** `GET …/font-programs/{displaySha256}`: `doc.fonts.getProgram()`. */
 export const FontProgramInfoSchema: z.ZodType<FontProgramInfo> = z.object({
   ...fontProgramShape,
   covers: z.array(
@@ -2002,12 +2047,12 @@ export const ByteRangeSchema = z.tuple([
 export const SignaturePreparedWireSchema = z.object({
   signingId: z.string().min(1),
   digest: Base64Schema,
-  algorithm: z.enum(['sha256', 'sha384', 'sha512']),
+  algorithm: closed(z.enum(['sha256', 'sha384', 'sha512'])),
   byteRange: ByteRangeSchema,
-  contentsSize: z.number().int().positive(),
+  contentsSizeBytes: z.number().int().positive(),
   subFilter: z.string(),
   expectedVersion: DocumentVersionRefSchema,
-  expiresAt: z.string().nullable(),
+  expiresAt: IsoDateTimeSchema.nullable(),
 });
 export type SignaturePreparedWire = z.infer<typeof SignaturePreparedWireSchema>;
 
@@ -2035,40 +2080,43 @@ export type SignatureCompleteBody = z.infer<typeof SignatureCompleteBodySchema>;
 // query, and the version catalog.
 // ---------------------------------------------------------------------------
 
-const DocMdpPermissionSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
-const ModificationLevelSchema = z.enum(['none', 'lta', 'fill', 'annotate']);
-const DigestAlgorithmSchema = z.enum(['sha1', 'sha256', 'sha384', 'sha512']);
+const DocMdpPermissionSchema = closed(z.union([z.literal(1), z.literal(2), z.literal(3)]));
+const ModificationLevelSchema = closed(z.enum(['none', 'lta', 'fill', 'annotate']));
+const DigestAlgorithmSchema = closed(z.enum(['sha1', 'sha256', 'sha384', 'sha512']));
 
 export const FieldLockSpecSchema: z.ZodType<FieldLockSpec> = z.object({
-  action: z.enum(['all', 'include', 'exclude']),
+  action: closed(z.enum(['all', 'include', 'exclude'])),
   fields: z.array(z.string()),
   permission: DocMdpPermissionSchema.optional(),
 });
 
 export const SignatureSeedValueSchema: z.ZodType<SignatureSeedValue> = z.object({
-  requiredFlags: z.number().int(),
-  presentFlags: z.number().int(),
-  version: z.number().int().nullable(),
-  mdp: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).nullable(),
+  parserVersion: z.number().int().nullable(),
+  parserVersionRequired: z.boolean(),
+  mdp: closed(z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)])).nullable(),
   filter: z.string().nullable(),
+  filterRequired: z.boolean(),
   subFilters: z.array(z.string()),
+  subFiltersRequired: z.boolean(),
   digestMethods: z.array(z.string()),
+  digestMethodsRequired: z.boolean(),
   reasons: z.array(z.string()),
+  reasonsRequired: z.boolean(),
   unsupportedRequired: z.boolean(),
 });
 
-export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
+export const SignatureDTOSchema: z.ZodType<Signature> = z.object({
   index: z.number().int().nonnegative(),
   field: FormFieldRefSchema,
   fieldName: z.string(),
   widget: FormFieldWidgetSchema.nullable(),
   signed: z.boolean(),
-  kind: z.enum(['signature', 'timestamp']),
+  kind: closed(z.enum(['signature', 'timestamp'])),
   filter: z.string().nullable(),
   subFilter: z.string().nullable(),
   byteRange: ByteRangeSchema.nullable(),
-  contentsSize: z.number().int().nonnegative(),
-  coverage: z.enum(['whole-revision', 'partial', 'malformed']).nullable(),
+  contentsSizeBytes: z.number().int().nonnegative(),
+  coverage: closed(z.enum(['whole-revision', 'partial', 'malformed'])).nullable(),
   revisionIndex: z.number().int().nonnegative().nullable(),
   signer: z.object({
     name: z.string().nullable(),
@@ -2084,6 +2132,16 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
   seedValue: SignatureSeedValueSchema.nullable(),
 });
 
+/**
+ * Signature models with a stable public name (see `DocumentWireComponents`).
+ * Named, a signature's `fieldMdp.permission` points to its own schema, not to
+ * the nullable `docMdp` beside it.
+ */
+export const SignatureWireComponents = {
+  DocMdpPermission: DocMdpPermissionSchema,
+  FieldLockSpec: FieldLockSpecSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
+
 export const DocumentProtectionSchema: z.ZodType<DocumentProtection> = z.object({
   enforced: ModificationLevelSchema.nullable(),
   judged: ModificationLevelSchema.nullable(),
@@ -2093,7 +2151,7 @@ export const DocumentProtectionSchema: z.ZodType<DocumentProtection> = z.object(
   fieldLocks: z.array(
     z.object({
       signatureIndex: z.number().int().nonnegative(),
-      source: z.enum(['fieldmdp', 'lock']),
+      source: closed(z.enum(['fieldmdp', 'lock'])),
       spec: FieldLockSpecSchema,
     }),
   ),
@@ -2116,11 +2174,11 @@ export const SignatureSnapshotSchema: z.ZodType<SignatureSnapshot> = z.object({
 
 export const BaseVersionInfoSchema: z.ZodType<BaseVersionInfo> = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
-  byteLength: z.number().int().nonnegative(),
+  sizeBytes: z.number().int().nonnegative(),
 });
 
 export const SignatureCompleteResultSchema: z.ZodType<SignatureCompleteResult> = z.object({
-  status: z.enum(['completed', 'already-completed']),
+  status: closed(z.enum(['completed', 'already-completed'])),
   signature: SignatureDTOSchema,
   version: BaseVersionInfoSchema,
   previous: DocumentVersionRefSchema,
@@ -2129,12 +2187,12 @@ export const SignatureCompleteResultSchema: z.ZodType<SignatureCompleteResult> =
 });
 
 export const SignatureCancelResultSchema: z.ZodType<SignatureCancelResult> = z.object({
-  status: z.enum(['cancelled', 'already-completed', 'unknown']),
+  status: closed(z.enum(['cancelled', 'already-completed', 'unknown'])),
 });
 
 const ChangeFindingSchema = z.object({
   rule: z.string(),
-  verdict: z.enum(['permitted', 'forbidden', 'incomplete']),
+  verdict: closed(z.enum(['permitted', 'forbidden', 'incomplete'])),
   objectNumber: z.number().int().nonnegative(),
   edge: z.string().optional(),
   detail: z.string().optional(),
@@ -2144,12 +2202,12 @@ const AnalysisDetailSchema = z.enum(['summary', 'full']);
 
 /** The analysis: one verdict (`current`) with its findings, the restrictions it was judged under, and facts about the revisions in between. */
 export const ChangeAnalysisSchema = z.object({
-  mode: z.enum(['authoritative', 'exploratory']),
+  mode: closed(z.enum(['authoritative', 'exploratory'])),
   policyVersion: z.number().int(),
   basis: z.object({
     version: BaseVersionInfoSchema,
     editsVersion: z.number().int().nonnegative(),
-    source: z.enum(['persisted', 'working-copy']),
+    source: closed(z.enum(['persisted', 'working-copy'])),
   }),
   since: z.object({
     revisionIndex: z.number().int().nonnegative(),
@@ -2160,25 +2218,25 @@ export const ChangeAnalysisSchema = z.object({
     z.object({
       signatureIndex: z.number().int().nonnegative(),
       revisionIndex: z.number().int().nonnegative(),
-      source: z.enum(['docmdp', 'fieldmdp', 'lock']),
+      source: closed(z.enum(['docmdp', 'fieldmdp', 'lock'])),
       own: z.boolean(),
-      permission: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+      permission: closed(z.union([z.literal(1), z.literal(2), z.literal(3)])).optional(),
       fields: z.unknown().optional(),
     }),
   ),
   current: z.object({
-    verdict: z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate']),
+    verdict: closed(z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate'])),
     complete: z.boolean(),
     primary: ChangeFindingSchema.optional(),
     findings: z.array(ChangeFindingSchema),
-    method: z.enum(['net-state', 'net-state+replay']),
+    method: closed(z.enum(['net-state', 'net-state+replay'])),
   }),
   later: z.object({
     revisionCount: z.number().int().nonnegative(),
     undoneObjectNumbers: z.array(z.number().int().nonnegative()),
   }),
   /** Equals `current.verdict`. */
-  verdict: z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate']),
+  verdict: closed(z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate'])),
   /** The step DTOs are large and evolving; carried verbatim. */
   steps: z.array(z.unknown()),
 }) as unknown as z.ZodType<ChangeAnalysis>;
@@ -2206,7 +2264,7 @@ export const SignaturePrepareBodySchema = z.object({
   kind: z.enum(['signature', 'timestamp']).optional(),
   subFilter: z.enum(['adbe.pkcs7.detached', 'ETSI.CAdES.detached']).optional(),
   digest: z.enum(['sha256', 'sha384', 'sha512']).optional(),
-  contentsSize: z.number().int().positive().optional(),
+  contentsSizeBytes: z.number().int().positive().optional(),
   signer: SignatureSignerInputSchema.optional(),
   certify: z.object({ permission: DocMdpPermissionSchema }).optional(),
   lock: FieldLockSpecSchema.optional(),
@@ -2264,18 +2322,18 @@ export function analyzeInputFromQuery(
 /** One of a layer's versions: the upload, or one its signatures made. */
 export const LayerVersionSchema = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
-  byteLength: z.number().int().nonnegative(),
+  sizeBytes: z.number().int().nonnegative(),
   number: z.number().int().positive(),
   parentSha256: z.string().nullable(),
-  producer: z.enum(['upload', 'signature']),
+  producer: closed(z.enum(['upload', 'signature'])),
   signingId: z.string().nullable(),
-  createdAt: z.number().int(),
+  createdAt: IsoDateTimeSchema,
 });
 export type LayerVersion = z.infer<typeof LayerVersionSchema>;
 
 export const LayerVersionsSchema = z.object({
   /** The layer's base: the upload, or the version its last signature made. */
-  baseSha: z.string().regex(/^[0-9a-f]{64}$/),
+  baseSha256: z.string().regex(/^[0-9a-f]{64}$/),
   /** Oldest first: the upload, then the versions the layer's signatures made. */
   versions: z.array(LayerVersionSchema),
 });
@@ -2285,5 +2343,6 @@ export { DigestAlgorithmSchema, ModificationLevelSchema };
 
 export const PageScaleResultSchema = z.object({
   page: PageRefSchema,
+  layout: PageListSnapshotSchema,
   meta: MutationMetaSchema,
 });

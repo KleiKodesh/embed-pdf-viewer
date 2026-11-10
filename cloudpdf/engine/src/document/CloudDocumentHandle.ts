@@ -45,7 +45,9 @@ import {
   ObjectNumberReservationResponseSchema,
   wirePaths,
   type DocumentHead,
+  tokenPinOf,
   type DocumentManifest,
+  type EngineValues,
   type LayerScopePlane,
 } from '@embedpdf/engine-core/wire';
 
@@ -78,11 +80,17 @@ import type { HttpClient } from '../transport/HttpClient';
  * back to the document handle (smaller circular-ref surface, easier
  * to mock in unit tests).
  */
+/**
+ * The manifest as this client holds it: the server's manifest, and the engine
+ * values of the `/head` it was read after, which every cached URL copies.
+ */
+export type CloudManifest = DocumentManifest & { readonly engine: EngineValues };
+
 export interface ManifestAccessor {
   /** Cached manifest (cold-fetched once, kept across requests). */
-  get(signal: AbortSignal): Promise<DocumentManifest>;
+  get(signal: AbortSignal): Promise<CloudManifest>;
   /** Force re-fetch of `/head` + `/manifest@docVersion=N`; replaces the cache. */
-  refresh(signal: AbortSignal): Promise<DocumentManifest>;
+  refresh(signal: AbortSignal): Promise<CloudManifest>;
   /**
    * Absorb mutation-returned state/cache deltas when safe. `owns` names the
    * planes this mutation kind takes ownership of (the monotone-flip
@@ -156,10 +164,11 @@ export class CloudDocumentHandle implements DocumentHandle {
    * `pageObjectNumber`. Today's documents are page-sparse so the
    * scan is cheaper than the hash overhead.
    */
-  private manifestCache: DocumentManifest | null = null;
-  private inflightManifest: Promise<DocumentManifest> | null = null;
+  private manifestCache: CloudManifest | null = null;
+  private inflightManifest: Promise<CloudManifest> | null = null;
   private manifestFloorVersion = 0;
   private pendingInitialHead: DocumentHead | null;
+  private readonly stopEngineWatch: () => void;
 
   private readonly manifestAccessor: ManifestAccessor;
   private readonly cloudSecurity: CloudDocumentSecurityService;
@@ -184,6 +193,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   ) {
     this.id = id;
     this.pendingInitialHead = initialHead ?? null;
+    this.stopEngineWatch = http.onEngineChanged(() => this.forgetEngineValues());
     // The editing session's object numbers: from `/access`, write
     // responses, the stream's `session` events and the bulk reservation.
     const pool = new CloudObjectNumberPool({
@@ -268,7 +278,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.events = {
       subscribe,
       on: (type, listener) => subscribeToType(subscribe, type, listener),
-      lastServerId: () => hub.lastServerId(),
+      lastServerSequence: () => hub.lastServerSequence(),
     };
     this.publisher = new SessionEventPublisher(hub, sessionId);
     // A version this handle published itself numbers objects anew too.
@@ -413,6 +423,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       (signal) => this.pageReads.pageLayout(ref, signal),
       () => this.cloudSecurity.pageLayerRights(),
       () => this.cloudSecurity.pagePictureRights(),
+      (pages, measure, options) => this.pages.setScale(pages, measure, options),
     );
   }
 
@@ -450,6 +461,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         return wirePaths.layerDownloadVersioned(this.id, this.layerName, {
           docVersion: manifest.docVersion,
           mode,
+          pin: tokenPinOf('download', manifest.engine),
         });
       };
       try {
@@ -483,7 +495,7 @@ export class CloudDocumentHandle implements DocumentHandle {
    * so an N-page handle that opens N services in parallel still
    * triggers exactly one `/head` + `/manifest@docVersion=N` round-trip.
    */
-  async getManifest(signal: AbortSignal): Promise<DocumentManifest> {
+  async getManifest(signal: AbortSignal): Promise<CloudManifest> {
     if (this.manifestCache) return this.manifestCache;
     if (!this.inflightManifest) {
       this.startManifestFetch({ allowInitialHead: true });
@@ -503,7 +515,7 @@ export class CloudDocumentHandle implements DocumentHandle {
    * URL returns 404 (stale version). Replaces `manifestCache`
    * wholesale so the next `getManifest()` is a Map lookup.
    */
-  async refreshManifest(signal: AbortSignal): Promise<DocumentManifest> {
+  async refreshManifest(signal: AbortSignal): Promise<CloudManifest> {
     const promise = this.startManifestFetch({ allowInitialHead: false });
     return awaitSignal(promise, signal);
   }
@@ -569,7 +581,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         ? { annotationsVersion: delta.annotationsVersion }
         : {}),
       ...(delta?.formsVersion !== undefined ? { formsVersion: delta.formsVersion } : {}),
-      // The plane pins a page-structure, metadata, attachment, outline or font write bumps:
+      // The plane pins a page-structure, metadata, attachment, outline, font or content write bumps:
       // absorbed so the next read addresses the fresh leaf.
       ...(delta?.layoutVersion !== undefined ? { layoutVersion: delta.layoutVersion } : {}),
       ...(delta?.metadataVersion !== undefined ? { metadataVersion: delta.metadataVersion } : {}),
@@ -578,6 +590,10 @@ export class CloudDocumentHandle implements DocumentHandle {
         : {}),
       ...(delta?.outlineVersion !== undefined ? { outlineVersion: delta.outlineVersion } : {}),
       ...(delta?.fontsVersion !== undefined ? { fontsVersion: delta.fontsVersion } : {}),
+      ...(delta?.contentsVersion !== undefined ? { contentsVersion: delta.contentsVersion } : {}),
+      ...(delta?.viewportsVersion !== undefined
+        ? { viewportsVersion: delta.viewportsVersion }
+        : {}),
       // The signing fences: every ordinary commit writes an artifact
       // (`working`), and the layer's write serial when the delta names it.
       ...(delta?.layerVersion !== undefined ? { layerVersion: delta.layerVersion } : {}),
@@ -630,7 +646,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.manifestCache = null;
   }
 
-  private startManifestFetch(opts: { allowInitialHead: boolean }): Promise<DocumentManifest> {
+  private startManifestFetch(opts: { allowInitialHead: boolean }): Promise<CloudManifest> {
     const ctrl = new AbortController();
     const promise = this.fetchManifest(ctrl.signal, opts);
     this.inflightManifest = promise;
@@ -656,7 +672,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   private async fetchManifest(
     signal: AbortSignal,
     opts: { allowInitialHead: boolean },
-  ): Promise<DocumentManifest> {
+  ): Promise<CloudManifest> {
     if (this.closed) {
       throw new EngineError(EngineErrorCode.DocNotOpen, `document ${this.id} is closed`);
     }
@@ -689,12 +705,31 @@ export class CloudDocumentHandle implements DocumentHandle {
     return head;
   }
 
-  private fetchManifestForHead(head: DocumentHead, signal: AbortSignal): Promise<DocumentManifest> {
-    return this.http.getJson(
-      wirePaths.layerManifest(this.id, this.layerName, head.docVersion),
+  private async fetchManifestForHead(
+    head: DocumentHead,
+    signal: AbortSignal,
+  ): Promise<CloudManifest> {
+    const manifest = await this.http.getJson(
+      wirePaths.layerManifest(
+        this.id,
+        this.layerName,
+        head.docVersion,
+        tokenPinOf('manifest', head.engine),
+      ),
       (raw) => DocumentManifestSchema.parse(raw),
       signal,
     );
+    return { ...manifest, engine: head.engine };
+  }
+
+  /**
+   * The server answered a cached read with another engine value than its
+   * URL named: its values moved (its fonts, a rule, another replica during a
+   * deploy). Read `/head` again before the next cached read.
+   */
+  private forgetEngineValues(): void {
+    this.inflightManifest = null;
+    this.manifestCache = null;
   }
 
   close(): AbortablePromise<void> {
@@ -702,6 +737,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       return AbortablePromise.resolveValue<void>(undefined);
     }
     this.closed = true;
+    this.stopEngineWatch();
     this.sseClient?.close();
     this.sseClient = null;
     this.manifestCache = null;
@@ -720,7 +756,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       // already seen, else the cached manifest's transactional auditHead.
       // Null (cold start, no manifest yet) subscribes "from now", which is
       // exact too: the first manifest fetched afterwards is newer anyway.
-      initialCursor: this.hub.lastServerId() ?? this.manifestCache?.auditHead ?? null,
+      initialCursor: this.hub.lastServerSequence() ?? this.manifestCache?.auditHead ?? null,
       onRow: (row) => {
         // Advance the cached manifest's audit cursor — own echoes and
         // unknown kinds included — so a later `annotations.list()` never stamps a
@@ -731,13 +767,13 @@ export class CloudDocumentHandle implements DocumentHandle {
         // A change this connection may not read: the server sent only its
         // pins, absorbed so reads stay warm. Which family it changed is part
         // of what was withheld, so both planes flip: never wrong, only
-        // unshared until the next manifest.
+        // unshared until the next manifest. Its one event, when its pins
+        // moved the font list's, is `fonts.changed`, published below.
         if (row.withheld) {
           const meta = (row.payload as { meta?: MutationMeta } | null)?.meta;
           if (meta && row.originSessionId !== this.sessionId) {
             this.absorbMutation(meta, ['annotations', 'forms']);
           }
-          return;
         }
         // A new version, this handle's own included: in stream order, before
         // the `session` event that hands out its fresh numbers.
@@ -759,7 +795,11 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.inflightManifest = null;
         // Tell subscribers their event-derived state may be stale — the
         // gap's mutations will never arrive as events.
-        this.hub.publish({ type: 'stream.desynced', reason: 'backlog-overflow', ts: Date.now() });
+        this.hub.publish({
+          type: 'stream.desynced',
+          reason: 'backlog-overflow',
+          at: new Date().toISOString(),
+        });
       },
       onAuthLost: () => {
         // The stream is gone for good under this credential. Local events
@@ -789,7 +829,8 @@ export class CloudDocumentHandle implements DocumentHandle {
   private absorbRemoteEvent(event: DocumentEvent): void {
     switch (event.type) {
       case 'pages.scaleSet':
-        this.absorbMutation(event.meta, []);
+        // The layout carries the pages' scales.
+        this.absorbMutation(event.meta, ['layout']);
         return;
       case 'annotations.created':
       case 'annotations.updated':
@@ -867,6 +908,10 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'signatures.cancelled':
         // Moves no pin a read uses, as an own cancel absorbs nothing.
         return;
+      case 'fonts.changed':
+        // Ends a row whose own events, or its withheld pins, absorbed the
+        // font list's pin already.
+        return;
       case 'stream.desynced':
         // The stream's own handler dropped the manifest already.
         return;
@@ -879,14 +924,14 @@ export class CloudDocumentHandle implements DocumentHandle {
 function fallbackUnknownHead(id: string): DocumentHead {
   return {
     id,
-    baseSha: '',
-    storageSizeBytes: 0,
+    baseSha256: '',
+    sizeBytes: 0,
     docVersion: 1,
     state: 'ready',
     encryption: { state: 'unknown', requiresPassword: null },
     permissions: {
       known: false,
-      bits: null,
+      flags: null,
       allAllowed: null,
       openedAs: null,
       securityHandlerRevision: null,
@@ -897,5 +942,6 @@ function fallbackUnknownHead(id: string): DocumentHead {
       reasons: ['permissions-unknown'],
       endpoint: wirePaths.access(id, DEFAULT_LAYER_NAME),
     },
+    engine: {},
   };
 }

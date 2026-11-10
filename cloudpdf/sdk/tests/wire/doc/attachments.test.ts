@@ -16,8 +16,8 @@ describe("AttachmentsClient", () => {
                     name: "name",
                     mimeType: "mimeType",
                     description: "description",
-                    size: 1,
-                    checksum: "checksum",
+                    sizeBytes: 1,
+                    md5: "md5",
                     createdAt: "2024-01-15T09:30:00Z",
                     modifiedAt: "2024-01-15T09:30:00Z",
                     index: 1,
@@ -44,7 +44,7 @@ describe("AttachmentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

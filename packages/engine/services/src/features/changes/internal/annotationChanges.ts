@@ -46,6 +46,10 @@ import {
 } from '../../annotations/internal/identity/resolveAnnotIndexRaw';
 import { annotationMutationMeta } from '../../annotations/internal/mutations/annotationMutationMeta';
 import {
+  annotationIndexByName,
+  nameTakenError,
+} from '../../annotations/internal/read/annotationIndexByName';
+import {
   applyReorder,
   familyOrder,
   planReorder,
@@ -133,12 +137,13 @@ export function importAnnotations(ctx: ChangeContext, op: AnnotationImportOp): D
       authorizeCreate: (draft) => {
         authorizeUnprotected(ctx.authority, annotationWriteCapability(draft.subtype));
         // A restoring import writes attribution that isn't the caller's,
-        // under the rights checked above; a copy is the caller's own create.
+        // under the rights checked above; a copy is the caller's own create,
+        // and an item in no group goes in the caller's (see `attributionOf`).
         if (!rights) {
           authorizeAnnotationCreate(
             ctx.authority,
             draft.subtype,
-            (draft as { groupId?: string | null }).groupId,
+            (draft as { groupId?: string | null }).groupId ?? undefined,
           );
         }
       },
@@ -227,7 +232,26 @@ export function updateAnnotation(
   }
   authorizeUnprotected(ctx.authority, annotationWriteCapability(current.subtype));
   assertExpected(opIndex, current, op.expect);
+  assertNewNameFree(ctx, current, op.patch.nm);
   return writeUpdate(ctx, op.ref, op.patch, 'annotations.update', op.resources);
+}
+
+/**
+ * A new name must be free on the annotation's page (ISO 32000-2 §12.5.2),
+ * checked against the page as the change's earlier ops left it. Only an op
+ * checks it: an undo puts back the name an annotation had, as the undo of a
+ * delete brings back the deleted one's.
+ */
+export function assertNewNameFree(
+  ctx: ChangeContext,
+  current: Annotation<PdfCoordinates>,
+  nm: string | null | undefined,
+): void {
+  if (!nm || nm === current.nm) return;
+  const record = ctx.session.resolvePageRef(current.ref.page);
+  if (annotationIndexByName(ctx.runtime, ctx.session.requireDocPtr(), record.pageIndex, nm) >= 0) {
+    throw nameTakenError(nm, record.pageObjectNumber);
+  }
 }
 
 /** `annotations.delete`; its reverse brings back everything it removed. */
@@ -485,7 +509,7 @@ function authorizeReorder(
   }
 }
 
-/** A reorder's item: the family's new order on the page, and the rows that moved. */
+/** A reorder's item: the kind's new order on the page, and the rows that moved. */
 function reorderItem(
   ctx: ChangeContext,
   family: AnnotationFamily,
@@ -530,7 +554,7 @@ export function writeUpdate(
   const before = readAnnotation(ctx, ref);
   const written =
     before.subtype === 'widget'
-      ? fitWidgetToFamily(before.fieldFamily, patch as WidgetPatch<PdfCoordinates>)
+      ? fitWidgetToFamily(before.fieldKind, patch as WidgetPatch<PdfCoordinates>)
       : patch;
   const linked = linkedTo(before, written).map((other) => ({
     objectNumber: objectNumberOf(ctx, other),
@@ -621,7 +645,7 @@ function writeDelete(ctx: ChangeContext, ref: AnnotationRef, rights?: StepRights
       {
         kind: 'annotation.restore',
         page: ref.page,
-        members: result.meta.changed,
+        members: result.meta.changedRefs,
         capture,
         unlinked: captureAfter(ctx.runtime, ctx.session, pending),
         ...(rights ? { rights } : {}),
@@ -633,7 +657,7 @@ function writeDelete(ctx: ChangeContext, ref: AnnotationRef, rights?: StepRights
 /**
  * The value fallback of an update: the fields it changed, their old values,
  * and the values it left. Fields the patch named whose value stayed are not
- * changes.
+ * changes; a `subtype` it changed to a sibling kind is one.
  */
 function valuesChanged(
   before: Annotation<PdfCoordinates>,
@@ -642,9 +666,7 @@ function valuesChanged(
 ): RevertFallback {
   const was = before as unknown as Record<string, unknown>;
   const is = after as unknown as Record<string, unknown>;
-  const keys = Object.keys(patch).filter(
-    (key) => key !== 'subtype' && !valuesEqual(was[key], is[key]),
-  );
+  const keys = Object.keys(patch).filter((key) => !valuesEqual(was[key], is[key]));
   return {
     kind: 'annotation',
     restore: Object.fromEntries(

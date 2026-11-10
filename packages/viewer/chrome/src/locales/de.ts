@@ -71,6 +71,7 @@ export const de: Locale = {
         group: 'Bildlauf',
         vertical: 'Vertikal',
         horizontal: 'Horizontal',
+        paged: 'Seitenweise',
       },
       rotate: {
         group: 'Drehen',
@@ -114,6 +115,13 @@ export const de: Locale = {
         copy: 'Kopieren',
         strip: 'Aktionen für Textauswahl',
       },
+      snapshot: {
+        tool: 'Schnappschuss erstellen',
+        copy: 'Kopieren',
+        save: 'Bild speichern',
+        clear: 'Schnappschuss verwerfen',
+        strip: 'Aktionen für Schnappschuss',
+      },
       shapes: {
         rectangle: 'Rechteck',
         circle: 'Ellipse',
@@ -142,6 +150,7 @@ export const de: Locale = {
       redact: {
         mark: 'Zum Schwärzen markieren',
         applyAll: 'Schwärzungen anwenden',
+        apply: { one: 'Schwärzung anwenden', other: '{count} Schwärzungen anwenden' },
         clearAll: 'Markierungen löschen',
       },
       undo: 'Rückgängig',
@@ -161,6 +170,7 @@ export const de: Locale = {
         'doc-annotate-modify': 'Ändern von Anmerkungen ist nicht zulässig',
         'doc-annotate-read': 'Anzeigen von Anmerkungen ist nicht zulässig',
         'doc-attachments-modify': 'Das Hinzufügen von Dateien ist nicht erlaubt',
+        'doc-content-copy': 'Schnappschüsse sind nicht zulässig',
         'doc-download': 'Herunterladen ist nicht zulässig',
         'doc-forms-modify': 'Bearbeiten von Formularfeldern ist nicht zulässig',
         'doc-outline-modify': 'Das Ändern der Lesezeichen ist nicht erlaubt',
@@ -347,6 +357,7 @@ export const de: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'Typ',
         opacity: 'Deckkraft',
         stroke: 'Kontur',
         fill: 'Füllung',
@@ -494,7 +505,7 @@ export const de: Locale = {
       lineStart: 'Anfang',
       lineEnd: 'Ende',
       empty: 'Wählen Sie ein Zeichenwerkzeug oder eine Anmerkung aus, um den Stil zu bearbeiten.',
-      selected: '{count} ausgewählt',
+      selected: { one: '{count} ausgewählt', other: '{count} ausgewählt' },
       toolDefaults: 'Standardwerte: {tool}',
       defaults: 'Standardwerte',
       fontGroups: {
@@ -517,20 +528,6 @@ export const de: Locale = {
         other: 'Darin kann kein neuer Text geschrieben werden',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Kennzeichen (/F)',
-      print: 'Beim Drucken der Seite mitdrucken',
-      hidden: 'Überall ausgeblendet: Bildschirm, Klicks, Druck',
-      noView: 'Auf dem Bildschirm ausgeblendet, kann gedruckt werden',
-      toggleNoView: 'Nicht angezeigte Anmerkung einblenden, solange sie ausgewählt ist',
-      readOnly: 'Sichtbar, aber nicht anklickbar',
-      locked: 'Kein Verschieben / Skalieren / Löschen / Umgestalten',
-      lockedContents: 'Text nicht änderbar; Geometrie schon',
-      noZoom: 'Konstante Bildschirmgröße (oben links verankert)',
-      noRotate: 'Bleibt aufrecht, wenn die Seite gedreht wird',
-      invisible: 'Veraltet: unbekannte Untertypen ausblenden',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Anhänge werden geladen…',
@@ -540,8 +537,7 @@ export const de: Locale = {
       dropHint: 'Oder Dateien hier ablegen',
       adding: 'Wird hinzugefügt…',
       onPage: 'Seite {page}',
-      count: '{count} Datei',
-      countPlural: '{count} Dateien',
+      count: { one: '{count} Datei', other: '{count} Dateien' },
     },
     outline: {
       filter: 'Lesezeichen filtern',
@@ -595,10 +591,9 @@ export const de: Locale = {
       retry: 'Erneut versuchen',
       empty: 'Noch keine Kommentare. Beginnen Sie mit dem Notiz-Werkzeug eine Diskussion.',
       emptyReadOnly: 'Dieses Dokument enthält keine Kommentare.',
-      anonymous: 'Unbekannt',
+      anonymous: 'Gast',
       page: 'Seite {page}',
-      count: '{count} Kommentar',
-      countPlural: '{count} Kommentare',
+      count: { one: '{count} Kommentar', other: '{count} Kommentare' },
       reply: 'Antworten',
       replyPlaceholder: 'Antworten…',
       addPlaceholder: 'Kommentar hinzufügen…',
@@ -625,7 +620,7 @@ export const de: Locale = {
       searchWholeWord: 'Nur ganze Wörter',
       searchRegex: 'Regulärer Ausdruck',
       searchSearching: 'Suche läuft…',
-      searchResults: '{count} Treffer gefunden',
+      searchResults: { one: '{count} Treffer gefunden', other: '{count} Treffer gefunden' },
       searchNoResults: 'Keine Treffer',
       searchPrevious: 'Vorheriger Treffer',
       searchNext: 'Nächster Treffer',
@@ -641,10 +636,16 @@ export const de: Locale = {
       redactionArea: 'Bereichsmarkierung',
       redactionText: 'Textmarkierung',
       redactionRemove: 'Markierung entfernen',
-      redactConfirmTitle: 'Schwärzungen anwenden?',
-      redactConfirmBody:
-        'Inhalt unter den Schwärzungsmarkierungen ({count}) endgültig entfernen. Dies kann nicht rückgängig gemacht werden.',
-      redactConfirmCollateral: 'Außerdem werden weitere Anmerkungen entfernt: {count}.',
+      redactConfirmTitle: { one: 'Schwärzung anwenden?', other: 'Schwärzungen anwenden?' },
+      redactConfirmBody: {
+        one: 'Inhalt unter {count} Schwärzungsmarkierung endgültig entfernen. Dies kann nicht rückgängig gemacht werden.',
+        other:
+          'Inhalt unter {count} Schwärzungsmarkierungen endgültig entfernen. Dies kann nicht rückgängig gemacht werden.',
+      },
+      redactConfirmCollateral: {
+        one: 'Außerdem wird {count} weitere Anmerkung entfernt.',
+        other: 'Außerdem werden {count} weitere Anmerkungen entfernt.',
+      },
       redactApply: 'Anwenden',
       redactApplying: 'Wird angewendet…',
       formatLabel: 'Format',

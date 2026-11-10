@@ -11,8 +11,8 @@
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/core';
 // What a page with a viewer needs from the browser: handing bytes to the user as a download,
-// and a font the engine draws with, for text you draw yourself.
-export { saveFile } from '@embedpdf/web';
+// an image to the clipboard, and a font the engine draws with, for text you draw yourself.
+export { copyImage, saveFile } from '@embedpdf/web';
 // The page context every layer draws through; its conversions are shared with every framework.
 export { makePageContext } from '@embedpdf/web';
 // A theme written with setting names, as the style for the element around a viewer.
@@ -67,12 +67,12 @@ import type { PageContext } from '@embedpdf/web';
 
 import { isDev } from './dev';
 
-const KernelCtx = createContext<Kernel | null>(null);
+const KernelReactContext = createContext<Kernel | null>(null);
 /** The document a subtree is bound to. null => use the active document. */
-const DocumentScopeCtx = createContext<string | null>(null);
+const DocumentScopeReactContext = createContext<string | null>(null);
 
 export function useKernel(): Kernel {
-  const kernel = useContext(KernelCtx);
+  const kernel = useContext(KernelReactContext);
   if (!kernel) throw new Error('useKernel must be used within <Viewer>/<EmbedPDF>');
   return kernel;
 }
@@ -88,7 +88,7 @@ export interface KernelProviderProps {
  * kernel; `<Viewer>` is the component that owns one.
  */
 export function KernelProvider({ kernel, children }: KernelProviderProps) {
-  return <KernelCtx.Provider value={kernel}>{children}</KernelCtx.Provider>;
+  return <KernelReactContext.Provider value={kernel}>{children}</KernelReactContext.Provider>;
 }
 
 export const shallowArray = <T,>(left: readonly T[], right: readonly T[]): boolean =>
@@ -128,7 +128,7 @@ export function useDocumentId(): string | null {
  * that needs the id itself uses {@link useDocumentId}.
  */
 export function useDocumentScope(): string | null {
-  return useContext(DocumentScopeCtx);
+  return useContext(DocumentScopeReactContext);
 }
 
 export interface DocumentScopeProps {
@@ -137,7 +137,9 @@ export interface DocumentScopeProps {
 }
 /** Bind a subtree to a specific document (panes, comparison). */
 export function DocumentScope({ id, children }: DocumentScopeProps) {
-  return <DocumentScopeCtx.Provider value={id}>{children}</DocumentScopeCtx.Provider>;
+  return (
+    <DocumentScopeReactContext.Provider value={id}>{children}</DocumentScopeReactContext.Provider>
+  );
 }
 
 export interface DocumentGateProps {
@@ -410,14 +412,15 @@ export interface ViewerProps {
    * value; open ones keep theirs. With the cloud engine the document's token
    * decides, and a share link takes it as the visitor's answers to what the
    * link asks.
+   * Left out or `null`: nobody.
    */
-  identity?: Identity;
+  identity?: Identity | null;
   /**
    * What the user may do, as permissions, in every document opened without a
-   * `scope` of its own (which replaces this one). Left out, they may do
+   * `scope` of its own (which replaces this one). Left out or `null`, they may do
    * everything. Changes reach the documents opened after them, as `identity`.
    */
-  scope?: readonly string[];
+  scope?: readonly string[] | null;
   /** The color every part without a color of its own follows. CSS `--epdf-accent` wins over it. */
   accent?: string;
   /** How pages look: `background` before the picture arrives, and the `shadow` under each page. */
@@ -585,9 +588,9 @@ export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
   }
   if (!boot.kernel) return null; // pre-effect first render only
   return (
-    <KernelCtx.Provider value={boot.kernel}>
+    <KernelReactContext.Provider value={boot.kernel}>
       {boot.phase === 'ready' ? children : (fallback ?? null)}
-    </KernelCtx.Provider>
+    </KernelReactContext.Provider>
   );
 });
 export const EmbedPDF = Viewer;
@@ -599,11 +602,11 @@ export const EmbedPDF = Viewer;
  */
 export type PageContextValue = PageContext<PageTransform, PageViewDemand>;
 
-const PageCtx = createContext<PageContextValue | null>(null);
-export const PageProvider = PageCtx.Provider;
+const PageReactContext = createContext<PageContextValue | null>(null);
+export const PageProvider = PageReactContext.Provider;
 
 export function usePage(): PageContextValue {
-  const context = useContext(PageCtx);
+  const context = useContext(PageReactContext);
   if (!context) throw new Error('usePage must be used inside <PageView> or a <Stage> page');
   return context;
 }

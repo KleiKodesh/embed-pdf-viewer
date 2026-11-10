@@ -2,7 +2,7 @@
 
 import type { BaseClientOptions, BaseRequestOptions } from "../../../../BaseClient.js";
 import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } from "../../../../BaseClient.js";
-import { mergeHeaders } from "../../../../core/headers.js";
+import { mergeHeaders, mergeOnlyDefinedHeaders } from "../../../../core/headers.js";
 import * as core from "../../../../core/index.js";
 import { mergeAdditionalBodyParameters } from "../../../../core/requestBody.js";
 import * as environments from "../../../../environments.js";
@@ -41,14 +41,14 @@ export class FoldersClient {
     public list(
         request: CloudPDF.ListFoldersRequest,
         requestOptions?: FoldersClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.FoldersList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.FoldersListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.ListFoldersRequest,
         requestOptions?: FoldersClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.FoldersList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.FoldersListResponse>> {
         const { tenantId, limit, cursor, parentId } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
@@ -59,6 +59,7 @@ export class FoldersClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -82,17 +83,26 @@ export class FoldersClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.FoldersList200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.FoldersListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -132,19 +142,20 @@ export class FoldersClient {
     public create(
         request: CloudPDF.FoldersCreateRequest,
         requestOptions?: FoldersClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.FoldersCreate200Response> {
+    ): core.HttpResponsePromise<CloudPDF.FoldersCreateResponse> {
         return core.HttpResponsePromise.fromPromise(this.__create(request, requestOptions));
     }
 
     private async __create(
         request: CloudPDF.FoldersCreateRequest,
         requestOptions?: FoldersClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.FoldersCreate200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.FoldersCreateResponse>> {
         const { tenantId, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -167,19 +178,31 @@ export class FoldersClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.FoldersCreate200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.FoldersCreateResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -215,19 +238,20 @@ export class FoldersClient {
     public get(
         request: CloudPDF.GetFoldersRequest,
         requestOptions?: FoldersClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.FoldersGet200Response> {
+    ): core.HttpResponsePromise<CloudPDF.FoldersGetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
     }
 
     private async __get(
         request: CloudPDF.GetFoldersRequest,
         requestOptions?: FoldersClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.FoldersGet200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.FoldersGetResponse>> {
         const { tenantId, folderId } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -247,15 +271,21 @@ export class FoldersClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.FoldersGet200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.FoldersGetResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -310,6 +340,7 @@ export class FoldersClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -339,11 +370,20 @@ export class FoldersClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -384,19 +424,20 @@ export class FoldersClient {
     public update(
         request: CloudPDF.FoldersUpdateRequest,
         requestOptions?: FoldersClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.FoldersUpdate200Response> {
+    ): core.HttpResponsePromise<CloudPDF.FoldersUpdateResponse> {
         return core.HttpResponsePromise.fromPromise(this.__update(request, requestOptions));
     }
 
     private async __update(
         request: CloudPDF.FoldersUpdateRequest,
         requestOptions?: FoldersClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.FoldersUpdate200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.FoldersUpdateResponse>> {
         const { tenantId, folderId, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -419,19 +460,31 @@ export class FoldersClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.FoldersUpdate200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.FoldersUpdateResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -450,7 +503,7 @@ export class FoldersClient {
     }
 
     /**
-     * Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.documentIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).
+     * Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.docIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).
      *
      * @param {CloudPDF.FoldersMoveIntoRequest} request
      * @param {FoldersClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -484,6 +537,7 @@ export class FoldersClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
+            mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1" }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -512,13 +566,25 @@ export class FoldersClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

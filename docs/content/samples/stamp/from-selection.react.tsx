@@ -38,7 +38,7 @@ const plugins = [
 
 // [!doc-source approvals]
 const approvals = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/approvals.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/approvals.pdf');
   return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -58,7 +58,7 @@ function SelectSeal() {
       .list()
       .filter((each) => each.nm === 'checked-frame' || each.nm === 'checked-text');
     if (found.length === 0) return;
-    annotation.selection.set(found.map((each) => each.ref));
+    annotation.selection.select(found.map((each) => each.ref));
     stage.reveal(found[0].page, { rect: found[0].rect });
   }, [annotation, stage, ready]);
 

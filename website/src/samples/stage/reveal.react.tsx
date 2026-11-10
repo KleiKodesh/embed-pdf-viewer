@@ -12,7 +12,7 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -80,13 +80,13 @@ function SpotPicker({
   const reveal = (index: number, revealZoom: RevealZoom) => {
     const spot = SPOTS[index];
     // The box lands about a third from the top, like a browser's find bar.
-    stage.reveal(spot.page, { rect: spot.rect, zoom: revealZoom, anchor: { y: 0.35 } });
+    stage.reveal(spot.page, { rect: spot.rect, zoom: revealZoom, align: { y: 0.35 } });
     onActive(index);
   };
 
   // Open on the first spot.
   useEffect(() => {
-    stage.reveal(SPOTS[0].page, { rect: SPOTS[0].rect, zoom: 'fit-width', anchor: { y: 0.35 } });
+    stage.reveal(SPOTS[0].page, { rect: SPOTS[0].rect, zoom: 'fit-width', align: { y: 0.35 } });
   }, [stage]);
 
   return (

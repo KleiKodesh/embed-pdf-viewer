@@ -71,6 +71,7 @@ export const pt: Locale = {
         group: 'Rolagem',
         vertical: 'Vertical',
         horizontal: 'Horizontal',
+        paged: 'Página por página',
       },
       rotate: {
         group: 'Girar',
@@ -114,6 +115,13 @@ export const pt: Locale = {
         copy: 'Copiar',
         strip: 'Ações de seleção de texto',
       },
+      snapshot: {
+        tool: 'Capturar instantâneo',
+        copy: 'Copiar',
+        save: 'Salvar imagem',
+        clear: 'Descartar instantâneo',
+        strip: 'Ações do instantâneo',
+      },
       shapes: {
         rectangle: 'Retângulo',
         circle: 'Círculo',
@@ -142,6 +150,11 @@ export const pt: Locale = {
       redact: {
         mark: 'Marcar para tarjar',
         applyAll: 'Aplicar tarjas',
+        apply: {
+          one: 'Aplicar tarja',
+          many: 'Aplicar {count} de tarjas',
+          other: 'Aplicar {count} tarjas',
+        },
         clearAll: 'Limpar marcações',
       },
       undo: 'Desfazer',
@@ -161,6 +174,7 @@ export const pt: Locale = {
         'doc-annotate-modify': 'Não é permitido alterar anotações',
         'doc-annotate-read': 'Não é permitido exibir anotações',
         'doc-attachments-modify': 'Não é permitido adicionar arquivos',
+        'doc-content-copy': 'Não é permitido capturar instantâneos',
         'doc-download': 'Não é permitido baixar',
         'doc-forms-modify': 'Não é permitido editar campos de formulário',
         'doc-outline-modify': 'Não é permitido alterar os marcadores',
@@ -346,6 +360,7 @@ export const pt: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'Tipo',
         opacity: 'Opacidade',
         stroke: 'Traço',
         fill: 'Preenchimento',
@@ -494,7 +509,11 @@ export const pt: Locale = {
       lineEnd: 'Fim',
       empty:
         'Escolha uma ferramenta de desenho ou selecione uma anotação para editar o estilo dela.',
-      selected: 'Selecionados: {count}',
+      selected: {
+        one: '{count} selecionada',
+        many: '{count} selecionadas',
+        other: '{count} selecionadas',
+      },
       toolDefaults: 'Padrões de {tool}',
       defaults: 'Padrões',
       fontGroups: {
@@ -517,20 +536,6 @@ export const pt: Locale = {
         other: 'Não é possível escrever texto novo nela',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Sinalizadores (/F)',
-      print: 'Incluir quando a página for impressa',
-      hidden: 'Some em todo lugar: tela, cliques, impressão',
-      noView: 'Oculta na tela, ainda pode ser impressa',
-      toggleNoView: 'Revelar uma anotação não exibida enquanto estiver selecionada',
-      readOnly: 'Visível, mas não clicável',
-      locked: 'Sem mover / redimensionar / excluir / mudar estilo',
-      lockedContents: 'O texto não pode mudar; a geometria pode',
-      noZoom: 'Tamanho constante na tela (ancorada no canto superior esquerdo)',
-      noRotate: 'Fica na vertical quando a página gira',
-      invisible: 'Legado: ocultar subtipos desconhecidos',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Carregando anexos…',
@@ -540,8 +545,7 @@ export const pt: Locale = {
       dropHint: 'Ou solte arquivos aqui',
       adding: 'Adicionando…',
       onPage: 'Página {page}',
-      count: '{count} arquivo',
-      countPlural: '{count} arquivos',
+      count: { one: '{count} arquivo', many: '{count} de arquivos', other: '{count} arquivos' },
     },
     outline: {
       filter: 'Filtrar marcadores',
@@ -595,10 +599,13 @@ export const pt: Locale = {
       retry: 'Tentar novamente',
       empty: 'Nenhum comentário ainda. Use a ferramenta de nota para iniciar uma discussão.',
       emptyReadOnly: 'Nenhum comentário neste documento.',
-      anonymous: 'Desconhecido',
+      anonymous: 'Convidado',
       page: 'Página {page}',
-      count: '{count} comentário',
-      countPlural: '{count} comentários',
+      count: {
+        one: '{count} comentário',
+        many: '{count} de comentários',
+        other: '{count} comentários',
+      },
       reply: 'Responder',
       replyPlaceholder: 'Responder…',
       addPlaceholder: 'Adicionar um comentário…',
@@ -625,7 +632,11 @@ export const pt: Locale = {
       searchWholeWord: 'Palavra inteira',
       searchRegex: 'Expressão regular',
       searchSearching: 'Pesquisando…',
-      searchResults: '{count} resultados encontrados',
+      searchResults: {
+        one: '{count} resultado encontrado',
+        many: '{count} de resultados encontrados',
+        other: '{count} resultados encontrados',
+      },
       searchNoResults: 'Nenhum resultado',
       searchPrevious: 'Resultado anterior',
       searchNext: 'Próximo resultado',
@@ -640,10 +651,22 @@ export const pt: Locale = {
       redactionArea: 'Marcação de área',
       redactionText: 'Marcação de texto',
       redactionRemove: 'Remover marcação',
-      redactConfirmTitle: 'Aplicar tarjas?',
-      redactConfirmBody:
-        'Remover permanentemente o conteúdo sob {count} marcações de tarja. Esta ação não pode ser desfeita.',
-      redactConfirmCollateral: '{count} outras anotações também serão removidas.',
+      redactConfirmTitle: {
+        one: 'Aplicar tarja?',
+        many: 'Aplicar tarjas?',
+        other: 'Aplicar tarjas?',
+      },
+      redactConfirmBody: {
+        one: 'Remover permanentemente o conteúdo sob {count} marcação de tarja. Esta ação não pode ser desfeita.',
+        many: 'Remover permanentemente o conteúdo sob {count} de marcações de tarja. Esta ação não pode ser desfeita.',
+        other:
+          'Remover permanentemente o conteúdo sob {count} marcações de tarja. Esta ação não pode ser desfeita.',
+      },
+      redactConfirmCollateral: {
+        one: '{count} outra anotação também será removida.',
+        many: '{count} de outras anotações também serão removidas.',
+        other: '{count} outras anotações também serão removidas.',
+      },
       redactApply: 'Aplicar',
       redactApplying: 'Aplicando…',
       formatLabel: 'Formato',

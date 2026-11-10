@@ -6,7 +6,7 @@ import type {
   AttachmentRef,
   ChangeItemType,
   CustomMetadataPatch,
-  FormFieldDTO,
+  FormField,
   FormFieldPatch,
   FormFieldValue,
   MetadataPatch,
@@ -16,6 +16,7 @@ import type {
   PageRef,
   PdfCoordinates,
   PdfDestination,
+  PdfMeasure,
   PdfRotation,
   WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -50,6 +51,7 @@ export type ReverseStep =
   | OutlineMoveStep
   | OutlineReopenStep
   | PageRotateStep
+  | PageScaleStep
   | PageReorderStep
   | PageRestoreStep
   | PageRemoveStep
@@ -178,9 +180,9 @@ export interface AnnotationReorderStep {
   readonly family: AnnotationFamily;
   /** The rows the reorder moved, in the order it was given them. */
   readonly refs: readonly AnnotationRef[];
-  /** The family's order before the reorder, bottom to top: where the rows go back to. */
+  /** The kind's order before the reorder, bottom to top: where the rows go back to. */
   readonly before: readonly AnnotationRef[];
-  /** The family's order it left. */
+  /** The kind's order it left. */
   readonly after: readonly AnnotationRef[];
 }
 
@@ -227,7 +229,7 @@ export interface FieldRemoveStep {
   readonly kind: 'field.remove';
   readonly objectNumber: number;
   /** The field as the change left it. */
-  readonly left: FormFieldDTO<PdfCoordinates>;
+  readonly left: FormField<PdfCoordinates>;
   /** The rights it takes beside `doc.forms.modify`: an import's (see {@link StepRights}). */
   readonly rights?: StepRights;
 }
@@ -326,6 +328,21 @@ export interface PageRotateStep {
   readonly pages: readonly number[];
   readonly rotation: PdfRotation;
   readonly left: PdfRotation;
+}
+
+/**
+ * Gives pages `measure` as their own scale (`null`: none): the reverse of a
+ * scale change, and, the other way round, its redo. Each page changes only
+ * while it still has the scale the change left it with (`left`). Both are in
+ * the file's coordinates. A change that found several scales, or pages of
+ * several sizes, has one step for each.
+ */
+export interface PageScaleStep {
+  readonly kind: 'pages.setScale';
+  /** The pages, by object number. */
+  readonly pages: readonly number[];
+  readonly measure: PdfMeasure | null;
+  readonly left: PdfMeasure | null;
 }
 
 /**

@@ -12,7 +12,7 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), searchPlugin()];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -34,7 +34,7 @@ function Hits() {
             <button
               type="button"
               className="hit"
-              onClick={() => stage.reveal(hit.page, { rect: hit.bounds, anchor: { y: 0.35 } })}
+              onClick={() => stage.reveal(hit.page, { rect: hit.bounds, align: { y: 0.35 } })}
             >
               <span className="where">page {hit.pageIndex + 1}</span>
               <code className="rect">

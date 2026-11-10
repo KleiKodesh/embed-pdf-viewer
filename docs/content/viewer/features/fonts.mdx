@@ -18,8 +18,8 @@ The style panel's font picker offers every font text can be written in, in three
 
 | Group | The fonts |
 | :-- | :-- |
-| In this document | The fonts the PDF already has |
-| Your fonts | The ones you give the viewer, and the engine's own |
+| In this document | The PDF's own fonts that new text can be written in |
+| Your fonts | The ones you give the viewer or its engine |
 | Standard | Helvetica, Times and Courier, which every PDF app has |
 
 </Engine>
@@ -28,14 +28,15 @@ The style panel's font picker offers every font text can be written in, in three
 
 | Group | The fonts |
 | :-- | :-- |
-| In this document | The fonts the PDF already has |
+| In this document | The PDF's own fonts that new text can be written in |
 | Server fonts | Your server's fonts |
 | Standard | Helvetica, Times and Courier, which every PDF app has |
 
 </Engine>
 
-Most PDFs carry only the characters their text uses, so their fonts can't be used for new text.
-Such a font shows greyed, with why, and a box that has it keeps it.
+Most PDFs carry only the characters their text uses, so their fonts can't be used for new text, and
+the picker doesn't offer them. A box that already has such a font keeps it: the picker shows it as
+the box's font, greyed, with why it can't be chosen for another box.
 
 <Engine local>
 
@@ -83,7 +84,7 @@ A `fonts` setting in the viewer is ignored on the cloud, with a warning in the c
 ## Text in any language
 
 Hebrew and Arabic work with no setup: the engine fills them in from Noto Sans Hebrew and Noto Naskh
-Arabic.
+Arabic, whichever font a box is in. So the picker doesn't offer them.
 
 <Engine local>
 
@@ -107,8 +108,9 @@ For another script, such as Chinese, give your server a fallback font; see
 
 </Engine>
 
-A character no font has shows as a box, both while typing and in the PDF, so no text is lost
-without a trace.
+Latin always shows: a font without it, such as Noto Sans Hebrew, keeps its Latin in Helvetica, in
+the same weight. A character no font has shows as a box, both while typing and in the PDF, so no
+text is lost without a trace.
 
 ## Typed signatures
 

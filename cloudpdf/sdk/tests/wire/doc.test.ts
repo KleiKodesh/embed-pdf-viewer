@@ -11,20 +11,30 @@ describe("DocClient", () => {
 
         const rawResponseBody = {
             id: "id",
-            baseSha: "baseSha",
-            storageSizeBytes: 1,
+            baseSha256: "baseSha256",
+            sizeBytes: 1,
             docVersion: 1,
             state: "pending",
             encryption: { state: "unknown", requiresPassword: true },
             permissions: {
                 known: true,
-                bits: 1,
+                flags: {
+                    print: true,
+                    modifyContents: true,
+                    copy: true,
+                    modifyAnnotations: true,
+                    fillForms: true,
+                    copyForAccessibility: true,
+                    assemble: true,
+                    printHighQuality: true,
+                },
                 allAllowed: true,
                 openedAs: "none",
                 securityHandlerRevision: 1,
                 canUpgradeToOwner: true,
             },
             access: { required: true, reasons: ["password"], endpoint: "endpoint" },
+            engine: { key: "value" },
         };
 
         server
@@ -45,7 +55,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -120,7 +130,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { changes: [{ opId: "opId" }, { opId: "opId" }] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -151,7 +161,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { changes: [{ opId: "opId" }, { opId: "opId" }] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -182,7 +192,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { changes: [{ opId: "opId" }, { opId: "opId" }] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -213,7 +223,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { changes: [{ opId: "opId" }, { opId: "opId" }] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -244,7 +254,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { url: "url", expiresAt: 1.1 };
+        const rawResponseBody = { url: "url", expiresAt: "2024-01-15T09:30:00Z" };
 
         server
             .mockEndpoint()
@@ -266,7 +276,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -289,7 +299,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { name: "EngineError", code: "Unknown", message: "message" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -321,13 +331,14 @@ describe("DocClient", () => {
             annotationsVersion: 1,
             formsVersion: 1,
             outlineVersion: 1,
+            viewportsVersion: 1,
             fontsVersion: 1,
-            serverFonts: "serverFonts",
+            contentsVersion: 1,
             auditHead: 1,
-            baseSha: "baseSha",
+            baseSha256: "baseSha256",
             layerVersion: 1,
             working: true,
-            baseByteLength: 1,
+            baseSizeBytes: 1,
             scopes: {
                 content: "base",
                 annotations: "base",
@@ -341,7 +352,7 @@ describe("DocClient", () => {
             protection: {
                 enforced: "none",
                 judged: "none",
-                certification: { signatureIndex: 1, permission: 1.1 },
+                certification: { signatureIndex: 1, permission: 1 },
                 fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: { action: "all", fields: ["fields"] } }],
                 policyVersion: 1,
             },
@@ -372,7 +383,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -416,7 +427,7 @@ describe("DocClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

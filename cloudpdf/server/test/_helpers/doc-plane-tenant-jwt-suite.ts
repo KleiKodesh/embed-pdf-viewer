@@ -139,12 +139,12 @@ export function runDocPlaneTenantJwt(dialect: DocPlaneTenantJwtDialect): void {
     async function issueTenantKey(
       sub: string,
       scope: ReadonlyArray<string>,
-    ): Promise<{ token: string; jti: string; expiresAt: number }> {
+    ): Promise<{ token: string; jti: string; expiresAt: string }> {
       const issued = await call(API_TOKEN, 'POST', `/v1/tenants/${OWN_TENANT}/tokens`, {
         kind: 'tenant',
         sub,
         scope,
-        expiresIn: 30 * 24 * 60 * 60,
+        expiresInSeconds: 30 * 24 * 60 * 60,
       });
       expect(issued.status, JSON.stringify(issued.body)).toBe(200);
       return issued.body;
@@ -324,7 +324,7 @@ export function runDocPlaneTenantJwt(dialect: DocPlaneTenantJwtDialect): void {
           kind: 'tenant',
           sub: 'apikey:bogus',
           scope,
-          expiresIn: 3600,
+          expiresInSeconds: 3600,
         });
         expect(refused.status, JSON.stringify(scope)).toBe(400);
       }
@@ -339,7 +339,7 @@ export function runDocPlaneTenantJwt(dialect: DocPlaneTenantJwtDialect): void {
         API_TOKEN,
         'POST',
         `/v1/tenants/${OWN_TENANT}/tokens/${key.jti}/revoke`,
-        { reason: 'dashboard', expiresAtSeconds: key.expiresAt },
+        { reason: 'dashboard', expiresAt: key.expiresAt },
       );
       expect(revoked.status, JSON.stringify(revoked.body)).toBe(204);
       // The guard caches "not revoked" for a while; a fresh replica would not have.

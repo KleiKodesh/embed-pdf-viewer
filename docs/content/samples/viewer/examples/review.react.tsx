@@ -10,7 +10,7 @@ import {
 import './review.css';
 
 // [!doc-source proposal]
-const proposal = '/pdfs/proposal.pdf';
+const proposal = 'https://www.embedpdf.com/pdfs/proposal.pdf';
 // [!/doc-source]
 
 type Status = 'review' | 'approved' | 'changes';
@@ -88,16 +88,14 @@ const config: ViewerConfig<Review> = {
     },
   },
   // What a review doesn't need.
-  disable: [
-    'shapes',
-    'stamps',
-    'signatures',
-    'forms',
-    'redaction',
-    'measurement',
-    'attachments',
-    'pages',
-  ],
+  features: {
+    shapes: false,
+    stamps: false,
+    signatures: false,
+    forms: false,
+    attachments: false,
+    pages: false,
+  },
   // Deletions in red, suggestions in the review's own color.
   plugins: {
     annotation: {

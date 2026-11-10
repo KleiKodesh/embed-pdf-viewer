@@ -6,9 +6,9 @@ import { EpdfPdfViewer, type Viewer } from '@embedpdf/viewer-angular';
   imports: [EpdfPdfViewer],
   template: `
     <epdf-pdf-viewer
-      src="/report.pdf"
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
       theme="system"
-      [disable]="['forms']"
+      [features]="{ forms: false }"
       style="height: 100vh"
       (ready)="onReady($event)"
     />

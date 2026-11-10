@@ -13,7 +13,7 @@ import {
   useFormState,
   useFormValue,
 } from '@embedpdf/react/form';
-import type { FormFieldDTO } from '@embedpdf/react/form';
+import type { FormField } from '@embedpdf/react/form';
 import { localEngine } from '@embedpdf/engine';
 
 import './read.css';
@@ -22,7 +22,7 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin()];
 
 const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/forms.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/forms.pdf');
   return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -39,9 +39,9 @@ function useFilledInName() {
   }, [form, status]);
 }
 
-/** A field's value as text, whatever its family. */
-function valueText(field: FormFieldDTO): string {
-  switch (field.family) {
+/** A field's value as text, whatever its kind. */
+function valueText(field: FormField): string {
+  switch (field.kind) {
     case 'text':
     case 'combobox':
       return field.value || '—';
@@ -85,7 +85,7 @@ function FieldList() {
       {fields.map((field) => (
         <li key={field.name} className="field">
           <span className="field-name">
-            {field.name} <span className="family">{field.family}</span>
+            {field.name} <span className="kind">{field.kind}</span>
           </span>
           <span className="field-value">{valueText(field)}</span>
         </li>

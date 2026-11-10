@@ -16,11 +16,11 @@ import {
   standardCommands,
   withCommands,
 } from '@embedpdf/angular/commands';
-import type { CommandDef } from '@embedpdf/angular/commands';
+import type { CommandDefinition } from '@embedpdf/angular/commands';
 import { localEngine } from '@embedpdf/engine';
 
 // A command of your own: pressed while the pages show two at a time.
-const twoPages: CommandDef = {
+const twoPages: CommandDefinition = {
   id: 'layout:two-pages',
   label: 'Two pages',
   categories: ['layout'],
@@ -33,7 +33,7 @@ const twoPages: CommandDef = {
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/welcome.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]

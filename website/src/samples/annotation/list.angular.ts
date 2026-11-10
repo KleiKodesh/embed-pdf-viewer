@@ -24,7 +24,7 @@ import {
 import { localEngine } from '@embedpdf/engine';
 
 const proposal = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/proposal.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/proposal.pdf');
   return { kind: 'bytes', id: 'proposal', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -94,7 +94,7 @@ export class AnnotationList {
 
   protected show(each: Annotation) {
     this.stage().reveal(each.page, { rect: each.rect });
-    this.annotation.selection.set([each.ref]);
+    this.annotation.selection.select([each.ref]);
   }
 }
 

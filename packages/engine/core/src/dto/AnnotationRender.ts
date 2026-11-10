@@ -1,4 +1,5 @@
 import { EngineError } from '../errors/EngineError';
+import type { TokenPin } from '../wire/cachedReads';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type {
   PageImageHandle,
@@ -114,8 +115,8 @@ export interface AnnotationAppearanceImageOptions extends AnnotationAppearanceRe
 export interface AnnotationAppearancesQuery {
   options: AnnotationAppearanceImageOptions;
   annotationVersion?: number;
-  /** As {@link PageRenderQuery.serverFonts}: an appearance drawn here may use fallback fonts. */
-  serverFonts?: string;
+  /** As {@link PageRenderQuery.pin}. */
+  pin?: TokenPin;
 }
 
 /**
@@ -125,8 +126,8 @@ export interface AnnotationAppearancesQuery {
 export interface WidgetAppearancesQuery {
   options: AnnotationAppearanceImageOptions;
   widgetVersion?: number;
-  /** As {@link PageRenderQuery.serverFonts}. */
-  serverFonts?: string;
+  /** As {@link PageRenderQuery.pin}. */
+  pin?: TokenPin;
 }
 
 /**
@@ -219,7 +220,7 @@ export interface AnnotationAppearanceBatchEntry<C extends Coordinates = PageCoor
   width: number;
   height: number;
   format: PageNetworkRenderFormat;
-  contentType: string;
+  mimeType: string;
 }
 
 /**

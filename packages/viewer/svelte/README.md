@@ -12,7 +12,7 @@ npm install @embedpdf/viewer-svelte
   import { PDFViewer } from '@embedpdf/viewer-svelte';
 </script>
 
-<PDFViewer src="/report.pdf" style="height: 100vh" />
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" style="height: 100vh" />
 ```
 
 No engine or wasm configuration is needed: the built-in local engine (PDFium
@@ -35,7 +35,7 @@ state, your CSS:
   const layout = (layout: Layout) => layout.add({ custom: 'doc-picker' }, { to: 'main', section: 'start' });
 </script>
 
-<PDFViewer src="/report.pdf" {layout}>
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" {layout}>
   <ToolbarItem id="doc-picker"><DocPicker /></ToolbarItem>
 </PDFViewer>
 ```
@@ -46,7 +46,7 @@ state, your CSS:
 ## Driving the viewer
 
 ```svelte
-<PDFViewer src="/report.pdf" onready={(viewer) => viewer.commands.execute('zoom:in')} />
+<PDFViewer src="https://www.embedpdf.com/pdfs/welcome.pdf" onready={(viewer) => viewer.commands.execute('zoom:in')} />
 ```
 
 `onready` hands you the `viewer`: each plugin's API by its name
@@ -59,7 +59,7 @@ functions of `@embedpdf/svelte` work there too. `ondocumentchange` and
 a panel. When the viewer unmounts, its `viewer` is done: its listeners stop and
 its calls refuse.
 
-`src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their props
+`src`, `theme`, `locale`, `features`, `readOnly` and `fetch` follow their props
 while the viewer runs; every other prop is read once, so wrap the viewer in `{#key}` to
 start over with a changed one.
 

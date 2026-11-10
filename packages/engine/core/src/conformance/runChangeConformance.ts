@@ -7,6 +7,8 @@ import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
 import type { PageBox } from '../geometry/pageSpace';
+import { measureFromKnownLength } from '../measure/calibrate';
+import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import { toOutlineItemRef } from '../identity/OutlineItemRef';
@@ -43,6 +45,33 @@ export const CHANGE_FIXTURE_PDF = pdfOf([
   '<< /Length 0 >>\nstream\n\nendstream',
 ]);
 
+/**
+ * Annotation names as other tools leave them. The first page holds a square
+ * without a name (5); two squares named `dup` (6 and 7), the first with an
+ * optional content group, an appearance and a key the engine doesn't know;
+ * and a reply to it named `reply` (8). The second page holds a square named
+ * `elsewhere` (9).
+ */
+export const NAMES_FIXTURE_PDF = pdfOf([
+  '<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [11 0 R] /D << /Order [11 0 R] >> >> >>',
+  '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Contents 10 0 R /Resources << >> ' +
+    '/Annots [5 0 R 6 0 R 7 0 R 8 0 R] >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Contents 10 0 R /Resources << >> ' +
+    '/Annots [9 0 R] >>',
+  '<< /Type /Annot /Subtype /Square /Rect [20 200 80 260] /C [1 0 0] /P 3 0 R >>',
+  '<< /Type /Annot /Subtype /Square /Rect [100 200 160 260] /C [1 0 0] /NM (dup) /OC 11 0 R ' +
+    '/AP << /N 12 0 R >> /EPDFTest_Kept (yes) /P 3 0 R >>',
+  '<< /Type /Annot /Subtype /Square /Rect [180 200 240 260] /C [1 0 0] /NM (dup) /P 3 0 R >>',
+  '<< /Type /Annot /Subtype /Text /Rect [100 120 120 140] /Contents (Reply) /T (Bea) ' +
+    '/IRT 6 0 R /NM (reply) /P 3 0 R >>',
+  '<< /Type /Annot /Subtype /Square /Rect [20 200 80 260] /C [1 0 0] /NM (elsewhere) /P 4 0 R >>',
+  '<< /Length 0 >>\nstream\n\nendstream',
+  '<< /Type /OCG /Name (Review) >>',
+  '<< /Type /XObject /Subtype /Form /BBox [0 0 60 60] /Length 23 >>\n' +
+    'stream\n1 0 0 RG 0 0 60 60 re S\nendstream',
+]);
+
 /** A one-page PDF to draw into a signature field. */
 const SIGNATURE_ARTWORK_PDF = pdfOf([
   '<< /Type /Catalog /Pages 2 0 R >>',
@@ -64,8 +93,16 @@ const FILE_POPUP = at(7);
 const FILE_REPLY = at(8);
 const FILE_WIDGET = at(9);
 const NAME: FormFieldRef = { kind: 'fqn', name: 'name' };
+/** {@link NAMES_FIXTURE_PDF}'s annotations. */
+const UNNAMED = at(5);
+const DUP = at(6);
+const OTHER_DUP = at(7);
+const DUP_REPLY = at(8);
 
 const BLUE = '#0000ff';
+/** Two page scales: 72 points (an inch) are 2 m, and 72 points are 50 m. */
+const DRAWING_SCALE = measureFromKnownLength(72, { value: 2, unit: 'm' });
+const SITE_SCALE = measureFromKnownLength(72, { value: 50, unit: 'm' });
 /** A calculate script: a field with one is in the form's calculation order. */
 const CALCULATE = { type: 'javascript', script: 'event.value = 1;' } as const;
 const box = (x: number, y = 120): PageBox => ({ x, y, width: 40, height: 30 });
@@ -97,21 +134,28 @@ const embedNotes = (bytes: Uint8Array = NOTES): ChangeOp => ({
 const latin1 = (bytes: Uint8Array | ArrayBuffer): string =>
   new TextDecoder('latin1').decode(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
 
-/** The `/Count` of object `objectNumber` in a saved PDF, as its last version writes it. */
-const countIn = (pdf: string, objectNumber: number): number | null => {
+/** Object `objectNumber` in a saved PDF, as its last version writes it. */
+const objectIn = (pdf: string, objectNumber: number): string | null => {
   const versions = [...pdf.matchAll(new RegExp(`(?:^|[\\r\\n])${objectNumber} 0 obj`, 'g'))];
   const last = versions[versions.length - 1];
   if (!last) return null;
-  const body = pdf.slice(last.index, pdf.indexOf('endobj', last.index));
-  const count = /\/Count (-?\d+)/.exec(body);
+  return pdf.slice(last.index, pdf.indexOf('endobj', last.index));
+};
+
+/** The `/Count` of object `objectNumber` in a saved PDF, as its last version writes it. */
+const countIn = (pdf: string, objectNumber: number): number | null => {
+  const count = /\/Count (-?\d+)/.exec(objectIn(pdf, objectNumber) ?? '');
   return count ? Number(count[1]) : null;
 };
 
 export interface ChangeConformanceOptions {
   label: string;
   makeEngine: () => Promise<Engine> | Engine;
-  /** Open {@link CHANGE_FIXTURE_PDF}, fresh for each call, with write access. */
-  open: (engine: Engine) => Promise<DocumentHandle>;
+  /**
+   * Open `pdf`, {@link CHANGE_FIXTURE_PDF} when it's left out, fresh for each
+   * call, with write access.
+   */
+  open: (engine: Engine, pdf?: Uint8Array) => Promise<DocumentHandle>;
   /**
    * Open the document `doc` is on as another user, with write access. A local
    * session has one user, so without it the test of who may undo is skipped.
@@ -180,7 +224,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'text',
+          kind: 'text',
           name: 'email',
           // A calculate script also puts it in the calculation order.
           actions: { calculate: CALCULATE },
@@ -234,7 +278,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'text',
+          kind: 'text',
           name: 'email',
           widgets: [
             { page: PAGE, rect: { x: 20, y: 60, width: 140, height: 24 } },
@@ -253,7 +297,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       { type: 'forms.update', field: NAME, patch: { actions: { calculate: CALCULATE } } },
       {
         type: 'forms.create',
-        draft: { family: 'text', name: 'total', actions: { calculate: CALCULATE } },
+        draft: { kind: 'text', name: 'total', actions: { calculate: CALCULATE } },
         objectNumber: field,
       },
     ],
@@ -271,7 +315,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'text',
+          kind: 'text',
           name: 'email',
           widgets: [
             { page: PAGE, rect: { x: 20, y: 60, width: 140, height: 24 } },
@@ -305,7 +349,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'signature',
+          kind: 'signature',
           name: 'signature',
           widgets: [{ page: EMPTY_PAGE, rect: { x: 20, y: 100, width: 120, height: 40 } }],
         },
@@ -372,6 +416,11 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
   'pages.rotate': {
     ops: () => [{ type: 'pages.rotate', pages: [PAGE, EMPTY_PAGE], rotation: 90 }],
   },
+  'pages.setScale': {
+    // One page had a scale of its own and the other none: the undo puts each back.
+    setup: () => [{ type: 'pages.setScale', pages: [PAGE], measure: DRAWING_SCALE }],
+    ops: () => [{ type: 'pages.setScale', pages: [PAGE, EMPTY_PAGE], measure: SITE_SCALE }],
+  },
   'pages.reorder': {
     ops: () => [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'start' }],
   },
@@ -428,23 +477,23 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
  */
 export function runChangeConformance(
   runner: ConformanceTestRunner,
-  opts: ChangeConformanceOptions,
+  options: ChangeConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`change conformance: ${opts.label}`, () => {
+  describe(`change conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
       if (engine) await engine.destroy();
     });
 
-    const withDocument = async (body: (doc: DocumentHandle) => Promise<void>) => {
-      const doc = await opts.open(engine);
+    const withDocument = async (body: (doc: DocumentHandle) => Promise<void>, pdf?: Uint8Array) => {
+      const doc = await options.open(engine, pdf);
       try {
         await body(doc);
       } finally {
@@ -494,13 +543,21 @@ export function runChangeConformance(
       return found && 'color' in found ? found.color : undefined;
     };
 
+    /** The name `ref` reads. */
+    const nmOf = async (doc: DocumentHandle, ref: AnnotationRef) => {
+      const { annotations } = await doc.page(ref.page).annotations.list();
+      return annotations.find((annotation) => annotationKey(annotation.ref) === annotationKey(ref))
+        ?.nm;
+    };
+
     const recordEvents = (doc: DocumentHandle) => {
       const events: DocumentEvent[] = [];
       const stop = doc.events.subscribe((event) => events.push(event));
       return { events, stop };
     };
 
-    const txOf = (event: DocumentEvent) => ('origin' in event ? event.origin.tx : undefined);
+    const txOf = (event: DocumentEvent) =>
+      'origin' in event ? event.origin.transaction : undefined;
 
     /** The item of `type` a result holds, applied or left alone. */
     const itemOfType = <T extends ChangeItemType>(
@@ -734,6 +791,149 @@ export function runChangeConformance(
       });
     });
 
+    test('a new name is checked against the page as the ops before it left it', async () => {
+      await withDocument(async (doc) => {
+        await doc.apply({
+          ops: [
+            { type: 'annotations.update', ref: FILE_SQUARE, patch: { nm: 'a' } },
+            { type: 'annotations.update', ref: FILE_NOTE, patch: { nm: 'b' } },
+          ],
+        });
+        const before = await factsOf(doc);
+        // Swapped directly, the first op meets 'b' still on the note.
+        await expect(
+          doc.apply({
+            ops: [
+              { type: 'annotations.update', ref: FILE_SQUARE, patch: { nm: 'b' } },
+              { type: 'annotations.update', ref: FILE_NOTE, patch: { nm: 'a' } },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        expect(await factsOf(doc)).toEqual(before);
+        // Through a free name, each name is free when its op runs.
+        await doc.apply({
+          ops: [
+            { type: 'annotations.update', ref: FILE_SQUARE, patch: { nm: 'free' } },
+            { type: 'annotations.update', ref: FILE_NOTE, patch: { nm: 'a' } },
+            { type: 'annotations.update', ref: FILE_SQUARE, patch: { nm: 'b' } },
+          ],
+        });
+        expect(await nmOf(doc, FILE_SQUARE)).toBe('b');
+        expect(await nmOf(doc, FILE_NOTE)).toBe('a');
+      });
+    });
+
+    test('undo puts back the name a rename replaced, even one another annotation took since', async () => {
+      // Whether someone also wrote the square, which makes the undo go by value.
+      for (const squareWrittenSince of [false, true]) {
+        await withDocument(async (doc) => {
+          await doc.apply({
+            ops: [{ type: 'annotations.update', ref: FILE_SQUARE, patch: { nm: 'x' } }],
+          });
+          const mine = await doc.apply({
+            ops: [{ type: 'annotations.update', ref: FILE_SQUARE, patch: { nm: 'y' } }],
+          });
+          await doc.apply({
+            ops: [
+              { type: 'annotations.update', ref: FILE_NOTE, patch: { nm: 'x' } },
+              ...(squareWrittenSince
+                ? [
+                    {
+                      type: 'annotations.update' as const,
+                      ref: FILE_SQUARE,
+                      patch: { contents: 'Theirs' },
+                    },
+                  ]
+                : []),
+            ],
+          });
+          const undo = await doc.apply({ undoOf: mine.meta.opId });
+          expect(appliedOfType(undo, 'annotations.update').skipped).toBe(undefined);
+          expect(await nmOf(doc, FILE_SQUARE)).toBe('x');
+          expect(await nmOf(doc, FILE_NOTE)).toBe('x');
+        });
+      }
+    });
+
+    test('names missing or shared on a page are set in place; another page is no conflict', async () => {
+      await withDocument(async (doc) => {
+        const result = await doc.apply({
+          ops: [
+            { type: 'annotations.update', ref: UNNAMED, patch: { nm: 'repaired-missing' } },
+            { type: 'annotations.update', ref: OTHER_DUP, patch: { nm: 'elsewhere' } },
+          ],
+        });
+        expect(result.items.map((item) => item.type)).toEqual([
+          'annotations.update',
+          'annotations.update',
+        ]);
+        expect(await nmOf(doc, UNNAMED)).toBe('repaired-missing');
+        expect(await nmOf(doc, OTHER_DUP)).toBe('elsewhere');
+        expect(await nmOf(doc, DUP)).toBe('dup');
+      }, NAMES_FIXTURE_PDF);
+    });
+
+    test('a name another annotation on the page has is refused, and the change writes nothing', async () => {
+      await withDocument(async (doc) => {
+        const before = await factsOf(doc);
+        await expect(
+          doc.apply({
+            ops: [
+              { type: 'annotations.update', ref: OTHER_DUP, patch: { nm: 'free' } },
+              { type: 'annotations.update', ref: UNNAMED, patch: { nm: 'dup' } },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        expect(await factsOf(doc)).toEqual(before);
+      }, NAMES_FIXTURE_PDF);
+    });
+
+    test('a rename writes /NM on the same object: its reply, appearance and other keys stay', async () => {
+      await withDocument(async (doc) => {
+        const result = await doc.apply({
+          ops: [{ type: 'annotations.update', ref: DUP, patch: { nm: 'repaired' } }],
+        });
+        const update = appliedOfType(result, 'annotations.update');
+        expect(update.annotation.ref).toEqual(DUP);
+        expect(update.annotation.nm).toBe('repaired');
+        expect(update.appearance.changed).toBe(false);
+        const { annotations } = await doc.page(PAGE).annotations.list();
+        const reply = annotations.find(
+          (annotation) => annotationKey(annotation.ref) === annotationKey(DUP_REPLY),
+        );
+        expect(reply?.reply?.to).toEqual(DUP);
+        const square = objectIn(latin1(await doc.download()), 6) ?? '';
+        expect(square).toContain('/OC 11 0 R');
+        expect(square).toContain('/AP');
+        expect(square).toContain('/EPDFTest_Kept');
+      }, NAMES_FIXTURE_PDF);
+    });
+
+    test('a name sent back as it reads is no change, even a shared one; null removes it', async () => {
+      await withDocument(async (doc) => {
+        await doc.apply({
+          ops: [
+            { type: 'annotations.update', ref: DUP, patch: { nm: 'dup', contents: 'Checked' } },
+            { type: 'annotations.update', ref: OTHER_DUP, patch: { nm: null } },
+          ],
+        });
+        expect(await nmOf(doc, DUP)).toBe('dup');
+        expect(await nmOf(doc, OTHER_DUP)).toBe(null);
+      }, NAMES_FIXTURE_PDF);
+    });
+
+    test('the undo of a repaired name brings the shared name back', async () => {
+      await withDocument(async (doc) => {
+        const before = await factsOf(doc);
+        const repair = await doc.apply({
+          ops: [{ type: 'annotations.update', ref: OTHER_DUP, patch: { nm: 'repaired' } }],
+        });
+        await doc.apply({ undoOf: repair.meta.opId });
+        expect(await factsOf(doc)).toEqual(before);
+        expect(await nmOf(doc, OTHER_DUP)).toBe('dup');
+      }, NAMES_FIXTURE_PDF);
+    });
+
     test("undo of a field's properties puts back each one still holding what it set", async () => {
       await withDocument(async (doc) => {
         const mine = await doc.apply({
@@ -753,14 +953,14 @@ export function runChangeConformance(
         const undone = await doc.forms.get(NAME);
         expect(undone.required).toBe(false);
         expect(undone.noExport).toBe(false);
-        expect(undone.family === 'text' && undone.value).toBe('Bea');
+        expect(undone.kind === 'text' && undone.value).toBe('Bea');
 
         // The undo's undo makes it required again, and leaves the rest.
         await doc.apply({ undoOf: undo.meta.opId });
         const redone = await doc.forms.get(NAME);
         expect(redone.required).toBe(true);
         expect(redone.noExport).toBe(false);
-        expect(redone.family === 'text' && redone.value).toBe('Bea');
+        expect(redone.kind === 'text' && redone.value).toBe('Bea');
       });
     });
 
@@ -1236,12 +1436,12 @@ export function runChangeConformance(
     });
 
     test('only the user who made a change may undo it', async () => {
-      if (!opts.openAsAnotherUser) return;
+      if (!options.openAsAnotherUser) return;
       await withDocument(async (doc) => {
         const mine = await doc.apply({
           ops: [{ type: 'annotations.update', ref: FILE_SQUARE, patch: { color: '#e11d48' } }],
         });
-        const other = await opts.openAsAnotherUser!(engine, doc);
+        const other = await options.openAsAnotherUser!(engine, doc);
         try {
           await expect(other.apply({ undoOf: mine.meta.opId })).rejects.toMatchObject({
             code: EngineErrorCode.Forbidden,

@@ -27,7 +27,7 @@ const plugins = [
 ];
 
 const proposal = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/proposal.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/proposal.pdf');
   return { kind: 'bytes', id: 'proposal', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -75,7 +75,7 @@ function AnnotationList() {
               className="item"
               onClick={() => {
                 stage.reveal(each.page, { rect: each.rect });
-                annotation.selection.set([each.ref]);
+                annotation.selection.select([each.ref]);
               }}
             >
               <span className="kind">

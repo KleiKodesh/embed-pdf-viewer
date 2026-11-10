@@ -30,12 +30,26 @@ const READ_ONLY_GRANT = 'shr_WGj1goAtlNN_fQ5OswPrbJQM';
 const grantOf = (key) => CLOUD_GRANTS[key]?.grant ?? READ_ONLY_GRANT;
 
 /**
+ * Where each site serves the demo documents: `pdfs/build.mjs` writes the same files into both
+ * sites' `public/pdfs/`, each with its own brand's welcome. Docs code gives a document by its full
+ * URL on embedpdf.com, never a site-relative one, so code a reader copies opens it on their own
+ * page too; a flavor's copy names its own site (the sync's `swapDocumentSite`).
+ */
+export const DOCUMENT_SITES = {
+  local: 'https://www.embedpdf.com',
+  cloud: 'https://www.cloudpdf.com',
+};
+
+/** A demo document's file as docs code names it: its full URL on embedpdf.com. */
+const documentUrl = (file) => `${DOCUMENT_SITES.local}/pdfs/${file}`;
+
+/**
  * A document as the ready-made viewer's samples give it: the cloud viewer's `src` on cloudpdf.com,
  * and the URL embedpdf.com's copy gives it at (see `welcome`).
  */
 const viewerForms = (key) => ({
   viewerCloud: `{ grant: '${grantOf(key)}' }`,
-  viewerUrls: [`/pdfs/${key}.pdf`],
+  viewerUrls: [documentUrl(`${key}.pdf`)],
 });
 
 /** `const <name> = …` emitted for the cloud flavor of a headless sample: an engine open input. */
@@ -54,8 +68,21 @@ export const DEMO_DOCUMENTS = {
      * the sync fails on a grant in it that isn't one of these.
      */
     viewerCloud: `{ grant: '${grantOf('welcome')}' }`,
-    /** The demo file itself, and `/report.pdf`, the path the snippets give for a reader's own PDF. */
-    viewerUrls: ['/pdfs/welcome.pdf', '/report.pdf'],
+    /** The demo file: the samples open it, and the snippets give it where a reader's own PDF goes. */
+    viewerUrls: [documentUrl('welcome.pdf')],
+    /**
+     * Characters on the cover the samples select, in each site's welcome, by the name a
+     * `[!doc-range welcome <name>]` block gives: `text` is what they read. The brand's tagline
+     * comes before the title in the cover's text, and CloudPDF's is longer, so the title starts 8
+     * characters later on cloudpdf.com. The PDF build fails when a range no longer reads its text.
+     */
+    ranges: {
+      firstWord: {
+        text: 'Documents',
+        local: { start: 28, count: 9 },
+        cloud: { start: 36, count: 9 },
+      },
+    },
   },
   links: { cloudSource: cloudSource('links'), ...viewerForms('links') },
   forms: { cloudSource: cloudSource('forms'), ...viewerForms('forms') },
@@ -64,7 +91,23 @@ export const DEMO_DOCUMENTS = {
   layout: { cloudSource: cloudSource('layout'), ...viewerForms('layout') },
   notice: { cloudSource: cloudSource('notice'), ...viewerForms('notice') },
   approvals: { cloudSource: cloudSource('approvals'), ...viewerForms('approvals') },
-  article: { cloudSource: cloudSource('article'), ...viewerForms('article') },
+  article: {
+    cloudSource: cloudSource('article'),
+    ...viewerForms('article'),
+    /**
+     * Characters on the cover the samples select, by the name a `[!doc-range article <name>]`
+     * block gives: `text` is what they read. A made-up company's document is the same on both
+     * sites, so both read the same characters. The letterhead's "Engineering blog" comes before
+     * the title in the cover's text.
+     */
+    ranges: {
+      firstLine: {
+        text: 'How the first page of a large PDF',
+        local: { start: 18, count: 33 },
+        cloud: { start: 18, count: 33 },
+      },
+    },
+  },
   sketch: { cloudSource: cloudSource('sketch'), ...viewerForms('sketch') },
   invoice: { cloudSource: cloudSource('invoice'), ...viewerForms('invoice') },
   registration: { cloudSource: cloudSource('registration'), ...viewerForms('registration') },

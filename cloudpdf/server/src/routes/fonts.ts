@@ -25,6 +25,7 @@ import {
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   setImmutableCache,
   setNoStore,
 } from './_helpers';
@@ -42,8 +43,9 @@ const PRIVATE_IMMUTABLE_CACHE = 'private, max-age=31536000, immutable';
 
 /**
  * The fonts that can be named in a document (`doc.fonts`): the list, pinned
- * by the document's `fontsVersion` and the server's fonts' fingerprint
- * (`/fonts@{fontsVersion, serverFonts}`); a resolve, a read with a body; a
+ * by the document's `fontsVersion` and the fonts engine value, which the
+ * server's fonts are an input of (`/fonts@{engine, fontsVersion, shape}`); a
+ * resolve, a read with a body; a
  * program's facts and its bytes, content-addressed by its display hash; and a
  * served server font's bytes at one URL for every document. The list, the
  * resolve and a program's facts need `doc.open`; a program's bytes need a
@@ -62,8 +64,15 @@ export async function registerFontRoutes(app: FastifyInstance, deps: FontRouteDe
       'forms',
     ]);
     const requested = parseTokenOrInvalidArg(decodeFontsToken, token, 'fonts token');
-    assertCurrent(requested, await service.getManifest(ctx, docId), reply);
-    const list = await fontListIn(service, ctx, docId, undefined, abortSignalOf(reply));
+    const list = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName: undefined,
+      assertCurrent: async () => assertCurrent(requested, await service.getManifest(ctx, docId)),
+      read: () => fontListIn(service, ctx, docId, undefined, abortSignalOf(reply)),
+      token: { kind: 'fonts', pin: requested.pin },
+    });
     setImmutableCache(reply);
     return list;
   });
@@ -76,8 +85,16 @@ export async function registerFontRoutes(app: FastifyInstance, deps: FontRouteDe
     };
     const ctx = await layerRead(req, service, docId, layerName, 'layer-fonts');
     const requested = parseTokenOrInvalidArg(decodeFontsToken, token, 'fonts token');
-    assertCurrent(requested, await service.getLayerManifest(ctx, docId, layerName), reply);
-    const list = await fontListIn(service, ctx, docId, layerName, abortSignalOf(reply));
+    const list = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName,
+      assertCurrent: async () =>
+        assertCurrent(requested, await service.getLayerManifest(ctx, docId, layerName)),
+      read: () => fontListIn(service, ctx, docId, layerName, abortSignalOf(reply)),
+      token: { kind: 'fonts', pin: requested.pin },
+    });
     setImmutableCache(reply);
     return list;
   });
@@ -110,32 +127,32 @@ export async function registerFontRoutes(app: FastifyInstance, deps: FontRouteDe
     );
   });
 
-  app.get('/v1/docs/:docId/layers/:layerName/font-programs/:displayHash', async (req, reply) => {
-    const { docId, layerName, displayHash } = req.params as {
+  app.get('/v1/docs/:docId/layers/:layerName/font-programs/:displaySha256', async (req, reply) => {
+    const { docId, layerName, displaySha256 } = req.params as {
       docId: string;
       layerName: string;
-      displayHash: string;
+      displaySha256: string;
     };
     const ctx = await layerRead(req, service, docId, layerName, 'layer-font-programs');
-    const info = await programInfo(service, ctx, docId, layerName, displayHash, reply);
+    const info = await programInfo(service, ctx, docId, layerName, displaySha256, reply);
     setImmutableCache(reply);
     return info;
   });
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/font-program-files/:displayHash',
+    '/v1/docs/:docId/layers/:layerName/font-program-files/:displaySha256',
     async (req, reply) => {
-      const { docId, layerName, displayHash } = req.params as {
+      const { docId, layerName, displaySha256 } = req.params as {
         docId: string;
         layerName: string;
-        displayHash: string;
+        displaySha256: string;
       };
       const ctx = await mayWriteText(req, service, docId, layerName);
       const signal = abortSignalOf(reply);
-      const builtIn = loadBuiltInProgram(displayHash);
+      const builtIn = loadBuiltInProgram(displaySha256);
       const bytes = builtIn
         ? await builtIn
-        : await documentProgramBytes(service, ctx, docId, layerName, displayHash, signal, reply);
+        : await documentProgramBytes(service, ctx, docId, layerName, displaySha256, signal, reply);
       return sendProgram(reply, bytes);
     },
   );
@@ -144,14 +161,14 @@ export async function registerFontRoutes(app: FastifyInstance, deps: FontRouteDe
   // keeps one copy: for a document token that may write text in its own
   // document, and for a tenant token or the API token, which own every
   // document. A font not served is not found.
-  app.get('/v1/font-program-files/:displayHash', async (req, reply) => {
-    const { displayHash } = req.params as { displayHash: string };
+  app.get('/v1/font-program-files/:displaySha256', async (req, reply) => {
+    const { displaySha256 } = req.params as { displaySha256: string };
     const claims = req.tenant?.claims;
     if (claims && isDocUserClaims(claims)) {
       await mayWriteText(req, service, claims.doc_id, claims.layer_name ?? 'default');
     }
     const bytes = await notFoundUncached(reply, () =>
-      service.serverFonts.programData(displayHash, abortSignalOf(reply)),
+      service.serverFonts.programData(displaySha256, abortSignalOf(reply)),
     );
     return sendProgram(reply, bytes);
   });
@@ -166,8 +183,8 @@ async function layerRead(
   resource: 'layer-fonts' | 'layer-font-programs',
 ): Promise<OpenContext> {
   const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-  const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
-  return requireLayerResource(req, docId, layerName, resource, pdfBits);
+  const permissionFlags = await service.getEffectivePermissionFlags(accessCtx, docId, layerName);
+  return requireLayerResource(req, docId, layerName, resource, permissionFlags);
 }
 
 /**
@@ -182,14 +199,14 @@ async function mayWriteText(
   layerName: string,
 ): Promise<OpenContext> {
   const ctx = requireLayerDocAccessOnly(req, docId, layerName);
-  const pdfBits = await service.getEffectivePdfBits(ctx, docId, layerName);
+  const permissionFlags = await service.getEffectivePermissionFlags(ctx, docId, layerName);
   const protection = await service.getProtection(ctx, docId, layerName);
   const allowed =
     ctx.mode === 'tenant'
       ? TEXT_WRITING_CAPABILITIES.some(
           (capability) => !protectedCapabilities(protection).has(capability),
         )
-      : checkAnyCapability(TEXT_WRITING_CAPABILITIES, ctx.jwt.scope, pdfBits, protection);
+      : checkAnyCapability(TEXT_WRITING_CAPABILITIES, ctx.jwt.scope, permissionFlags, protection);
   if (!allowed) {
     throw new PermissionDenied(TEXT_WRITING_CAPABILITIES[0], undefined, TEXT_WRITING_CAPABILITIES);
   }
@@ -213,20 +230,20 @@ async function programInfo(
   ctx: OpenContext,
   docId: string,
   layerName: string,
-  displayHash: string,
+  displaySha256: string,
   reply: FastifyReply,
 ): Promise<FontProgramInfo> {
-  const builtIn = builtInProgramInfo(displayHash);
+  const builtIn = builtInProgramInfo(displaySha256);
   if (builtIn) return builtIn;
   const signal = abortSignalOf(reply);
   const program = await notFoundUncached(reply, async () =>
-    listedProgram(await fontListIn(service, ctx, docId, layerName, signal), displayHash),
+    listedProgram(await fontListIn(service, ctx, docId, layerName, signal), displaySha256),
   );
   const info = await service.readLayerFontProgram(
     ctx,
     docId,
     layerName,
-    displayHash,
+    displaySha256,
     'info',
     signal,
   );
@@ -238,18 +255,18 @@ async function documentProgramBytes(
   ctx: OpenContext,
   docId: string,
   layerName: string,
-  displayHash: string,
+  displaySha256: string,
   signal: AbortSignal,
   reply: FastifyReply,
 ): Promise<Uint8Array> {
   await notFoundUncached(reply, async () =>
-    downloadableProgram(await fontListIn(service, ctx, docId, layerName, signal), displayHash),
+    downloadableProgram(await fontListIn(service, ctx, docId, layerName, signal), displaySha256),
   );
   const program = await service.readLayerFontProgram(
     ctx,
     docId,
     layerName,
-    displayHash,
+    displaySha256,
     'data',
     signal,
   );
@@ -275,22 +292,11 @@ function sendProgram(reply: FastifyReply, bytes: Uint8Array): FastifyReply {
   return reply.send(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
 }
 
-/** A pinned list answers only at the manifest's pins and this server's fonts; any other is a 404. */
-function assertCurrent(
-  requested: FontsToken,
-  manifest: DocumentManifest,
-  reply: Parameters<typeof setNoStore>[0],
-): void {
-  if (
-    requested.fontsVersion === manifest.fontsVersion &&
-    requested.serverFonts === manifest.serverFonts
-  ) {
-    return;
-  }
-  setNoStore(reply);
+/** A pinned list answers only at the manifest's `fontsVersion`; any other is a 404. */
+function assertCurrent(requested: FontsToken, manifest: DocumentManifest): void {
+  if (requested.fontsVersion === manifest.fontsVersion) return;
   throw new EngineError(
     EngineErrorCode.NotFound,
-    `fonts ${requested.fontsVersion}/${requested.serverFonts} no longer current ` +
-      `(current=${manifest.fontsVersion}/${manifest.serverFonts})`,
+    `fonts ${requested.fontsVersion} no longer current (current=${manifest.fontsVersion})`,
   );
 }

@@ -8,12 +8,12 @@
  * `footer`, `tabs`, `empty`); the viewer's own components among them
  * (`<epdf-button>`, `<epdf-menu>`) are drawn by the viewer (./components).
  *
- * Seven keys follow their value while the viewer runs, from `.config`, their
- * own properties (`.src`, `.theme`, `.locale`, `.disable`, `.readOnly`,
- * `.fetch`, `.appState`) or the attributes: `src` opens the new document in
- * place of the old one, `theme` swaps the token sheet and the mode, `locale`,
- * `disable` and `readOnly` reach their plugins, the next download uses the new
- * `fetch`, and the commands read the new `appState`.
+ * Eight keys follow their value while the viewer runs, from `.config`, their
+ * own properties (`.src`, `.theme`, `.locale`, `.features`, `.disable`,
+ * `.readOnly`, `.fetch`, `.appState`) or the attributes: `src` opens the new
+ * document in place of the old one, `theme` swaps the token sheet and the mode,
+ * `locale`, `features`, `disable` and `readOnly` reach their plugins, the next
+ * download uses the new `fetch`, and the commands read the new `appState`.
  * Changing any other key re-creates the viewer from scratch — documents and
  * all — which is the honest semantic for a workspace-owning embed.
  */
@@ -56,6 +56,13 @@ export interface DoorEngine {
    * element applies it to `src`, `documents` and `.src`.
    */
   readonly sourceOf?: SourceOf;
+  /**
+   * Whether `next` names the same document as the one `opened` opened (`opened` is what
+   * `sourceOf` made of the `src` that opened it): then the element keeps that document open,
+   * and the door takes what it needs from `next`, such as the cloud's next token. Without it,
+   * every new `src` opens again.
+   */
+  readonly follows?: (opened: ElementSrc, next: ElementSrc) => boolean;
   /** Plugin settings this engine needs, under the config's own, per plugin: a door whose stamp
    *  libraries open in another engine names that engine here. */
   readonly plugins?: ViewerPluginsConfig;
@@ -170,6 +177,7 @@ const PROPERTIES = [
   'src',
   'theme',
   'locale',
+  'features',
   'disable',
   'readOnly',
   'fetch',
@@ -194,6 +202,8 @@ interface SrcDocument {
   readonly reserved: string;
   id: string;
   readonly opened: Promise<string | null>;
+  /** What the door made of the `src` (see `DoorEngine.follows`). */
+  readonly input: ElementSrc;
 }
 
 export class EmbedPdfViewerElement extends ElementBase {
@@ -215,6 +225,8 @@ export class EmbedPdfViewerElement extends ElementBase {
   #props: FullViewerProps | null = null;
   /** What the running viewer's door makes of a `src` (`DoorEngine.sourceOf`). */
   #sourceOf: SourceOf = (src) => src;
+  /** Whether the running viewer's door keeps a document open under a new `src` (`DoorEngine.follows`). */
+  #follows: DoorEngine['follows'];
   #viewer: Viewer | null = null;
   #srcDocument: SrcDocument | null = null;
   /** The ids of `src` documents still closing, which a new one must not take. */
@@ -268,7 +280,18 @@ export class EmbedPdfViewerElement extends ElementBase {
     return this.config.locale;
   }
 
-  /** The features and commands this viewer doesn't have. */
+  /** What people can do in this viewer: features and their parts, on or off. */
+  set features(features: ElementConfig['features']) {
+    this.#change({ features });
+  }
+  get features(): ElementConfig['features'] {
+    return this.config.features;
+  }
+
+  /**
+   * The features and commands this viewer doesn't have.
+   * @deprecated Use `features`; goes in 4.0.
+   */
   set disable(disable: ElementConfig['disable']) {
     this.#change({ disable });
   }
@@ -361,8 +384,8 @@ export class EmbedPdfViewerElement extends ElementBase {
     if (changed.includes('theme')) this.#adoptSheets(next.theme);
     // `src` opens below, and `#fetch` reads the new `fetch` at the next download.
     if (changed.some((key) => key !== 'src' && key !== 'fetch')) {
-      const { theme, locale, disable, readOnly, appState } = next;
-      this.#props = { ...this.#props!, theme, locale, disable, readOnly, appState };
+      const { theme, locale, features, disable, readOnly, appState } = next;
+      this.#props = { ...this.#props!, theme, locale, features, disable, readOnly, appState };
       this.#root.render(createElement(FullViewer, this.#props));
     }
     if (changed.includes('src')) this.#showSrc();
@@ -408,6 +431,9 @@ export class EmbedPdfViewerElement extends ElementBase {
     if (!viewer || !config || config.documents) return;
     const { documents } = viewer;
     const previous = this.#srcDocument;
+    // The same document under a new `src`, such as the cloud's `{ id, token }` with a new token
+    // function: it stays open, and the door takes the rest.
+    if (previous && config.src != null && this.#follows?.(previous.input, config.src)) return;
     this.#srcDocument = null;
     // A tab's id changes once its source has said which document it is.
     const previousId = previous && documents.has(previous.id) ? previous.id : previous?.reserved;
@@ -449,7 +475,12 @@ export class EmbedPdfViewerElement extends ElementBase {
       () => null,
     );
     if (!reserved) return;
-    const shown: SrcDocument = { reserved, id: isOpenInput(src) ? reserved : id, opened };
+    const shown: SrcDocument = {
+      reserved,
+      id: isOpenInput(src) ? reserved : id,
+      opened,
+      input: src,
+    };
     this.#srcDocument = shown;
     void opened.then((openedId) => {
       if (openedId !== null) shown.id = openedId;
@@ -493,8 +524,9 @@ export class EmbedPdfViewerElement extends ElementBase {
     } = config;
     this.#adoptSheets(theme);
     this.#shown = config;
-    const { engine, sourceOf = (src) => src, plugins } = engineOf(config);
+    const { engine, sourceOf = (src) => src, follows, plugins } = engineOf(config);
     this.#sourceOf = sourceOf;
+    this.#follows = follows;
     this.#props = {
       engine,
       initialDocuments: documents && initialDocumentsOf(documents, sourceOf),

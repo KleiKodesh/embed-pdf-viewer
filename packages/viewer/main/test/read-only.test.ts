@@ -2,8 +2,9 @@
  * What a turned-off feature leaves in the document stays, frozen: under `readOnly` an annotation
  * is selected but not dragged or deleted, the View only label says why, and the comments panel
  * only reads; turning `readOnly` off while the viewer runs makes it movable again. Under
- * `disable: ['shapes']` a square is frozen and a highlight isn't. A scope that allows no change
- * shows the label too.
+ * `shapes: false` a square is frozen and a highlight isn't. A scope that allows no change
+ * shows the label too. The default layout leaves the label out, so these pages add it as the docs
+ * do, but one.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -22,15 +23,30 @@ import {
   type ViewerHost,
 } from './helpers/viewer-host';
 
+/** Every feature on, the ones that start off too, so what's frozen is what the test turns off. */
+const EVERYTHING = {
+  measurement: true,
+  redaction: true,
+  'forms.building': true,
+  snapshots: true,
+} as const;
+
 const CONFIGS = {
-  'read-only': { readOnly: true },
-  'no-shapes': { disable: ['shapes'] },
+  'read-only': { features: EVERYTHING, readOnly: true },
+  'no-shapes': { features: { ...EVERYTHING, shapes: false } },
   'no-change-allowed': {
     scope: ['doc.open', 'doc.render', 'doc.text.select', 'doc.text.search', 'doc.annotate.read'],
   },
 } as const;
 
-const page = (config: unknown) => `<!doctype html><html><head><meta charset="utf-8">
+/** The View only label, added where the docs add it. */
+const ADD_LABEL =
+  "layout: (layout) => layout.add({ custom: 'view-only' }, { to: 'main', before: 'panel:search' }),";
+
+const page = (
+  config: unknown,
+  addLabel = true,
+) => `<!doctype html><html><head><meta charset="utf-8">
 <title>read-only</title>
 <style>
   body { margin: 0; }
@@ -46,6 +62,7 @@ const page = (config: unknown) => `<!doctype html><html><head><meta charset="utf
     src: '/sample.pdf',
     theme: 'light',
     ...${JSON.stringify(config)},
+    ${addLabel ? ADD_LABEL : ''}
   });
   window.element.addEventListener('epdf:ready', (event) => window.readies.push(event.detail.viewer));
 </script>
@@ -110,7 +127,7 @@ const selectedRefs = (tab: Page): Promise<Ref[]> =>
   tab.evaluate(() =>
     window.element.viewer
       .get('annotation')
-      .selection.list()
+      .selection.getSelected()
       .map((annotation: { ref: Ref }) => annotation.ref),
   );
 
@@ -143,11 +160,12 @@ describe('what a turned-off feature made stays, frozen', () => {
 
   beforeAll(async () => {
     expect(existsSync(join(dist, 'embedpdf.js')), 'run `pnpm build` first').toBe(true);
-    host = await serveViewer(
-      Object.fromEntries(
+    host = await serveViewer({
+      ...Object.fromEntries(
         Object.entries(CONFIGS).map(([name, config]) => [`/${name}.html`, page(config)]),
       ),
-    );
+      '/default-layout.html': page(CONFIGS['read-only'], false),
+    });
     browser = await launchChromium();
   });
   afterAll(async () => {
@@ -155,7 +173,7 @@ describe('what a turned-off feature made stays, frozen', () => {
     await host?.close();
   });
 
-  const open = async (name: keyof typeof CONFIGS): Promise<Page> => {
+  const open = async (name: keyof typeof CONFIGS | 'default-layout'): Promise<Page> => {
     const tab = await browser.newPage({ viewport: { width: 1200, height: 800 } });
     const errors: string[] = [];
     tab.on('pageerror', (error) => errors.push(error.message));
@@ -238,7 +256,7 @@ describe('what a turned-off feature made stays, frozen', () => {
     // With writing back, the selected card offers its reply box.
     await tab.evaluate(() => (window.element.readOnly = false));
     await tab.evaluate((ref) => {
-      window.element.viewer.get('annotation').selection.set([ref]);
+      window.element.viewer.get('annotation').selection.select([ref]);
     }, square);
     await tab.waitForFunction(
       () => window.element.shadowRoot!.querySelectorAll('li input').length > 0,
@@ -246,7 +264,7 @@ describe('what a turned-off feature made stays, frozen', () => {
     await tab.close();
   });
 
-  it("under disable: ['shapes'] a square is frozen and a highlight isn't", async () => {
+  it("under shapes: false a square is frozen and a highlight isn't", async () => {
     const tab = await open('no-shapes');
     expect(await viewOnlyLabel(tab)).toBeNull();
     const square = await create(tab, SQUARE);
@@ -287,7 +305,7 @@ describe('what a turned-off feature made stays, frozen', () => {
 
     // The highlight: restyled and deleted by hand as ever.
     await tab.evaluate(
-      (ref) => window.element.viewer.get('annotation').selection.set([ref]),
+      (ref) => window.element.viewer.get('annotation').selection.select([ref]),
       highlight,
     );
     await frames(tab);
@@ -313,6 +331,13 @@ describe('what a turned-off feature made stays, frozen', () => {
         (span) => span.textContent === 'View only' && span.getBoundingClientRect().width > 0,
       ),
     );
+    await tab.close();
+  });
+
+  it('leaves the label out of the default layout, read-only as well', async () => {
+    const tab = await open('default-layout');
+    expect(await byHand(tab)).toEqual({ editable: false, fillable: false });
+    expect(await viewOnlyLabel(tab)).toBeNull();
     await tab.close();
   });
 });

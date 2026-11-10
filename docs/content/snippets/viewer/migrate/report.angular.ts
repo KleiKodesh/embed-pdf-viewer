@@ -14,7 +14,7 @@
 //     const container = EmbedPDF.init({
 //       type: 'container',
 //       target: this.host.nativeElement,
-//       src: '/report.pdf',
+//       src: 'https://www.embedpdf.com/pdfs/welcome.pdf',
 //       theme: { preference: 'dark' },
 //       disabledCategories: ['redaction', 'document-print'],
 //     });
@@ -30,9 +30,9 @@ import { EpdfPdfViewer, type Viewer } from '@embedpdf/viewer-angular';
   imports: [EpdfPdfViewer],
   template: `
     <epdf-pdf-viewer
-      src="/report.pdf"
+      src="https://www.embedpdf.com/pdfs/welcome.pdf"
       theme="dark"
-      [disable]="['redaction', 'documents.print']"
+      [features]="{ 'documents.print': false }"
       style="height: 100vh"
       (ready)="onReady($event)"
     />

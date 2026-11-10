@@ -21,7 +21,7 @@ const plugins = [
 
 // [!doc-source forms]
 const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/forms.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/forms.pdf');
   return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -39,7 +39,7 @@ function useDesignForm() {
     started.current = true;
     interaction.activateTool('form-edit');
     const widget = form.get(toFieldRef('name'))?.widgets[0]?.ref;
-    if (widget) annotation.selection.set([widget]);
+    if (widget) annotation.selection.select([widget]);
   }, [form, annotation, interaction, status]);
 }
 

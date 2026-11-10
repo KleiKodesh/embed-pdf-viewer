@@ -32,7 +32,6 @@ import {
   type CustomMetadataUpdateResult,
   type PageFlattenResult,
   type PageReorderResult,
-  type PageScaleResult,
   type RedactionApplyResult,
   type FormFieldRef,
   type SignatureCompleteResult,
@@ -69,7 +68,7 @@ export interface AuditEventRow {
  * items, a form reset is one `forms.valueSet` per field it changed, an
  * import is one `annotations.created` per annotation, and a completed
  * signing is the signature and the new version. An undo's events name the
- * change it undid (`origin.undoOf`). Every event of a row shares `origin.tx`,
+ * change it undid (`origin.undoOf`). Every event of a row shares `origin.transaction`,
  * its id the request's `Idempotency-Key`. Returns none for an own echo and for kinds
  * this engine version doesn't know (a newer server's events degrade to
  * "ignored", never to a crash).
@@ -86,9 +85,9 @@ export function auditRowToEvents(row: AuditEventRow, mySessionId: string): Docum
   const origin: EventOrigin = {
     kind: 'remote',
     sessionId: row.originSessionId ?? `unknown:${row.sub}`,
-    sub: row.sub,
-    ts: row.ts,
-    serverId: row.id,
+    subject: row.sub,
+    at: new Date(row.ts).toISOString(),
+    serverSequence: row.id,
     ...(row.undoOf ? { undoOf: row.undoOf } : {}),
   };
   // Every event of the write shares its id: the request's `Idempotency-Key`,
@@ -105,7 +104,7 @@ export function auditRowToEvents(row: AuditEventRow, mySessionId: string): Docum
       : facts;
   return events.map((event, index) => ({
     ...event,
-    origin: { ...origin, tx: { id, index, count: events.length } },
+    origin: { ...origin, transaction: { id, index, count: events.length } },
   }));
 }
 
@@ -174,8 +173,12 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
   const rowPage = () => toPageRef(row.pageObjectNumber ?? row.affectedPages[0] ?? 0);
 
   switch (row.kind) {
-    case 'measure.setScale':
-      return { type: 'pages.scaleSet', origin, ...(row.payload as PageScaleResult) };
+    case 'measure.setScale': {
+      const result = row.payload as Extract<DocumentEvent, { type: 'pages.scaleSet' }>;
+      // A row written before a scale carried the layout has nothing to fold.
+      if (!result.layout) return null;
+      return { ...result, type: 'pages.scaleSet', origin };
+    }
     case 'annot.create':
       return {
         type: 'annotations.created',

@@ -18,6 +18,7 @@ import {
 import { encodeSearchToken } from '@embedpdf/engine-core/wire';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { pinOf } from './_helpers/pins';
 
 /**
  * The guarantee screenshot protection rests on: a session without
@@ -121,6 +122,7 @@ beforeAll(async () => {
     modules: [
       {
         id: 'protected-display',
+        name: 'Screenshot protection',
         permissions: {
           view: { level: 'document', label: 'See pages with screenshot protection' },
         },
@@ -219,7 +221,13 @@ function categoryOf(route: DocRoute): Category | null {
  */
 const REQUESTS: Readonly<Record<string, { token?: string; query?: string; body?: unknown }>> = {
   'GET /layers/:layerName/search/full/data@:token': {
-    token: encodeSearchToken({ epoch: '1', query: { text: 'confidential' }, skip: 0 }),
+    token: encodeSearchToken({
+      contentsVersion: 1,
+      layoutVersion: 1,
+      query: { text: 'confidential' },
+      skip: 0,
+      pin: pinOf('search'),
+    }),
   },
   'GET /layers/:layerName/search/full/data': { query: '?q=confidential' },
   'POST /layers/:layerName/pages/extract': {
@@ -239,7 +247,7 @@ function urlOf(route: DocRoute): string {
     .replace(':sha', 'a'.repeat(64))
     .replace(':index', '0')
     .replace(':signingId', 'sig1')
-    .replace(':displayHash', 'a'.repeat(64))
+    .replace(':displaySha256', 'a'.repeat(64))
     .replace(':algorithm', 'sha256')
     .replace(':token', request?.token ?? 'contentVersion=1');
   return `${baseUrl}/v1/docs/${DOC}${path}${request?.query ?? ''}`;
@@ -345,7 +353,13 @@ describe('plugin permissions are checked where people grant them', () => {
     return fetch(`${baseUrl}/v1/tenants/${TENANT}/tokens`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'doc', sub: 'viewer-1', docId: DOC, scope, expiresIn: 600 }),
+      body: JSON.stringify({
+        kind: 'doc',
+        sub: 'viewer-1',
+        docId: DOC,
+        scope,
+        expiresInSeconds: 600,
+      }),
     });
   }
 

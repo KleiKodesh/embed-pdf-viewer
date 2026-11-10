@@ -41,14 +41,14 @@ export class RedactionsClient {
     public apply(
         request: CloudPDF.doc.DocRedactionsApplyRequest,
         requestOptions?: RedactionsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocRedactionsApply200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocRedactionsApplyResponse> {
         return core.HttpResponsePromise.fromPromise(this.__apply(request, requestOptions));
     }
 
     private async __apply(
         request: CloudPDF.doc.DocRedactionsApplyRequest,
         requestOptions?: RedactionsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocRedactionsApply200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocRedactionsApplyResponse>> {
         const {
             docId,
             layerName,
@@ -60,7 +60,11 @@ export class RedactionsClient {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            mergeOnlyDefinedHeaders({
+                "X-Document-Password": documentPassword,
+                "Idempotency-Key": idempotencyKey,
+                "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.1",
+            }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -83,18 +87,21 @@ export class RedactionsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocRedactionsApply200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocRedactionsApplyResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

@@ -33,7 +33,7 @@ import {
 } from './mirror';
 import type { OperationOptions, ResourceStatus } from './types';
 
-/** One applied change of one page, handed to the spec's `changed` callback. */
+/** One applied change of one page, handed to the spec's `onChanged` callback. */
 export interface PageMirrorChange<V> {
   readonly page: PageRef;
   /** `load` for reads, `event` for a folded event, `drop` when the page was deleted. */
@@ -66,7 +66,7 @@ export interface PageMirrorSpec<V> {
    */
   predict?(value: V, op: PredictedOp, page: PageRef): V;
   /** Runs after every load of a page (even one that changed nothing) and every applied change. */
-  readonly changed?: (change: PageMirrorChange<V>) => void;
+  readonly onChanged?: (change: PageMirrorChange<V>) => void;
 }
 
 export interface PageMirror<V> {
@@ -87,8 +87,6 @@ interface PageEntry<V> {
   readonly value?: V;
 }
 
-type PageCells<V> = Readonly<Record<string, PageEntry<V>>>;
-
 const IDLE = 'idle' as const;
 /** A load of a page that went before the engine had it: nothing to read. */
 const GONE = Symbol('page-mirror.gone');
@@ -97,7 +95,13 @@ export function createPageMirror<V>(
   spec: PageMirrorSpec<V>,
   env: MirrorEnvironment,
 ): PageMirror<V> {
-  const cell = env.cell<PageCells<V>>(`page-mirror/${spec.name}`, {});
+  /**
+   * The pages' entries live here, not in the store: the cell holds a number
+   * each write bumps, so a write wakes the store's readers without copying
+   * every other page's entry.
+   */
+  const entries = new Map<string, PageEntry<V>>();
+  const cell = env.cell(`page-mirror/${spec.name}`, 0);
   const epochs = new Map<string, number>();
   const inFlight = new Map<string, Promise<void>>();
 
@@ -153,17 +157,20 @@ export function createPageMirror<V>(
     return next;
   };
 
-  const entryOf = (key: string): PageEntry<V> | undefined => cell.read()[key];
+  const entryOf = (key: string): PageEntry<V> | undefined => entries.get(key);
 
+  /** Once the cell is revoked, a write changes nothing and returns false, as the cell's own does. */
   const setEntry = (key: string, entry: PageEntry<V> | null): boolean => {
-    const { [key]: _replaced, ...rest } = cell.read();
-    return cell.write(entry ? { ...rest, [key]: entry } : rest);
+    if (!cell.live) return false;
+    if (entry) entries.set(key, entry);
+    else entries.delete(key);
+    return cell.write(cell.read() + 1);
   };
 
   const announce = (change: PageMirrorChange<V>): void => {
     if (change.cause !== 'load' && change.previous === change.next) return;
     try {
-      spec.changed?.(change);
+      spec.onChanged?.(change);
     } catch (error) {
       env.report(error);
     }
@@ -179,14 +186,14 @@ export function createPageMirror<V>(
       };
       const closed = () => done(false);
       const off = env.pages.onChange(() => {
-        if (!env.pages.pending(page)) done(env.pages.has(page));
+        if (!env.pages.getPending(page)) done(env.pages.has(page));
       });
       env.lifetime.addEventListener('abort', closed, { once: true });
     });
 
   /** Read the page; one a pending change makes once the engine has it. */
   const read = (page: PageRef): Promise<V | typeof GONE> =>
-    env.pages.pending(page)
+    env.pages.getPending(page)
       ? whenHeld(page).then<V | typeof GONE>((held) =>
           held ? spec.load(env.doc, page, env.lifetime) : GONE,
         )
@@ -233,9 +240,7 @@ export function createPageMirror<V>(
   };
 
   const loadedPages = (): PageRef[] =>
-    Object.values(cell.read())
-      .filter((entry) => entry.status !== IDLE)
-      .map((entry) => entry.page);
+    [...entries.values()].filter((entry) => entry.status !== IDLE).map((entry) => entry.page);
 
   env.onDocumentEvent((event) => {
     if (!cell.live) return;

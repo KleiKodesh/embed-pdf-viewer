@@ -14,6 +14,7 @@ import {
   FontProgramInfoSchema,
   FontResolutionSchema,
   wirePaths,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
@@ -53,29 +54,29 @@ export class CloudDocumentFontsService implements DocumentFontsService {
     );
   }
 
-  getProgram(displayHash: string): AbortablePromise<FontProgramInfo> {
+  getProgram(displaySha256: string): AbortablePromise<FontProgramInfo> {
     return this.run((signal) =>
       this.http.getJson(
-        wirePaths.layerFontProgram(this.docId, this.layerName, displayHash),
+        wirePaths.layerFontProgram(this.docId, this.layerName, displaySha256),
         (raw) => FontProgramInfoSchema.parse(raw),
         signal,
       ),
     );
   }
 
-  downloadProgram(displayHash: string): AbortablePromise<Uint8Array> {
+  downloadProgram(displaySha256: string): AbortablePromise<Uint8Array> {
     return this.run(async (signal) => {
       const list = await this.listOf(signal);
-      downloadableProgram(list, displayHash);
+      downloadableProgram(list, displaySha256);
       const serverFont = list.fonts.some(
         (font) =>
           font.source === 'engine' &&
-          font.programs.some((program) => program.displayHash === displayHash),
+          font.programs.some((program) => program.displaySha256 === displaySha256),
       );
       return this.http.getBytes(
         serverFont
-          ? wirePaths.fontProgramFile(displayHash)
-          : wirePaths.layerFontProgramFile(this.docId, this.layerName, displayHash),
+          ? wirePaths.fontProgramFile(displaySha256)
+          : wirePaths.layerFontProgramFile(this.docId, this.layerName, displaySha256),
         signal,
       );
     });
@@ -84,7 +85,10 @@ export class CloudDocumentFontsService implements DocumentFontsService {
   private listOf(signal: AbortSignal): Promise<FontList> {
     const buildPath = async (s: AbortSignal): Promise<string> => {
       const manifest = await this.manifest.get(s);
-      const token = { fontsVersion: manifest.fontsVersion, serverFonts: manifest.serverFonts };
+      const token = {
+        fontsVersion: manifest.fontsVersion,
+        pin: tokenPinOf('fonts', manifest.engine),
+      };
       // A document's fonts are wherever its drawings are: while the layer
       // inherits its pages, annotations and form, it has the base's.
       return planesInherited(manifest, ['content', 'annotations', 'forms'])

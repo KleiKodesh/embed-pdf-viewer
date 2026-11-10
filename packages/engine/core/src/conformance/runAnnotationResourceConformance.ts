@@ -62,15 +62,15 @@ export interface AnnotationResourceConformanceOptions {
  */
 export function runAnnotationResourceConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationResourceConformanceOptions,
+  options: AnnotationResourceConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation resource conformance: ${opts.label}`, () => {
+  describe(`annotation resource conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -81,7 +81,7 @@ export function runAnnotationResourceConformance(
       fixture: AnnotationResourceFixture,
       run: (page: PageHandle, doc: DocumentHandle) => Promise<void>,
     ): Promise<void> => {
-      const doc = await opts.open(engine, fixture);
+      const doc = await options.open(engine, fixture);
       try {
         await run(doc.page(await firstPage(doc)), doc);
       } finally {
@@ -508,6 +508,40 @@ export function runAnnotationResourceConformance(
       });
     });
 
+    test("an ink's appearance is drawn in place of its segments, on create and update", async () => {
+      await onPage('authoring', async (page) => {
+        const ink = (y: number) => ({
+          subtype: 'ink' as const,
+          strokeWidth: 4,
+          inkList: [
+            [
+              { x: 100, y },
+              { x: 180, y: y + 40 },
+              { x: 260, y },
+            ],
+          ],
+        });
+        const plain = (await page.annotations.create(ink(100))).annotation;
+        const drawn = (
+          await page.annotations.create(ink(200), { resources: { appearance: BANDS_PDF } })
+        ).annotation;
+        const plainRaster = await rasterOf(page, plain.ref);
+        const drawnRaster = await rasterOf(page, drawn.ref);
+        expect([drawnRaster.width, drawnRaster.height]).toEqual([
+          plainRaster.width,
+          plainRaster.height,
+        ]);
+        expect(maxDifference(drawnRaster, plainRaster) > 3).toBe(true);
+
+        await page.annotations.update(plain.ref, {}, { resources: { appearance: BANDS_PDF } });
+        expectSameDrawing(await rasterOf(page, plain.ref), drawnRaster);
+
+        await expect(
+          page.annotations.create(ink(300), { resources: { appearance: BANDS_PNG } }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+      });
+    });
+
     test('a role the kind does not take is refused', async () => {
       await onPage('authoring', async (page) => {
         const rect: PageBox = { x: 300, y: 300, width: 60, height: 40 };
@@ -538,7 +572,8 @@ const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
  * it a fresh one.
  */
 function copyOnItsPage(dto: Annotation): AnnotationDraft {
-  return { ...(JSON.parse(JSON.stringify(dto)) as AnnotationDraft), nm: null };
+  const { nm: _name, ...copy } = JSON.parse(JSON.stringify(dto)) as AnnotationDraft;
+  return copy as AnnotationDraft;
 }
 
 /**

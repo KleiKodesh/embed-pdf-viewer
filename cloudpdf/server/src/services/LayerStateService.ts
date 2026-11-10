@@ -132,6 +132,8 @@ export class LayerStateService {
         formsVersion: row.formsVersion,
         outlineVersion: row.outlineVersion,
         fontsVersion: row.fontsVersion,
+        contentsVersion: row.contentsVersion,
+        viewportsVersion: row.viewportsVersion,
       };
     }
     return { sha256, byteLength: fallbackByteLength ?? 0, ...INITIAL_BASE_POINTERS };
@@ -201,6 +203,7 @@ export class LayerStateService {
       | 'annotationsVersion'
       | 'formsVersion'
       | 'outlineVersion'
+      | 'viewportsVersion'
       | 'baseSha'
     > | null,
     layerPages: DurablePageRow[],
@@ -215,6 +218,7 @@ export class LayerStateService {
       | 'annotationsVersion'
       | 'formsVersion'
       | 'outlineVersion'
+      | 'viewportsVersion'
     > | null = null,
   ): LayerScopes {
     if (!layer) return { ...ALL_BASE_SCOPES };
@@ -253,7 +257,12 @@ export class LayerStateService {
       // Doc-level planes compare against the base version's pointers (law
       // 9c): a layer seeded over a published version whose metadata sits
       // at epoch 2 is inherited at 2, not owned because 2 ≠ 1.
-      layout: layer.layoutVersion === base.layoutVersion ? 'base' : 'layer',
+      // The layout carries the pages' scales: a layer that set one reads its own.
+      layout:
+        layer.layoutVersion === base.layoutVersion &&
+        layer.viewportsVersion === base.viewportsVersion
+          ? 'base'
+          : 'layer',
       attachments: layer.attachmentsVersion === base.attachmentsVersion ? 'base' : 'layer',
       metadata: layer.metadataVersion === base.metadataVersion ? 'base' : 'layer',
       actions: 'base',
@@ -286,8 +295,6 @@ export class LayerStateService {
     version: BaseVersionFacts,
     /** What the head version's signatures forbid. */
     protection: DocumentProtection | null,
-    /** The server's fonts' fingerprint (`ServerFonts.fingerprint`). */
-    serverFonts: string,
   ): DocumentManifest {
     return {
       docVersion: head.docVersion,
@@ -301,14 +308,15 @@ export class LayerStateService {
       formsVersion: version.formsVersion,
       outlineVersion: version.outlineVersion,
       fontsVersion: version.fontsVersion,
-      serverFonts,
+      contentsVersion: version.contentsVersion,
+      viewportsVersion: version.viewportsVersion,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
-      baseSha: head.baseSha,
+      baseSha256: head.baseSha256,
       layerVersion: 0,
       working: false,
-      baseByteLength: version.byteLength,
+      baseSizeBytes: version.byteLength,
       protection,
       pages: pages.map((page) => this.toManifestPage(page)),
     };
@@ -331,6 +339,8 @@ export class LayerStateService {
       | 'formsVersion'
       | 'outlineVersion'
       | 'fontsVersion'
+      | 'contentsVersion'
+      | 'viewportsVersion'
       | 'lastAuditId'
       | 'currentVersion'
       | 'currentArtifactKey'
@@ -342,8 +352,6 @@ export class LayerStateService {
      * flips the whole plane.
      */
     scopes: LayerScopes,
-    /** The server's fonts' fingerprint (`ServerFonts.fingerprint`). */
-    serverFonts: string,
   ): DocumentManifest {
     return {
       docVersion: layer.docVersion,
@@ -355,17 +363,18 @@ export class LayerStateService {
       formsVersion: layer.formsVersion,
       outlineVersion: layer.outlineVersion,
       fontsVersion: layer.fontsVersion,
-      serverFonts,
+      contentsVersion: layer.contentsVersion,
+      viewportsVersion: layer.viewportsVersion,
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
-      baseSha: base.sha256,
+      baseSha256: base.sha256,
       // The signing fences a client pins: the layer's write serial, and
       // whether an artifact (edits not yet sealed into a version) exists —
       // `currentVersion > 0` alone no longer says so after a publish.
       layerVersion: layer.currentVersion,
       working: layer.currentArtifactKey !== null,
-      baseByteLength: base.byteLength,
+      baseSizeBytes: base.byteLength,
       scopes,
       protection,
       pages: pages.map((page) => this.toManifestPage(page)),
@@ -387,6 +396,10 @@ export class LayerStateService {
     formsVersion?: number;
     /** The font list's pin, when the write changed the fonts the list shows. */
     fontsVersion?: number;
+    /** The contents pin, when the write moved a page's content or the page set. */
+    contentsVersion?: number;
+    /** The pages' scales pin, when the write set a page's scale. */
+    viewportsVersion?: number;
     pages: DurablePageRow[];
   }): CacheDelta {
     return {
@@ -397,6 +410,8 @@ export class LayerStateService {
         : {}),
       ...(input.formsVersion !== undefined ? { formsVersion: input.formsVersion } : {}),
       ...(input.fontsVersion !== undefined ? { fontsVersion: input.fontsVersion } : {}),
+      ...(input.contentsVersion !== undefined ? { contentsVersion: input.contentsVersion } : {}),
+      ...(input.viewportsVersion !== undefined ? { viewportsVersion: input.viewportsVersion } : {}),
       // Every ordinary commit writes an artifact: the layer holds edits not
       // yet sealed into a version (a signature's publish clears it again,
       // and refreshes the manifest instead of sending a delta).

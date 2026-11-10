@@ -33,7 +33,7 @@ const plugins = [
 
 // [!doc-source sketch]
 const sketch = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/sketch.pdf');
+  const response = await fetch('https://www.embedpdf.com/pdfs/sketch.pdf');
   return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -97,7 +97,7 @@ function Readout({ annotation }: { annotation: Annotation }) {
 
   return (
     <li>
-      <button type="button" className="row" onClick={() => selection.set([annotation.ref])}>
+      <button type="button" className="row" onClick={() => selection.select([annotation.ref])}>
         <span className="kind">{'unavailable' in readout ? 'No scale' : readout.kind}</span>
         <span className="value">{'unavailable' in readout ? '—' : readout.label}</span>
       </button>

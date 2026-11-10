@@ -8,7 +8,6 @@ import {
 import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
-  docScopedToken,
   seedDocument,
   teardownDbSeededFixture,
   type DbSeededFixture,
@@ -48,10 +47,20 @@ function fixture(): DbSeededFixture {
 runChangeConformance(runner, {
   label: 'cloud engine (HTTP -> @cloudpdf/server, native runtime)',
   makeEngine: () => cloudEngine({ baseUrl: fixture().baseUrl }),
-  open: async (engine) => {
+  open: async (engine, pdf = CHANGE_FIXTURE_PDF) => {
     const docId = `changes-${++docs}`;
-    await seedDocument(fixture(), TENANT_ID, docId, CHANGE_FIXTURE_PDF);
-    return engine.open({ kind: 'token', token: docScopedToken(fixture(), TENANT_ID, docId) });
+    await seedDocument(fixture(), TENANT_ID, docId, pdf);
+    // A token of its own, as each viewer has: the object-number budget is per token.
+    return engine.open({
+      kind: 'token',
+      token: signDevToken(fixture().secret, {
+        sub: 'cloud-test',
+        tenant_id: TENANT_ID,
+        doc_id: docId,
+        scope: ['*'],
+        jti: docId,
+      }),
+    });
   },
   // Another subject on the same layer.
   openAsAnotherUser: (engine, doc) =>

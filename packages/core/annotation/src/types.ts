@@ -1,4 +1,4 @@
-import type { PageRotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/core-geometry';
+import type { Rotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/core-geometry';
 import type { PaintFonts } from '@embedpdf/core-text';
 import type {
   AnnotationBorderStyle,
@@ -64,7 +64,7 @@ export type PolySubtype = 'polygon' | 'polyline';
  */
 export interface ViewEnv {
   zoom: number;
-  rotation: PageRotation;
+  rotation: Rotation;
 }
 
 /**
@@ -117,8 +117,11 @@ export type Shape =
  * hit-testing: nothing is written back through it.
  */
 export interface Style {
-  /** The stroke for a drawn kind, a markup's colour, a free text's border. */
-  color: Color;
+  /**
+   * The stroke for a drawn kind, a markup's colour, a free text's border.
+   * `null` strokes nothing: a shape with no stroke keeps its fill and its width.
+   */
+  color: Color | null;
   /** The fill; `null` when the annotation has none. */
   interiorColor: Color | null;
   strokeWidth: number;
@@ -283,13 +286,13 @@ export interface SnapSettings {
    * How close a move comes before it snaps, in screen pixels: each pointer
    * sample converts it by its `scale`. Without one it is in page units.
    */
-  readonly alignmentThreshold: number;
+  readonly alignmentThresholdPx: number;
   /** Snap a turn onto `rotationAngles`. */
   readonly rotation: boolean;
   /** The angles a turn snaps to, in degrees clockwise. */
   readonly rotationAngles: readonly number[];
   /** How close a turn comes before it snaps, in degrees. */
-  readonly rotationThreshold: number;
+  readonly rotationThresholdDeg: number;
 }
 
 /**
@@ -311,7 +314,7 @@ export type Draft =
       /** Display rotation + upright policy captured at down (the gesture's home
        *  page), so the commit counter-rotates against what the author saw even
        *  if the up sample resolves elsewhere. See {@link PointerInput}. */
-      displayRotation?: PageRotation;
+      displayRotation?: Rotation;
       upright?: boolean;
       /** The tool's click-create policy, captured at down like `upright`. */
       clickCreate?: ClickCreate | false;
@@ -341,7 +344,7 @@ export type Draft =
       to: Point;
       /** Display rotation + upright policy captured at down (see the rect
        *  draft): an upright tool's click lays its line as the author saw the page. */
-      displayRotation?: PageRotation;
+      displayRotation?: Rotation;
       upright?: boolean;
       /** The tool's click-create policy, captured at down like `upright`. */
       clickCreate?: ClickCreate | false;
@@ -366,6 +369,8 @@ export type Draft =
       preset?: string;
       page: PageRef;
       strokes: Point[][];
+      /** The pen is down: the last stroke is still being drawn. */
+      drawing?: boolean;
       intent?: InkIntent;
       /** The tool's `/F` seed, captured at down (see the rect draft). */
       flags?: Partial<AnnotationFlags>;
@@ -392,7 +397,7 @@ export type Draft =
        *  gesture's home page) — the text box commits counter-rotated so it
        *  reads upright; the leader (tip/knee) is page-space and never turns.
        *  Same capture rule as the rect draft. */
-      displayRotation?: PageRotation;
+      displayRotation?: Rotation;
       upright?: boolean;
       /** The tool's `/F` seed, captured at down (see the rect draft). */
       flags?: Partial<AnnotationFlags>;
@@ -403,7 +408,7 @@ export type Draft =
   // Single-shape resize / vertex drag. For a screen-anchored (`noZoom`/
   // `noRotate`) target, `base`/`cur` live in view space — the projected
   // geometry the user actually grabbed — and the commit maps `cur` back to
-  // stored space through `unanchoredGeom` with the captured `view`. For every
+  // stored space through `unanchoredGeometry` with the captured `view`. For every
   // other target the projection is the identity and `base` Is the stored geom.
   | {
       kind: 'handle';
@@ -418,7 +423,7 @@ export type Draft =
   // centre for a group); `ids` are the members being turned; `start`/`cur` are
   // the pointer at grab and now, so the live angle is
   // `angle(cur - pivot) - angle(start - pivot)`. The base geometry stays in
-  // `m.byId` until commit, so `effGeom` rotates from there. `free` (shift
+  // `m.byId` until commit, so `effectiveGeometry` rotates from there. `free` (shift
   // held) bypasses rotation snapping for this sample. `view` (captured at
   // Down) projects screen-anchored members for preview + commit.
   | {
@@ -608,10 +613,10 @@ export interface PointerInput {
    * `scale`, so screen-anchored (`noZoom`/`noRotate`) annotations hit-test and
    * clamp at their effective geometry. Page space itself never rotates.
    */
-  displayRotation?: PageRotation;
+  displayRotation?: Rotation;
   /**
    * Screen pixels per page unit at the event: the page's view scale. A
-   * setting in screen pixels (`snap.alignmentThreshold`) is converted by it,
+   * setting in screen pixels (`snap.alignmentThresholdPx`) is converted by it,
    * so snapping feels the same at every zoom. Absent → 1.
    */
   scale?: number;
@@ -758,6 +763,8 @@ export type Message =
   | { type: 'setFlags'; patch: Partial<AnnotationFlags>; ids?: Id[] }
   // Merge fields into a tool's defaults (keyed by its preset).
   | { type: 'setDefaults'; preset: string; patch: FieldValues }
+  // Set a tool's defaults to exactly these, dropping any field they leave out.
+  | { type: 'replaceDefaults'; preset: string; defaults: FieldValues }
   // Live-adjust snapping (a UI toggle) — merges into `Model.snap`.
   | { type: 'setSnap'; patch: Partial<SnapSettings> }
   // Turn the selection a quarter turn, clockwise (90) or back (-90): the
@@ -932,9 +939,11 @@ export interface Paint {
   opacity?: number;
   dash?: number[]; // stroke dash (content units)
   blend?: Exclude<BlendMode, 'normal'>;
-  lineCap?: 'round'; // stroke-linecap; omitted = the default butt. Round for freehand ink.
-  join?: 'round'; // stroke-linejoin; omitted = the default miter. Round for freehand ink.
+  lineCap?: 'round'; // stroke-linecap; omitted = the default butt. Round for ink and icons.
+  join?: 'round'; // stroke-linejoin; omitted = the default miter. Round for clouds and icons.
   fillRule?: 'evenodd'; // fill-rule; omitted = the default nonzero. Even-odd punches icon holes.
+  /** The thinnest line the screen draws, one pixel at any zoom: a stroke of width 0 (ISO 32000-2 §8.4.3.2). */
+  hairline?: true;
 }
 
 /**

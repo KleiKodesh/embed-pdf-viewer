@@ -4,6 +4,7 @@ import type { PageBox } from '../geometry/pageSpace';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageRef } from '../identity/PageRef';
 import type { TextLayout } from '../text/layout';
+import { standardFontOfBaseFont } from '../fonts/fontList';
 import { drawnTextOf, type DrawnText } from './drawnText';
 import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataConformance';
 import { EVERY_PERMISSION } from './fixtureScope';
@@ -15,6 +16,8 @@ const LAST_RESORT = 'EmbedPDFLastResort-Regular';
 
 interface MixedScriptCase {
   name: string;
+  /** The box's font: Helvetica when left out. */
+  fontFamily?: string;
   value: string;
   /** What each font draws, in the order drawn, left to right. */
   runs: [font: string, text: string][];
@@ -65,6 +68,24 @@ const CASES: MixedScriptCase[] = [
     runs: [[ARABIC, 'مَرْحَبًا']],
   },
   {
+    // Noto Sans Hebrew has no Latin, and no fallback has it: the standard
+    // font that stands in for it draws it, never boxes.
+    name: 'Latin in a font that has none',
+    fontFamily: 'noto-sans-hebrew',
+    value: 'Hello שלום',
+    runs: [
+      ['Helvetica', 'Hello'],
+      [HEBREW, ' שלום'],
+    ],
+  },
+  {
+    // In the bold font's style.
+    name: 'bold Latin in a bold font that has none',
+    fontFamily: 'noto-sans-hebrew-bold',
+    value: 'Hi',
+    runs: [['Helvetica-Bold', 'Hi']],
+  },
+  {
     name: 'a character no font has',
     value: 'A中B',
     runs: [
@@ -76,7 +97,7 @@ const CASES: MixedScriptCase[] = [
   },
 ];
 
-/** A free text or a text field in Helvetica, holding `value`, in `box` on `page`. */
+/** A free text or a text field in `fontFamily`, holding `value`, in `box` on `page`. */
 interface Writer {
   name: string;
   field: boolean;
@@ -85,6 +106,7 @@ interface Writer {
     doc: DocumentHandle,
     page: PageRef,
     value: string,
+    fontFamily: string,
   ): Promise<{ ref: AnnotationRef; missing: string[] | undefined }>;
 }
 
@@ -97,11 +119,11 @@ const WRITERS: Writer[] = [
     name: 'free text',
     field: false,
     box: { x: 20, y: 20, width: 260, height: 40 },
-    async write(doc, page, value) {
+    async write(doc, page, value, fontFamily) {
       const { annotation, meta } = await doc.page(page).annotations.create({
         subtype: 'free-text',
         box: this.box,
-        fontFamily: 'helvetica',
+        fontFamily,
         fontSize: 12,
         contents: value,
       });
@@ -112,15 +134,15 @@ const WRITERS: Writer[] = [
     name: 'text field',
     field: true,
     box: { x: 20, y: 100, width: 260, height: 24 },
-    async write(doc, page, value) {
+    async write(doc, page, value, fontFamily) {
       const { field } = await doc.forms.create({
-        family: 'text',
+        kind: 'text',
         name: `mixed-${++fields}`,
         widgets: [
           {
             page,
             rect: this.box,
-            fontFamily: 'helvetica',
+            fontFamily,
             fontSize: 12,
           },
         ],
@@ -182,7 +204,8 @@ function problemsOf(drawn: DrawnText): string[] {
       problems.push(`${label} starts at ${run.x}, out of order`);
     }
     if (run.end === undefined) {
-      if (run.font !== 'Helvetica') problems.push(`${label} has no widths`);
+      // A standard font is written without its widths: every reader has them.
+      if (!standardFontOfBaseFont(run.font)) problems.push(`${label} has no widths`);
       return;
     }
     const next = runs[i + 1];
@@ -226,20 +249,21 @@ function charactersOutside(layout: TextLayout, box: PageBox): string[] {
  * font, what it says, its direction and its place; flattened, every
  * character's box inside the box it was written in, and its right-to-left
  * runs reading as written. Hebrew and Arabic come
- * from the engine's default fallback fonts, a character none has from its
- * last resort. `opts.fixture` is a blank page.
+ * from the engine's default fallback fonts, Latin a box's font lacks from the
+ * standard font that stands in for it, a character none has from the last
+ * resort. `opts.fixture` is a blank page.
  */
 export function runMixedScriptConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`mixed-script conformance: ${opts.label}`, () => {
+  describe(`mixed-script conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -249,11 +273,16 @@ export function runMixedScriptConformance(
     for (const writer of WRITERS) {
       for (const scriptCase of CASES) {
         test(`${writer.name}: ${scriptCase.name}`, async () => {
-          const doc = await openFixture(engine, opts);
+          const doc = await openFixture(engine, options);
           try {
             // A page of its own: what earlier cases flattened stays on theirs.
             const [page] = (await doc.pages.insertBlank({ size: PAGE_SIZE })).insertedPages;
-            const { ref, missing } = await writer.write(doc, page!, scriptCase.value);
+            const { ref, missing } = await writer.write(
+              doc,
+              page!,
+              scriptCase.value,
+              scriptCase.fontFamily ?? 'helvetica',
+            );
             const pdf = await doc.page(ref.page).annotations.exportAppearance([ref]);
             const drawn = await drawnTextOf(pdf);
             expect(drawn).toHaveLength(1);
@@ -281,7 +310,7 @@ export function runMixedScriptConformance(
     }
 
     test('a change says what each op drew with no font, and what all of them did', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = (await doc.pages.list()).pages[0]!;
         const freeText = (y: number, contents: string) =>
