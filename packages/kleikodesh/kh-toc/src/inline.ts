@@ -95,14 +95,14 @@ export function inlineOutlineTargets(saved: Uint8Array, start: number): Uint8Arr
   mark(trailer);
   const kept = objects.filter((o) => used.has(o.num));
 
-  const prevSize = Number(/\/Size\s+(\d+)/.exec(trailer)?.[1] ?? 0);
+  if (!changed) return saved;
+  // Dropped objects may have been the highest numbers the engine's /Size
+  // counted: one past the highest kept object, never below the base file's.
   const baseSize = baseSizeOf(saved, start);
-  const size = Math.max(baseSize, ...kept.map((o) => o.num + 1));
-  // The engine's /Size counts the object numbers it reserves at open, which
-  // no object uses: qpdf flags a /Size above the highest object number + 1.
-  const sizeTooBig = baseSize > 0 && prevSize > size;
-  if (!changed && !sizeTooBig) return saved;
-  if (prevSize && baseSize > 0) trailer = trailer.replace(/\/Size\s+\d+/, `/Size ${size}`);
+  if (baseSize > 0) {
+    const size = Math.max(baseSize, ...kept.map((o) => o.num + 1));
+    trailer = trailer.replace(/\/Size\s+\d+/, `/Size ${size}`);
+  }
 
   let out = '';
   const offsets = new Map<number, { off: number; gen: number }>();

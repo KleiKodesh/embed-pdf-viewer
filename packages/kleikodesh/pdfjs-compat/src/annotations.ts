@@ -341,12 +341,13 @@ async function draftOf(
         appearance = await stampImage(value.bitmapId);
       }
       if (!appearance) return { reason: `no image for stamp ${value.bitmapId ?? ''}`.trim() };
-      // PDF.js keeps the alt text in the structure tree (a /Figure with /Alt), which the
-      // engine can't write; as /Contents it would reopen as a comment, so it stays out.
+      // PDF.js keeps the alt text in the structure tree: a /Figure with /Alt.
+      const alt = value.accessibilityData?.alt;
       return {
         draft: {
           subtype: 'stamp',
           ...base,
+          ...(alt ? { altText: alt } : {}),
           ...turnedBox(value.rect, value.rotation, page.crop),
           fit: 'fill',
         },
