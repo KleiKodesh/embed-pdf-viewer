@@ -2,7 +2,7 @@
   "name": "@kleikodesh/pdfjs-compat",
   "version": "0.1.0",
   "private": true,
-  "description": "PDF.js shapes over the EmbedPDF engine: PDF.js annotation editor values (annotationStorage) written as engine annotation creates, updates and deletes.",
+  "description": "PDF.js shapes over the EmbedPDF engine: PDF.js annotation editor values (annotationStorage) written as engine annotation creates, updates and deletes; PDF.js getTextContent() shaped from page.text.objects().",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
