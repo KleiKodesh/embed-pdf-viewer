@@ -195,14 +195,11 @@ export async function applyAnnotationEdits(
     try {
       if (value.deleted) {
         if (!ref) continue;
-        // The annotation goes with its comment window (PDF.js deletes `popupRef` too).
+        // The engine deletes the annotation with its comment window (PDF.js deletes `popupRef` too).
         const { popup } = await existing(pageIndex!, ref);
         await annotations.delete(ref);
         out.deleted.push(ref);
-        if (popup) {
-          await annotations.delete(popup).catch(() => undefined);
-          out.deleted.push(popup);
-        }
+        if (popup) out.deleted.push(popup);
       } else if (ref) {
         const patch = patchOf(value, page);
         const comment = commentOf(value);
@@ -214,7 +211,8 @@ export async function applyAnnotationEdits(
           out.updated.push(ref);
         }
         if (comment === null && popup) {
-          // A deleted comment: PDF.js drops `/Popup`, `/Contents`, `/RC` and the window.
+          // A deleted comment: PDF.js drops `/Popup`, `/Contents`, `/RC` and the window
+          // (deleting the window unlinks it from its annotation).
           await annotations.delete(popup);
           out.deleted.push(popup);
         } else if (comment != null && !popup) {
@@ -318,9 +316,11 @@ async function draftOf(
           fontSize: positive(value.fontSize, 10),
           // PDF.js writes no border (`/Border [0 0 0]`).
           strokeWidth: 0,
-          // PDF.js's `/DA` color is the text's; the engine writes `/DA` from `color`.
+          // PDF.js has one color, the text's, and reads it from `/DA`; the engine writes the
+          // text's as `fontColor` and `/DA`'s as `color` (Acrobat's model), so it is both.
           ...(value.color ? { color: hexOf(value.color), fontColor: hexOf(value.color) } : {}),
-          ...alignOf(value.value),
+          // The editor shows text `dir="auto"`: right-to-left text is saved right-aligned.
+          textAlign: 'auto',
           richText: richTextOf(value.value),
         },
       };
@@ -415,7 +415,7 @@ function patchOf(value: PdfjsEditorValue, page: PageInfo): Record<string, unknow
       if (value.fontSize) patch.fontSize = value.fontSize;
       if (value.color) patch.color = patch.fontColor = hexOf(value.color);
       if (value.value != null)
-        Object.assign(patch, alignOf(value.value), { richText: richTextOf(value.value) });
+        Object.assign(patch, { textAlign: 'auto', richText: richTextOf(value.value) });
       break;
     case AnnotationEditorType.STAMP:
     case AnnotationEditorType.SIGNATURE:
@@ -535,21 +535,7 @@ function turnedBox(rect: number[], rotation: number | undefined, crop: PdfRect) 
 }
 
 function richTextOf(text: string) {
-  const body = isRtl(text) ? { body: { align: 'right', dir: 'rtl' } } : {};
-  return { ...body, paragraphs: text.split('\n').map((line) => ({ runs: [{ text: line }] })) };
-}
-
-/**
- * Right-to-left text (its first strong character is Hebrew or Arabic, as `dir="auto"` decides):
- * the free text editor shows it right-aligned, so it is saved right-aligned (`/Q 2`).
- */
-function isRtl(text: string): boolean {
-  const strong = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]|([֐-ࣿיִ-﷿ﹰ-﻿])/u.exec(text);
-  return !!strong?.[1];
-}
-
-function alignOf(text: string): Record<string, unknown> {
-  return isRtl(text) ? { textAlign: 'right' } : {};
+  return { paragraphs: text.split('\n').map((line) => ({ runs: [{ text: line }] })) };
 }
 
 /** An `ImageBitmap` (or any canvas image source) as PNG bytes; null without `OffscreenCanvas`. */
