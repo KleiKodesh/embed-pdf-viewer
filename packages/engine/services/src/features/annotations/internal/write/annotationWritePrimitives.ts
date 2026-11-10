@@ -174,6 +174,27 @@ export function writeAnnotStringOrClear(
 }
 
 /**
+ * Set (or, for `null` or empty, remove) the annotation's alternate
+ * description: the `/Alt` of its structure element, tagging it as a
+ * `/Figure` when it isn't tagged yet.
+ */
+export function writeAnnotAltText(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  value: string | null,
+): void {
+  const ptr = mem.writeU16String(value ?? '');
+  try {
+    if (!fn.EPDFAnnot_SetAltText(annotPtr, ptr)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetAltText returned false');
+    }
+  } finally {
+    mem.free(ptr);
+  }
+}
+
+/**
  * Set `/BS /S` (border style code) and `/BS /W` (width) in one call via
  * `EPDFAnnot_SetBorderStyle`. `styleCode` is a raw
  * `FPDF_ANNOT_BORDER_STYLE` enum value — the string<->code mapping lives

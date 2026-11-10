@@ -9,6 +9,7 @@ import { toLineBreaks, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import {
+  readAnnotAltText,
   readAnnotFlags,
   readAnnotRect,
   readAnnotString,
@@ -68,6 +69,7 @@ export function readAnnotationBase(
     rect,
     contents,
     subject,
+    altText: readAnnotAltText(fn, mem, annotPtr),
     author,
     createdAt: createdRaw ? pdfDateToIso(createdRaw) : null,
     modifiedAt: modifiedRaw ? pdfDateToIso(modifiedRaw) : null,

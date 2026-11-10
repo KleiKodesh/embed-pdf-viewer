@@ -11,6 +11,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 
 import {
   setAnnotFlags,
+  writeAnnotAltText,
   writeAnnotString,
   writeAnnotStringOrClear,
 } from './annotationWritePrimitives';
@@ -44,6 +45,9 @@ export function applyAnnotationBaseDraft(
   }
   if (draft.subject !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', draft.subject);
+  }
+  if (draft.altText) {
+    writeAnnotAltText(fn, mem, annotPtr, draft.altText);
   }
   if (draft.nm) {
     writeAnnotString(fn, mem, annotPtr, 'NM', draft.nm);
@@ -79,6 +83,9 @@ export function applyAnnotationBasePatch(
   }
   if (patch.subject !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', patch.subject);
+  }
+  if (patch.altText !== undefined) {
+    writeAnnotAltText(fn, mem, annotPtr, patch.altText);
   }
   if (patch.nm !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'NM', patch.nm || null);

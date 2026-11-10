@@ -51,6 +51,19 @@ export function readAnnotString(
 }
 
 /**
+ * The annotation's alternate description: the `/Alt` of the structure
+ * element that lists it. `null` when it isn't tagged or has none.
+ */
+export function readAnnotAltText(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: Ptr): string | null {
+  const text = readUtf16String(
+    mem,
+    (buf, capacity) => fn.EPDFAnnot_GetAltText(annotPtr, buf, capacity),
+    '',
+  );
+  return text === '' ? null : text;
+}
+
+/**
  * Read /Rect from an annot dict via FPDFAnnot_GetRect.
  * FS_RECTF layout: { float left, top, right, bottom } -> 16 bytes.
  */
