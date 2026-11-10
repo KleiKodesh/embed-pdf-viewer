@@ -209,7 +209,8 @@ export async function applyAnnotationEdits(
         const { popup, top } =
           comment === undefined ? { popup: null, top: null } : await existing(pageIndex!, ref);
         if (Object.keys(patch).length > 0) {
-          await annotations.update(ref, patch as AnnotationPatch);
+          const updated = await annotations.update(ref, patch as AnnotationPatch);
+          await drawInk(annotations, value, updated.annotation, page.crop);
           out.updated.push(ref);
         }
         if (comment === null && popup) {
@@ -238,6 +239,7 @@ export async function applyAnnotationEdits(
             resources: made.resources,
           } as never,
         );
+        await drawInk(annotations, value, result.annotation, page.crop);
         out.created.push(result.annotation.ref);
         // PopupAnnotation.createNewDict: a comment gets its window, linked both ways.
         if (commentOf(value)) {
@@ -354,6 +356,44 @@ async function draftOf(
     default:
       return { reason: `unsupported annotationType ${String(value.annotationType)}` };
   }
+}
+
+/**
+ * PDF.js draws ink as smoothed Bézier curves (`paths.lines`); the engine joins
+ * `/InkList` points with straight segments. Once the engine has placed the
+ * ink (its `/Rect`), PDF.js's curves become its appearance, drawn into that
+ * rect in page space.
+ */
+async function drawInk(
+  annotations: ReturnType<DocumentHandle['page']>['annotations'],
+  value: PdfjsEditorValue,
+  annotation: { ref: AnnotationRef; subtype: string; rect?: unknown },
+  crop: PdfRect,
+): Promise<void> {
+  const lines = value.paths?.lines;
+  if (value.annotationType !== AnnotationEditorType.INK || annotation.subtype !== 'ink') return;
+  if (!lines?.length) return;
+  const box = annotation.rect as
+    | { x: number; y: number; width: number; height: number }
+    | undefined;
+  if (!box) return;
+  const left = crop.left + box.x;
+  const top = crop.top - box.y;
+  const appearance = drawingPdf({
+    rect: [left, top - box.height, left + box.width, top],
+    lines,
+    color: value.color ?? [0, 0, 0],
+    thickness: positive(value.thickness),
+    areContours: false,
+    opacity: value.opacity,
+  });
+  await annotations.update(
+    annotation.ref,
+    {} as AnnotationPatch,
+    {
+      resources: { appearance },
+    } as never,
+  );
 }
 
 /** The fields an edit of an existing annotation changes, as PDF.js serializes them. */

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deflateSync } from 'node:zlib';
+import { deflateSync, inflateSync } from 'node:zlib';
 
 import { createLocalEngine } from '@embedpdf/engine';
 import type { DocumentHandle, Engine } from '@embedpdf/engine-core/public';
@@ -21,6 +21,25 @@ beforeAll(async () => {
 afterAll(async () => {
   await engine.destroy();
 });
+
+/** Every stream in the file that inflates, as text. */
+function inflatedStreams(pdf: Uint8Array): string[] {
+  const bytes = Buffer.from(pdf);
+  const out: string[] = [];
+  for (let at = bytes.indexOf('stream'); at >= 0; at = bytes.indexOf('stream', at + 6)) {
+    let start = at + 6;
+    if (bytes[start] === 13) start++;
+    if (bytes[start] === 10) start++;
+    const end = bytes.indexOf('endstream', start);
+    if (end < 0) break;
+    try {
+      out.push(inflateSync(bytes.subarray(start, end)).toString('latin1'));
+    } catch {
+      // Not Flate, or not a stream.
+    }
+  }
+  return out;
+}
 
 /** A 2×2 red PNG. */
 function png(): Uint8Array {
@@ -102,7 +121,10 @@ const created: PdfjsEditorValue[] = [
     color: [0, 0, 255],
     opacity: 0.5,
     thickness: 2,
-    paths: { lines: [], points: [[310, 510, 350, 550, 390, 510]] },
+    paths: {
+      lines: [[NaN, NaN, NaN, NaN, 310, 510, 330, 540, 370, 540, 390, 510]],
+      points: [[310, 510, 350, 550, 390, 510]],
+    },
   },
   {
     annotationType: T.FREETEXT,
@@ -149,6 +171,8 @@ describe('applyAnnotationEdits', () => {
       await doc.close();
     }
     expect(Buffer.from(first.subarray(0, sample.length)).equals(Buffer.from(sample))).toBe(true);
+    // The ink's appearance is PDF.js's curve, not straight segments.
+    expect(inflatedStreams(first).some((s) => s.includes('330 540 370 540 390 510 c'))).toBe(true);
 
     const again = await open(first);
     let second: Uint8Array;

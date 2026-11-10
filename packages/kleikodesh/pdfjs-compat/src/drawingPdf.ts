@@ -13,6 +13,8 @@ export interface Drawing {
   color: ArrayLike<number>;
   thickness: number;
   areContours: boolean;
+  /** 0–1; drawn through an ExtGState when below 1. */
+  opacity?: number;
 }
 
 const num = (n: number) => {
@@ -20,9 +22,13 @@ const num = (n: number) => {
   return Object.is(r, -0) ? '0' : String(r);
 };
 
-export function drawingContent({ lines, color, thickness, areContours }: Drawing): string {
+const translucent = (opacity: number | undefined) =>
+  typeof opacity === 'number' && opacity >= 0 && opacity < 1;
+
+export function drawingContent({ lines, color, thickness, areContours, opacity }: Drawing): string {
   const rgb = [0, 1, 2].map((i) => num((Number(color[i]) || 0) / 255)).join(' ');
   const out = [`${num(thickness)} w 1 J 1 j`, `${rgb} ${areContours ? 'rg' : 'RG'}`];
+  if (translucent(opacity)) out.unshift('/R0 gs');
   for (const line of lines) {
     if (line.length < 6) continue;
     out.push(`${num(line[4])} ${num(line[5])} m`);
@@ -48,7 +54,11 @@ export function drawingPdf(drawing: Drawing): Uint8Array {
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    `<< /Type /Page /Parent 2 0 R /MediaBox [${box}] /Resources << >> /Contents 4 0 R >>`,
+    `<< /Type /Page /Parent 2 0 R /MediaBox [${box}] /Resources << ${
+      translucent(drawing.opacity)
+        ? `/ExtGState << /R0 << /Type /ExtGState /CA ${num(drawing.opacity!)} /ca ${num(drawing.opacity!)} >> >> `
+        : ''
+    }>> /Contents 4 0 R >>`,
     `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
   ];
   let pdf = '%PDF-1.7\n';
