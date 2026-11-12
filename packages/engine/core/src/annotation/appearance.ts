@@ -104,6 +104,7 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
   'open',
   'groupId',
   'subject',
+  'altText',
   'state',
   'stateModel',
   'ref',

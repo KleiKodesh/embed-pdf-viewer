@@ -81,6 +81,14 @@ export const annotationBaseFields = {
   rect: field.data(PdfRectSchema).space('box'),
   contents: field.data(z.string()).nullable().optional(),
   subject: field.data(z.string()).nullable().optional(),
+  /**
+   * The annotation's alternate description for assistive technology: the
+   * `/Alt` of the structure element that lists it (ISO 32000-2 §14.9.3), e.g.
+   * what an image stamp shows. `null` when there is none; an update's `null`
+   * removes it. Writing one tags the annotation (a `/Figure` element) when it
+   * isn't tagged yet.
+   */
+  altText: field.data(z.string()).nullable().optional(),
   blendMode: field.data(BlendModeSchema).optional(),
   invisible: flag(),
   hidden: flag(),
