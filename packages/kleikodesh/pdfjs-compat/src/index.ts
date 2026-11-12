@@ -28,6 +28,8 @@ export {
   outlineOf,
   readDocInfo,
   readDocMeta,
+  readFingerprints,
+  readPageMode,
   type Attachment,
   type DocInfo,
   type DocMeta,

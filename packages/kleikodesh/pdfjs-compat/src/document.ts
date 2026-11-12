@@ -181,6 +181,19 @@ export async function readDocInfo(doc: DocumentHandle): Promise<DocInfo> {
   };
 }
 
+/** PDF.js getPageMode() alone: one catalog read, for the initial view (no outline or attachments). */
+export async function readPageMode(doc: DocumentHandle): Promise<string> {
+  return PAGE_MODES[(await doc.metadata.file()).pageMode] ?? 'UseNone';
+}
+
+/** pdfDocument.fingerprints alone (the view history key), without the rest of the metadata. */
+export async function readFingerprints(
+  doc: DocumentHandle,
+  bytes: Uint8Array,
+): Promise<[string, string | null]> {
+  return fingerprintsOf((await doc.metadata.file()).identifiers, bytes);
+}
+
 /** PDF.js pdfDocument.getDestination(id): the explicit destination a name stands for, or null. */
 export async function getDestination(
   doc: DocumentHandle,

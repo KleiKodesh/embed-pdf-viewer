@@ -6,7 +6,14 @@ import { createLocalEngine } from '@embedpdf/engine';
 import type { Engine } from '@embedpdf/engine-core/public';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { getDestination, isLinearized, readDocInfo, readDocMeta } from '../src';
+import {
+  getDestination,
+  isLinearized,
+  readDocInfo,
+  readDocMeta,
+  readFingerprints,
+  readPageMode,
+} from '../src';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const samplePath = resolve(here, '../../../../examples/engine-runtime-demo/public/sample.pdf');
@@ -77,6 +84,8 @@ describe('document info', () => {
       expect(meta.info.IsLinearized).toBe(false);
       expect(typeof meta.info.PDFFormatVersion).toBe('string');
       expect(meta.fingerprints[0]).toMatch(/^[0-9a-f]{32}$/);
+      expect(await readFingerprints(doc, sample)).toEqual(meta.fingerprints);
+      expect(await readPageMode(doc)).toBe('UseNone');
     } finally {
       await doc.close();
     }
