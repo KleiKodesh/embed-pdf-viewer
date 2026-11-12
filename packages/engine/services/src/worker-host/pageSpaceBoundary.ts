@@ -95,6 +95,8 @@ export function resultInPageSpace(
       const origin = firstOrigin && pagePointOf(firstOrigin, boxOf(ref.page));
       return { ...payload, text: { ...payload.text, firstOrigin: origin } };
     }
+    case 'actions.resolveNamedDestination':
+      return { ...payload, destination: payload.destination && toPage(payload.destination) };
     case 'annotations.list':
       return {
         ...payload,
