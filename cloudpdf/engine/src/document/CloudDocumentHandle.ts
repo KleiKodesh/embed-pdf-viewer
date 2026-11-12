@@ -9,6 +9,8 @@ import {
   attachmentVerbs,
   isPluginId,
   outlineVerbs,
+  annotationVerbs,
+  formVerbs,
   pageVerbs,
   subscribeToType,
   type DocumentAnnotationsService,
@@ -326,15 +328,18 @@ export class CloudDocumentHandle implements DocumentHandle {
     const importLimits = async () =>
       (security.currentAccess ?? (await security.establishAccess()).access)?.bundleLimits ??
       DEFAULT_BUNDLE_LIMITS;
-    this.annotations = new CloudDocumentAnnotationsService(
-      http,
-      id,
-      layerName,
-      () => this.closed,
-      this.manifestAccessor,
-      this.publisher,
-      this.writes,
-      importLimits,
+    this.annotations = annotationVerbs(
+      new CloudDocumentAnnotationsService(
+        http,
+        id,
+        layerName,
+        () => this.closed,
+        this.manifestAccessor,
+        this.publisher,
+        this.writes,
+        importLimits,
+      ),
+      (change, options) => this.apply(change, options),
     );
     this.actions = new CloudDocumentActionsService(
       http,
@@ -373,15 +378,18 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.publisher,
       this.writes,
     );
-    this.forms = new CloudDocumentFormsService(
-      http,
-      id,
-      layerName,
-      () => this.closed,
-      this.manifestAccessor,
-      this.publisher,
-      this.writes,
-      importLimits,
+    this.forms = formVerbs(
+      new CloudDocumentFormsService(
+        http,
+        id,
+        layerName,
+        () => this.closed,
+        this.manifestAccessor,
+        this.publisher,
+        this.writes,
+        importLimits,
+      ),
+      (change, options) => this.apply(change, options),
     );
     this.search = new CloudDocumentSearchService(
       http,
