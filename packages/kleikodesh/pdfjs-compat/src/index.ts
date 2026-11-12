@@ -21,3 +21,17 @@ export {
   type TextStyle,
 } from './textContent';
 export { normalizeUnicode, removeNullCharacters } from './textUtils';
+export {
+  explicitDestOf,
+  getDestination,
+  isLinearized,
+  outlineOf,
+  readDocInfo,
+  readDocMeta,
+  type Attachment,
+  type DocInfo,
+  type DocMeta,
+  type ExplicitDest,
+  type OutlineItem,
+  type PdfRef,
+} from './document';
