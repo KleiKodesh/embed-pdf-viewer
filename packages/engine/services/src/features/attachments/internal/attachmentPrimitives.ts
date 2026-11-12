@@ -159,7 +159,8 @@ export function extractAttachmentToBuffer(
     mem.poke(statusPtr, 'i32', -1);
     const ok = fn.EPDFAttachment_ExtractFileToOwnedBuffer(
       attachmentPtr,
-      BigInt(maxDecodedBytes ?? 0),
+      // Runtime 4dbc941c declares the limit as i32 (newer runtimes take i64).
+      maxDecodedBytes ?? 0,
       bufPtrSlot,
       sizePtr,
       statusPtr,
@@ -207,7 +208,8 @@ export function extractAttachmentToFile(
     const ok = fn.EPDFAttachment_ExtractFile(
       attachmentPtr,
       writer.ptr,
-      BigInt(maxDecodedBytes ?? 0),
+      // Runtime 4dbc941c declares the limit as i32 (newer runtimes take i64).
+      maxDecodedBytes ?? 0,
       sizePtr,
       statusPtr,
     );
