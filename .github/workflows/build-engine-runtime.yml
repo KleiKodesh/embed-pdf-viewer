@@ -151,6 +151,11 @@ jobs:
         with:
           name: engine-runtime-${{ matrix.target }}
           path: packages/engine/runtime/npm/${{ matrix.target }}/
+      - if: ${{ steps.payload-cache.outputs.cache-hit != 'true' && matrix.target == 'wasm32' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: engine-runtime-generated-functions
+          path: packages/engine/runtime/src/core/pdf-functions.generated.ts
 
   linux-arm:
     name: Linux arm64 + musl
