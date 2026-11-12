@@ -61,6 +61,18 @@ for TARGET in "${TARGETS[@]}"; do
 
   ASSET="engine-runtime-payload-$TARGET.tar.gz"
   URL="$BASE_URL/$ASSET"
+  # A fork pinned to its own runtime release (engine-runtime-build.json "fork") keeps the
+  # payload next to that release's libpdfium archives, named with the payload hash.
+  if [[ -z "${EPDF_PAYLOAD_REPO:-}" ]] && grep -q '"fork"' "$ROOT/engine-runtime-build.json"; then
+    FORK_URL="$(grep -o '"url": *"[^"]*wasm32[^"]*"' "$ROOT/engine-runtime-build.json" | head -1 | sed -E 's/.*"(https[^"]*)"/\1/')"
+    if [[ -n "$FORK_URL" ]]; then
+      CANDIDATE="$(dirname "$FORK_URL")/engine-runtime-payload-$TARGET-$HASH.tar.gz"
+      if curl -sfIL "$CANDIDATE" >/dev/null 2>&1; then
+        ASSET="engine-runtime-payload-$TARGET-$HASH.tar.gz"
+        URL="$CANDIDATE"
+      fi
+    fi
+  fi
 
   if ! curl -sfIL "$URL" >/dev/null 2>&1; then
     if ((WAIT_MINUTES > 0)); then
