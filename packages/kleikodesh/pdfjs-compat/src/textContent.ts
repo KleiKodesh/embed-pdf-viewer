@@ -15,7 +15,15 @@
 // PDF.js 5.7.284 `page.getTextContent()` built from the engine's `page.text.objects()`:
 // objects in content order with their marked-content stacks, glyphs in pen order.
 // The grouping is PDF.js's evaluator code (compareWithLastPosition & co.).
-import type { PageTextObjectsSnapshot } from '@embedpdf/engine-core';
+import {
+  PACKED_GLYPH_SPACE,
+  PACKED_GLYPH_STACKED,
+  PACKED_TEXT_OBJECT_KINDS,
+  PACKED_TEXT_OBJECT_NUMBERS,
+  PACKED_TEXT_OBJECT_STRIDE,
+  type PageTextObjectsPacked,
+  type PageTextObjectsSnapshot,
+} from '@embedpdf/engine-core';
 import { bidi } from './bidi';
 import { normalizeUnicode } from './textUtils';
 
@@ -94,35 +102,86 @@ function fontFamily(font: PageTextObjectsSnapshot['fonts'][number]) {
   return font.monospace ? 'monospace' : isSerif ? 'serif' : 'sans-serif';
 }
 
-/** PDF.js `page.getTextContent()` items and styles from `page.text.objects()`. */
-export function buildTextContent(snapshot: PageTextObjectsSnapshot, opts: BuildTextContentOptions): PdfjsTextContent {
+/** Each object's mark stack and glyphs, from either form of `page.text.objects()`. */
+function objectGlyphs(snapshot: PageTextObjectsSnapshot | PageTextObjectsPacked, fontNameOf: (font: number) => string) {
+  const objectMarks: number[][] = [];
+  const glyphs: Glyph[][] = [];
+  if ('glyphCodes' in snapshot) {
+    const { objects: o, objectNumbers: n, glyphNumbers: gn } = snapshot;
+    for (let i = 0; i * PACKED_TEXT_OBJECT_STRIDE < o.length; i++) {
+      const at = i * PACKED_TEXT_OBJECT_STRIDE;
+      objectMarks.push(Array.from(snapshot.objectMarks.subarray(o[at + 4], o[at + 4] + o[at + 5])));
+      const out: Glyph[] = [];
+      glyphs.push(out);
+      if (PACKED_TEXT_OBJECT_KINDS[o[at]] !== 'text' || !o[at + 3]) continue;
+      const fontName = fontNameOf(o[at + 1]);
+      const num = i * PACKED_TEXT_OBJECT_NUMBERS;
+      const fontSize = n[num];
+      const matrix = [n[num + 1], n[num + 2], n[num + 3], n[num + 4]].map((v) => v * fontSize);
+      const advScale = Math.hypot(n[num + 1], n[num + 2]) || 1;
+      for (let g = o[at + 2], end = g + o[at + 3]; g < end; g++) {
+        const flags = snapshot.glyphFlags[g];
+        out.push({
+          ch: String.fromCodePoint(snapshot.glyphCodes[g]),
+          x: gn[g * 3],
+          y: gn[g * 3 + 1],
+          w: gn[g * 3 + 2],
+          matrix,
+          fs: fontSize,
+          advScale,
+          fontName,
+          isSpace: (flags & PACKED_GLYPH_SPACE) !== 0,
+          piled: (flags & PACKED_GLYPH_STACKED) !== 0,
+        });
+      }
+    }
+    return { objectMarks, glyphs };
+  }
+  for (const o of snapshot.objects) {
+    objectMarks.push(o.marks);
+    if (o.kind !== 'text' || !o.glyphs.length) {
+      glyphs.push([]);
+      continue;
+    }
+    const fontName = fontNameOf(o.font);
+    const m = o.matrix;
+    const matrix = [m[0], m[1], m[2], m[3]].map((v) => v * o.fontSize);
+    const advScale = Math.hypot(m[0], m[1]) || 1;
+    glyphs.push(
+      o.glyphs.map((g) => ({
+        ch: g.unicode,
+        x: g.origin.x,
+        y: g.origin.y,
+        w: g.advance,
+        matrix,
+        fs: o.fontSize,
+        advScale,
+        fontName,
+        isSpace: /^\s$/.test(g.unicode),
+        piled: !!g.stacked,
+      })),
+    );
+  }
+  return { objectMarks, glyphs };
+}
+
+/**
+ * PDF.js `page.getTextContent()` items and styles from `page.text.objects()`
+ * (or `page.text.objectsPacked()`, the same content in typed arrays).
+ */
+export function buildTextContent(snapshot: PageTextObjectsSnapshot | PageTextObjectsPacked, opts: BuildTextContentOptions): PdfjsTextContent {
   const { viewBox } = opts;
   const plain = !!opts.plain;
   const styles: Record<string, TextStyle> = Object.create(null);
   const fontNames = new Map<number, string>();
-  const glyphs: Glyph[][] = snapshot.objects.map((o) => {
-    if (o.kind !== 'text' || !o.glyphs.length) return [];
-    let fontName = fontNames.get(o.font);
+  const { objectMarks, glyphs } = objectGlyphs(snapshot, (font) => {
+    let fontName = fontNames.get(font);
     if (!fontName) {
       fontName = `g_d0_f${fontNames.size + 1}`;
-      fontNames.set(o.font, fontName);
-      styles[fontName] = { fontFamily: fontFamily(snapshot.fonts[o.font]), ascent: 0, descent: 0, vertical: false };
+      fontNames.set(font, fontName);
+      styles[fontName] = { fontFamily: fontFamily(snapshot.fonts[font]), ascent: 0, descent: 0, vertical: false };
     }
-    const m = o.matrix;
-    const matrix = [m[0], m[1], m[2], m[3]].map((v) => v * o.fontSize);
-    const advScale = Math.hypot(m[0], m[1]) || 1;
-    return o.glyphs.map((g) => ({
-      ch: g.unicode,
-      x: g.origin.x,
-      y: g.origin.y,
-      w: g.advance,
-      matrix,
-      fs: o.fontSize,
-      advScale,
-      fontName: fontName!,
-      isSpace: /^\s$/.test(g.unicode),
-      piled: !!g.stacked,
-    }));
+    return fontName;
   });
 
   const textContent: PdfjsTextContent = { items: [], styles, lang: null };
@@ -334,8 +393,8 @@ export function buildTextContent(snapshot: PageTextObjectsSnapshot, opts: BuildT
     open = marks;
   };
 
-  snapshot.objects.forEach((o, oi) => {
-    syncMarks(o.marks);
+  objectMarks.forEach((marks, oi) => {
+    syncMarks(marks);
     for (const g of glyphs[oi]) {
       // setFont: a different font or size flushes (buildTextContentItem's check).
       if (g.fontName !== loadedName || g.fs !== fontSize) {
