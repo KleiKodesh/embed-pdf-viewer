@@ -167,6 +167,7 @@ export type {
   PdfTextSegment,
   PageTextSnapshot,
   PageTextObjectsSnapshot,
+  PageTextObjectsPacked,
   PageContentObject,
   PageContentMark,
   PageTextObject,

@@ -6,6 +6,7 @@ import {
   sliceText,
   wirePack,
   type PageTextService,
+  type PageTextObjectsPacked,
   type PageTextObjectsSnapshot,
   type PageTextSnapshot,
   type PageRef,
@@ -81,6 +82,27 @@ export class LocalPageTextService implements PageTextService {
   }
 
   objects(): AbortablePromise<PageTextObjectsSnapshot> {
+    return this.readObjects(false, (payload) => {
+      if (payload.tag !== 'pages.textObjects') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      return payload.snapshot;
+    });
+  }
+
+  objectsPacked(): AbortablePromise<PageTextObjectsPacked> {
+    return this.readObjects(true, (payload) => {
+      if (payload.tag !== 'pages.textObjectsPacked') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      return payload.packed;
+    });
+  }
+
+  private readObjects<T>(
+    packed: boolean,
+    unwrap: (payload: WorkerResultPayload) => T,
+  ): AbortablePromise<T> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -96,17 +118,20 @@ export class LocalPageTextService implements PageTextService {
     const ref = this.ref;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'pages.textObjects', effect: 'read', jobId, docId, page: ref }),
+        wirePack({
+          kind: 'pages.textObjects',
+          effect: 'read',
+          jobId,
+          docId,
+          page: ref,
+          ...(packed ? { packed: true as const } : {}),
+        }),
     });
-    return AbortablePromise.run<PageTextObjectsSnapshot>(async (signal) => {
+    return AbortablePromise.run<T>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
-      const payload = await submission;
-      if (payload.tag !== 'pages.textObjects') {
-        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
-      }
-      return payload.snapshot;
+      return unwrap(await submission);
     });
   }
 

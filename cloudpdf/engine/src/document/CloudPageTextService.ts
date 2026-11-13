@@ -6,6 +6,7 @@ import {
   sliceText,
   type PageRef,
   type PageTextService,
+  type PageTextObjectsPacked,
   type PageTextObjectsSnapshot,
   type PageTextSnapshot,
   type TextLayout,
@@ -54,6 +55,16 @@ export class CloudPageTextService implements PageTextService {
   layout(): AbortablePromise<TextLayout> {
     return this.readLeaf('geometry', (raw) =>
       createTextLayout(PageGeometrySnapshotSchema.parse(raw)),
+    );
+  }
+
+  /** Not served by the cloud API yet. */
+  objectsPacked(): AbortablePromise<PageTextObjectsPacked> {
+    return AbortablePromise.rejectReason(
+      new EngineError(
+        EngineErrorCode.NotImplemented,
+        'page text objects are not available from the cloud engine yet',
+      ),
     );
   }
 

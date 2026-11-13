@@ -16,6 +16,8 @@ import {
   itemWrote,
   EngineErrorCode,
   serializeError,
+  packedTextObjectsBuffers,
+  unpackPageTextObjects,
   wirePack,
   type AnnotationsCreateWorkerRequest,
   type AnnotationsDeleteWorkerRequest,
@@ -1966,8 +1968,11 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const reader = new PageTextObjectsReader(this.runtime, session);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
-    const snapshot = await reader.read(pageObjectNumber, signal, this.slices);
-    return wirePack({ tag: 'pages.textObjects', snapshot });
+    const packed = await reader.readPacked(pageObjectNumber, signal, this.slices);
+    if (req.packed) {
+      return wirePack({ tag: 'pages.textObjectsPacked', packed }, packedTextObjectsBuffers(packed));
+    }
+    return wirePack({ tag: 'pages.textObjects', snapshot: unpackPageTextObjects(packed) });
   }
 
   private async handleSearchQuery(
