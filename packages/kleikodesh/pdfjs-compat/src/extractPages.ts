@@ -14,6 +14,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Engine } from '@embedpdf/engine-core/public';
 
+import { finishOrganizedPdf } from './organizerPostPass';
+
 type Any = any;
 
 /** One entry of PDF.js's `extractPages(pageInfos)`. */
@@ -233,7 +235,16 @@ export async function extractPages(
     for (const [s, o] of others.entries())
       if (o?.outline.length) await copyOutline(doc, o.doc, o.outline, insertedFrom.get(s)!);
     await pruneOutline(doc, new Set((await doc.pages.list()).pages.map((p: Any) => refKey(p.ref))));
-    return await doc.download({ mode: 'rewrite' });
+    const saved = await doc.download({ mode: 'rewrite' });
+    // Every page from the open document: finish it like PDFEditor (structure tree, links, fields).
+    if (sources.every((src) => src === base || src === null)) {
+      try {
+        return finishOrganizedPdf(base, saved, layout);
+      } catch {
+        return saved;
+      }
+    }
+    return saved;
   } finally {
     await doc.close();
     for (const o of others) await o?.doc.close();
