@@ -89,6 +89,47 @@ export interface TextObjectChar {
   width: number;
 }
 
+/** The text page's characters in columns (see `readChars`). */
+interface CharColumns {
+  /** Text-page index, code point, origin and shear-free loose width per character read. */
+  index: Int32Array;
+  code: Uint32Array;
+  x: Float64Array;
+  y: Float64Array;
+  width: Float64Array;
+  /** Per text-page index: 1 on a right-to-left line. */
+  lineRtl: Uint8Array;
+  /** Characters grouped by object; `slotStart`/`slotCount` give each group's range. */
+  order: Int32Array;
+  slotOf: Map<number | bigint, number>;
+  slotStart: Int32Array;
+  slotCount: Int32Array;
+  uniformWidths: Map<number | bigint, boolean>;
+  count: number;
+}
+
+/** `isSpace` for one code point. */
+function isSpaceCode(u: number): boolean {
+  return (
+    (u >= 9 && u <= 13) ||
+    u === 32 ||
+    u === 0xa0 ||
+    u === 0x1680 ||
+    (u >= 0x2000 && u <= 0x200a) ||
+    u === 0x2028 ||
+    u === 0x2029 ||
+    u === 0x202f ||
+    u === 0x205f ||
+    u === 0x3000 ||
+    u === 0xfeff
+  );
+}
+
+/** `MIRRORED` by code point. */
+const MIRRORED_CODES = new Map<number, number>(
+  Object.entries(MIRRORED).map(([a, b]) => [a.codePointAt(0)!, b.codePointAt(0)!]),
+);
+
 /**
  * Object-level page text: every page object in content order with its
  * marked-content stack, and each text object's font, matrix and glyphs in
@@ -190,17 +231,23 @@ export class PageTextObjectsReader {
               for (let k = 0; k < 6; k++) matrix[k] = readF32(mem, scratch, k * 4);
             }
             for (let k = 0; k < 6; k++) objectNumbers[num + 1 + k] = matrix[k];
-            const chars = charsByObject.chars.get(object.handle) ?? [];
-            const reversed = orderGlyphs(chars, matrix, charsByObject.lineRtl, (c, unicode, advance, stacked) => {
-              glyphCodes[glyphAt] = unicode.codePointAt(0) ?? 0;
-              glyphIndexes[glyphAt] = c.index;
-              glyphNumbers[glyphAt * 3] = c.x;
-              glyphNumbers[glyphAt * 3 + 1] = c.y;
-              glyphNumbers[glyphAt * 3 + 2] = advance;
-              glyphFlags[glyphAt] =
-                (isSpace(unicode) ? PACKED_GLYPH_SPACE : 0) | (stacked ? PACKED_GLYPH_STACKED : 0);
-              glyphAt++;
-            });
+            const slot = charsByObject.slotOf.get(object.handle);
+            let reversed = false;
+            if (slot !== undefined) {
+              const cols = charsByObject;
+              const from = cols.slotStart[slot];
+              const list = cols.order.subarray(from, from + cols.slotCount[slot]);
+              reversed = orderPackedGlyphs(cols, list, matrix, (c, code, advance, stacked) => {
+                glyphCodes[glyphAt] = code;
+                glyphIndexes[glyphAt] = cols.index[c];
+                glyphNumbers[glyphAt * 3] = cols.x[c];
+                glyphNumbers[glyphAt * 3 + 1] = cols.y[c];
+                glyphNumbers[glyphAt * 3 + 2] = advance;
+                glyphFlags[glyphAt] =
+                  (isSpaceCode(code) ? PACKED_GLYPH_SPACE : 0) | (stacked ? PACKED_GLYPH_STACKED : 0);
+                glyphAt++;
+              });
+            }
             objects[at + 3] = glyphAt - objects[at + 2];
             objects[at + 6] = reversed ? 1 : 0;
           }
@@ -283,32 +330,41 @@ export class PageTextObjectsReader {
   }
 
   /**
-   * The text page's characters grouped by text object, each line's base
-   * direction, and, for fonts whose glyph widths can't be probed, whether the
-   * cells they draw on this page are all one width (the fixed-pitch fallback).
+   * The text page's characters in columns, grouped by text object (`order`
+   * holds each object's characters in text-page order, `slotOf` maps an
+   * object handle to its group), each character's line direction, and, for
+   * fonts whose glyph widths can't be probed, whether the cells they draw on
+   * this page are all one width (the fixed-pitch fallback).
    */
   private async readChars(
     textPagePtr: Ptr,
     timer: SliceTimer,
     fontProbes: Map<number | bigint, FontProbe>,
-  ) {
+  ): Promise<CharColumns> {
     const { fn, mem } = this.runtime;
     const count = Math.max(fn.FPDFText_CountChars(textPagePtr), 0);
-    const lineRtl: boolean[] = new Array(count);
-    const codePoints = new Array<number>(count);
+    const lineRtl = new Uint8Array(count);
+    const codePoints = new Uint32Array(count);
     let lineStart = 0;
     let rtl = false;
     for (let i = 0; i <= count; i++) {
       const u = i < count ? (codePoints[i] = fn.FPDFText_GetUnicode(textPagePtr, i)) : 10;
       if (u === 10 || u === 13) {
-        for (let j = lineStart; j <= i && j < count; j++) lineRtl[j] = rtl;
+        if (rtl) lineRtl.fill(1, lineStart, Math.min(i + 1, count));
         lineStart = i + 1;
         rtl = false;
       } else if (isRtlCodePoint(u)) {
         rtl = true;
       }
     }
-    const chars = new Map<number | bigint, TextObjectChar[]>();
+    const index = new Int32Array(count);
+    const code = new Uint32Array(count);
+    const x = new Float64Array(count);
+    const y = new Float64Array(count);
+    const width = new Float64Array(count);
+    const slotOfChar = new Int32Array(count);
+    const slotOf = new Map<number | bigint, number>();
+    const slotSizes: number[] = [];
     const widthsByFont = new Map<number | bigint, Set<number>>();
     let read = 0;
     // x and y (f64) then the loose box (FS_RECTF), in one block.
@@ -317,8 +373,7 @@ export class PageTextObjectsReader {
     const matrixPtr = mem.alloc(24);
     // Consecutive characters mostly share a text object: its font and slant are read once.
     let lastObject: Ptr | undefined;
-    let list: TextObjectChar[] | undefined;
-    let fontPtr: Ptr = 0n as Ptr;
+    let slot = -1;
     let cellWidths: Set<number> | undefined;
     let slant = 0;
     try {
@@ -330,9 +385,14 @@ export class PageTextObjectsReader {
         if (!object) continue;
         if (object !== lastObject) {
           lastObject = object;
-          list = chars.get(object);
-          if (!list) chars.set(object, (list = []));
-          fontPtr = fn.FPDFTextObj_GetFont(object);
+          let found = slotOf.get(object);
+          if (found === undefined) {
+            found = slotSizes.length;
+            slotOf.set(object, found);
+            slotSizes.push(0);
+          }
+          slot = found;
+          const fontPtr = fn.FPDFTextObj_GetFont(object);
           // Cell widths only matter for a font whose glyph widths say nothing.
           cellWidths = undefined;
           if (this.probeFont(fontPtr, fontProbes).needsCells) {
@@ -346,7 +406,7 @@ export class PageTextObjectsReader {
             if (c && d) slant = Math.abs(c / d);
           }
         }
-        const unicode = String.fromCodePoint(codePoints[i]);
+        const u = codePoints[i];
         fn.FPDFText_GetCharOrigin(textPagePtr, i, xPtr, yPtr);
         fn.FPDFText_GetLooseCharBox(textPagePtr, i, rectPtr);
         // FS_RECTF { left, top, right, bottom }
@@ -354,29 +414,49 @@ export class PageTextObjectsReader {
         const top = readF32(mem, rectPtr, 4);
         const right = readF32(mem, rectPtr, 8);
         const bottom = readF32(mem, rectPtr, 12);
-        let width = right - left;
-        if (cellWidths && width > 0 && !isSpace(unicode)) {
+        let w = right - left;
+        if (cellWidths && w > 0 && !isSpaceCode(u)) {
           const fontSize = fn.FPDFText_GetFontSize(textPagePtr, i) || 1;
-          cellWidths.add(Math.round((width / fontSize) * 1000));
+          cellWidths.add(Math.round((w / fontSize) * 1000));
         }
         // Sheared text: the loose box bounds the slanted cell; remove the slant.
-        if (slant) width = Math.max(0, width - slant * Math.abs(top - bottom));
-        list!.push({
-          index: i,
-          unicode,
-          x: Number(mem.peek(xPtr, 'f64')),
-          y: Number(mem.peek(yPtr, 'f64')),
-          width,
-        });
+        if (slant) w = Math.max(0, w - slant * Math.abs(top - bottom));
+        index[read] = i;
+        code[read] = u;
+        x[read] = Number(mem.peek(xPtr, 'f64'));
+        y[read] = Number(mem.peek(yPtr, 'f64'));
+        width[read] = w;
+        slotOfChar[read] = slot;
+        slotSizes[slot]++;
         read++;
       }
     } finally {
       mem.free(matrixPtr);
       mem.free(block);
     }
+    // Group by object, keeping text-page order within each group.
+    const slotStart = new Int32Array(slotSizes.length);
+    const slotCount = Int32Array.from(slotSizes);
+    for (let k = 1; k < slotSizes.length; k++) slotStart[k] = slotStart[k - 1] + slotSizes[k - 1];
+    const fill = slotStart.slice();
+    const order = new Int32Array(read);
+    for (let c = 0; c < read; c++) order[fill[slotOfChar[c]]++] = c;
     const uniformWidths = new Map<number | bigint, boolean>();
     for (const [font, set] of widthsByFont) uniformWidths.set(font, set.size === 1);
-    return { chars, lineRtl, uniformWidths, count: read };
+    return {
+      index,
+      code,
+      x,
+      y,
+      width,
+      lineRtl,
+      order,
+      slotOf,
+      slotStart,
+      slotCount,
+      uniformWidths,
+      count: read,
+    };
   }
 
   /**
@@ -514,6 +594,86 @@ function orderGlyphs(
       if (step > 0) advance = step / scale;
     }
     emit(c, rtl && MIRRORED[c.unicode] ? MIRRORED[c.unicode] : c.unicode, advance, stacked);
+  }
+  return rtl;
+}
+
+/**
+ * `orderGlyphs` over character columns, with no per-glyph objects: `list`
+ * holds the object's characters (column positions) in text-page order.
+ * Same order, advances and mirroring.
+ */
+function orderPackedGlyphs(
+  cols: CharColumns,
+  list: Int32Array,
+  matrix: readonly number[],
+  emit: (c: number, code: number, advance: number, stacked: boolean) => void,
+): boolean {
+  const n = list.length;
+  if (n === 0) return false;
+  const { x, y, code, index } = cols;
+  const [ax, ay] = matrix;
+  const along = new Float64Array(n);
+  for (let k = 0; k < n; k++) along[k] = x[list[k]] * ax + y[list[k]] * ay;
+  let direction = 0;
+  let previous = -1;
+  let solidCount = 0;
+  for (let k = 0; k < n; k++) {
+    if (isSpaceCode(code[list[k]])) continue;
+    solidCount++;
+    if (previous >= 0 && !direction) {
+      const delta = along[k] - along[previous];
+      if (Math.abs(delta) > 1e-3) direction = Math.sign(delta);
+    }
+    previous = k;
+  }
+  const rtl = direction ? direction < 0 : cols.lineRtl[index[list[0]]] === 1;
+  const stacked = direction === 0 && solidCount > 1;
+  // Positions within `list`; text-page order is position order.
+  let sorted: number[] = new Array(n);
+  for (let k = 0; k < n; k++) sorted[k] = k;
+  if (stacked) {
+    if (rtl) sorted.reverse();
+  } else {
+    // Mostly already in order, or in reverse (right-to-left): no ties then, so
+    // the sort would give the same.
+    let rising = true;
+    let falling = true;
+    for (let k = 1; k < n && (rising || falling); k++) {
+      if (!(along[k] > along[k - 1])) rising = false;
+      if (!(along[k] < along[k - 1])) falling = false;
+    }
+    if (falling && n > 1) sorted.reverse();
+    else if (!rising) sorted.sort((a, b) => along[a] - along[b] || (rtl ? b - a : a - b));
+    if (rtl) {
+      let firstSolid = 0;
+      while (firstSolid < n && isSpaceCode(code[list[firstSolid]])) firstSolid++;
+      if (firstSolid === n) firstSolid = -1;
+      let lastSolid = n - 1;
+      while (lastSolid >= 0 && isSpaceCode(code[list[lastSolid]])) lastSolid--;
+      if (lastSolid < n - 1 || firstSolid > 0) {
+        const trailing = (k: number) => k > lastSolid;
+        const leading = (k: number) => k < firstSolid;
+        const descending = (a: number, b: number) => b - a;
+        sorted = [
+          ...sorted.filter(trailing).sort(descending),
+          ...sorted.filter((k) => !trailing(k) && !leading(k)),
+          ...sorted.filter(leading).sort(descending),
+        ];
+      }
+    }
+  }
+  const scale = Math.hypot(ax, ay) || 1;
+  for (let j = 0; j < n; j++) {
+    const k = sorted[j];
+    const c = list[k];
+    let advance = cols.width[c];
+    if (j + 1 < n) {
+      const step = along[sorted[j + 1]] - along[k];
+      if (step > 0) advance = step / scale;
+    }
+    const u = code[c];
+    emit(c, rtl ? (MIRRORED_CODES.get(u) ?? u) : u, advance, stacked);
   }
   return rtl;
 }
