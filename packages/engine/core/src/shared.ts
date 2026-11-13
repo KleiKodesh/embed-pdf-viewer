@@ -158,6 +158,16 @@ export type {
   PageTextGlyph,
   PageTextObject,
   PageTextObjectsSnapshot,
+  PageTextObjectsPacked,
+} from './dto/PageTextObjectsSnapshot';
+export {
+  PACKED_GLYPH_SPACE,
+  PACKED_GLYPH_STACKED,
+  PACKED_TEXT_OBJECT_KINDS,
+  PACKED_TEXT_OBJECT_NUMBERS,
+  PACKED_TEXT_OBJECT_STRIDE,
+  packedTextObjectsBuffers,
+  unpackPageTextObjects,
 } from './dto/PageTextObjectsSnapshot';
 export type {
   PageGeometryGlyph,

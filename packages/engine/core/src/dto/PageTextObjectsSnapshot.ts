@@ -116,3 +116,100 @@ export interface PageTextFont {
   /** True when the descriptor's Serif flag is set. */
   serif: boolean;
 }
+
+/**
+ * `PageTextObjectsSnapshot` in typed-array columns, returned by
+ * `PageHandle.text.objectsPacked()`. Same content, but a worker hands the
+ * arrays over without copying and nothing is allocated per glyph: the shape
+ * for reads that walk every page (find, copy-all), where per-glyph objects
+ * cost more than the read itself. `unpackPageTextObjects` gives the snapshot.
+ */
+export interface PageTextObjectsPacked {
+  /**
+   * `PACKED_TEXT_OBJECT_STRIDE` integers per object: its kind
+   * (`PACKED_TEXT_OBJECT_KINDS` index), font index (-1 when not text), first
+   * glyph, glyph count, first entry in `objectMarks`, mark count, and 1 when
+   * `reversed`.
+   */
+  objects: Int32Array;
+  /** Every object's mark stack (indexes into `marks`), back to back. */
+  objectMarks: Int32Array;
+  /** Per object, `fontSize` then `matrix` (7 numbers; zeros when not text). */
+  objectNumbers: Float64Array;
+  /** Per glyph, the code point of `unicode`. */
+  glyphCodes: Uint32Array;
+  /** Per glyph, `index`. */
+  glyphIndexes: Int32Array;
+  /** Per glyph, `origin.x`, `origin.y` and `advance`. */
+  glyphNumbers: Float64Array;
+  /** Per glyph, `PACKED_GLYPH_SPACE` and `PACKED_GLYPH_STACKED` bits. */
+  glyphFlags: Uint8Array;
+  marks: PageContentMark[];
+  fonts: PageTextFont[];
+}
+
+/** Integers per object in `PageTextObjectsPacked.objects`. */
+export const PACKED_TEXT_OBJECT_STRIDE = 7;
+/** Numbers per object in `PageTextObjectsPacked.objectNumbers`. */
+export const PACKED_TEXT_OBJECT_NUMBERS = 7;
+/** `PageTextObjectsPacked.objects` kind codes. */
+export const PACKED_TEXT_OBJECT_KINDS: readonly PageContentObjectKind[] = [
+  'text',
+  'path',
+  'image',
+  'shading',
+  'unknown',
+];
+export const PACKED_GLYPH_SPACE = 1;
+export const PACKED_GLYPH_STACKED = 2;
+
+/** The buffers of a packed snapshot, for a transfer list. */
+export function packedTextObjectsBuffers(packed: PageTextObjectsPacked): ArrayBuffer[] {
+  return [
+    packed.objects,
+    packed.objectMarks,
+    packed.objectNumbers,
+    packed.glyphCodes,
+    packed.glyphIndexes,
+    packed.glyphNumbers,
+    packed.glyphFlags,
+  ].map((a) => a.buffer as ArrayBuffer);
+}
+
+/** `PageTextObjectsPacked` back to the snapshot it encodes. */
+export function unpackPageTextObjects(packed: PageTextObjectsPacked): PageTextObjectsSnapshot {
+  const { objects: o, objectMarks, objectNumbers: n } = packed;
+  const objects: PageContentObject[] = [];
+  for (let i = 0; i * PACKED_TEXT_OBJECT_STRIDE < o.length; i++) {
+    const at = i * PACKED_TEXT_OBJECT_STRIDE;
+    const kind = PACKED_TEXT_OBJECT_KINDS[o[at]] ?? 'unknown';
+    const marks = Array.from(objectMarks.subarray(o[at + 4], o[at + 4] + o[at + 5]));
+    if (kind !== 'text') {
+      objects.push({ kind, marks });
+      continue;
+    }
+    const num = i * PACKED_TEXT_OBJECT_NUMBERS;
+    const glyphs: PageTextGlyph[] = [];
+    for (let g = o[at + 2], end = g + o[at + 3]; g < end; g++) {
+      const flags = packed.glyphFlags[g];
+      glyphs.push({
+        index: packed.glyphIndexes[g],
+        unicode: String.fromCodePoint(packed.glyphCodes[g]),
+        origin: { x: packed.glyphNumbers[g * 3], y: packed.glyphNumbers[g * 3 + 1] },
+        advance: packed.glyphNumbers[g * 3 + 2],
+        ...(flags & PACKED_GLYPH_SPACE ? { space: true as const } : {}),
+        ...(flags & PACKED_GLYPH_STACKED ? { stacked: true as const } : {}),
+      });
+    }
+    objects.push({
+      kind,
+      marks,
+      font: o[at + 1],
+      fontSize: n[num],
+      matrix: [n[num + 1], n[num + 2], n[num + 3], n[num + 4], n[num + 5], n[num + 6]],
+      ...(o[at + 6] ? { reversed: true as const } : {}),
+      glyphs,
+    });
+  }
+  return { objects, marks: packed.marks, fonts: packed.fonts };
+}

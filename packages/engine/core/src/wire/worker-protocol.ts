@@ -23,7 +23,7 @@ import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { PageNetworkRenderFormat, PageRaster, PageRenderOptions } from '../dto/PageRender';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
-import type { PageTextObjectsSnapshot } from '../dto/PageTextObjectsSnapshot';
+import type { PageTextObjectsPacked, PageTextObjectsSnapshot } from '../dto/PageTextObjectsSnapshot';
 import type { DocumentActionsSnapshot } from '../dto/PdfAction';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
@@ -980,6 +980,8 @@ export interface PagesTextObjectsWorkerRequest {
   docId: string;
   layerName?: string;
   page: PageRef;
+  /** Answer with `PageTextObjectsPacked`, its arrays on the transfer list. */
+  packed?: true;
 }
 
 /**
@@ -1907,6 +1909,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     } & WritePayloadFacts)
   | { tag: 'pages.text'; snapshot: PageTextSnapshot }
   | { tag: 'pages.textObjects'; snapshot: PageTextObjectsSnapshot }
+  | { tag: 'pages.textObjectsPacked'; packed: PageTextObjectsPacked }
   | { tag: 'pages.geometry'; page: PageRef; snapshot: PageGeometrySnapshot<C> }
   | {
       tag: 'pages.render';

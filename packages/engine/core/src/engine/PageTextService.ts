@@ -1,4 +1,7 @@
-import type { PageTextObjectsSnapshot } from '../dto/PageTextObjectsSnapshot';
+import type {
+  PageTextObjectsPacked,
+  PageTextObjectsSnapshot,
+} from '../dto/PageTextObjectsSnapshot';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 import type { TextLayout } from '../text/layout';
@@ -28,4 +31,11 @@ export interface PageTextService {
    * `doc.text.copy`.
    */
   objects(): AbortablePromise<PageTextObjectsSnapshot>;
+  /**
+   * `objects()` in typed-array columns (`unpackPageTextObjects` gives the
+   * snapshot): no per-glyph objects, and a worker transfers the arrays
+   * instead of copying them. For reads of every page, such as find. Needs
+   * `doc.text.copy`.
+   */
+  objectsPacked(): AbortablePromise<PageTextObjectsPacked>;
 }

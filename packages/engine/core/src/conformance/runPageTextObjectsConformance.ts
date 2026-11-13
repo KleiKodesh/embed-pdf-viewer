@@ -1,4 +1,8 @@
-import type { PageTextObject, PageTextObjectsSnapshot } from '../dto/PageTextObjectsSnapshot';
+import {
+  unpackPageTextObjects,
+  type PageTextObject,
+  type PageTextObjectsSnapshot,
+} from '../dto/PageTextObjectsSnapshot';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -166,6 +170,19 @@ export function runPageTextObjectsConformance(
       const [hello] = texts(snapshot);
       expect(Math.abs(hello.glyphs[0].origin.x - 72) < TOLERANCE).toBe(true);
       expect(Math.abs(hello.glyphs[0].origin.y - 700) < TOLERANCE).toBe(true);
+    });
+
+    test('objectsPacked() holds the same snapshot in typed arrays', async () => {
+      const snapshot = await read();
+      const doc = await open();
+      try {
+        const packed = await doc.page(PAGE).text.objectsPacked();
+        expect(packed.glyphCodes instanceof Uint32Array).toBe(true);
+        expect(packed.glyphNumbers instanceof Float64Array).toBe(true);
+        expect(unpackPageTextObjects(packed)).toEqual(snapshot);
+      } finally {
+        await doc.close();
+      }
     });
 
     test('an unknown page throws NotFound', async () => {
