@@ -74,19 +74,6 @@ const VERTICAL_SHIFT_RATIO = 0.25;
 // getSerifFonts() keys that can match a normalized (whitespace-free) name.
 const SERIF_FONTS = new Set(['Bembo', 'Bodoni', 'Bordeaux', 'Cholla', 'Concrete', 'Plantin', 'Rotis', 'Trinité', 'Trump', 'Wingdings']);
 
-interface Glyph {
-  ch: string;
-  x: number;
-  y: number;
-  w: number;
-  matrix: number[];
-  fs: number;
-  advScale: number;
-  fontName: string;
-  isSpace: boolean;
-  piled: boolean;
-}
-
 function fontFamily(font: PageTextObjectsSnapshot['fonts'][number]) {
   // fonts.js: fallbackName = isMonospace ? "monospace" : isSerifFont ? "serif" : "sans-serif"
   let isSerif = font.serif;
@@ -102,67 +89,70 @@ function fontFamily(font: PageTextObjectsSnapshot['fonts'][number]) {
   return font.monospace ? 'monospace' : isSerif ? 'serif' : 'sans-serif';
 }
 
-/** Each object's mark stack and glyphs, from either form of `page.text.objects()`. */
-function objectGlyphs(snapshot: PageTextObjectsSnapshot | PageTextObjectsPacked, fontNameOf: (font: number) => string) {
-  const objectMarks: number[][] = [];
-  const glyphs: Glyph[][] = [];
+/** A text object's run of glyphs in the columns below, with what its glyphs share. */
+interface ObjectRun {
+  marks: number[];
+  start: number;
+  end: number;
+  fontName: string;
+  fs: number;
+  /** The object's matrix times the font size (a, b, c, d). */
+  matrix: number[];
+  advScale: number;
+}
+
+/**
+ * Each object's run and the glyphs in columns (code point; x, y, advance; space/stacked
+ * flags), from either form of `page.text.objects()`. Nothing is allocated per glyph.
+ */
+function objectRuns(snapshot: PageTextObjectsSnapshot | PageTextObjectsPacked, fontNameOf: (font: number) => string) {
+  const runs: ObjectRun[] = [];
+  const run = (marks: number[], start: number, end: number, font: number, fs: number, m: ArrayLike<number>, at: number) => {
+    const text = end > start;
+    runs.push({
+      marks,
+      start,
+      end,
+      fontName: text ? fontNameOf(font) : '',
+      fs,
+      matrix: text ? [m[at], m[at + 1], m[at + 2], m[at + 3]].map((v) => v * fs) : [],
+      advScale: text ? Math.hypot(m[at], m[at + 1]) || 1 : 1,
+    });
+  };
   if ('glyphCodes' in snapshot) {
-    const { objects: o, objectNumbers: n, glyphNumbers: gn } = snapshot;
+    const { objects: o, objectNumbers: n } = snapshot;
     for (let i = 0; i * PACKED_TEXT_OBJECT_STRIDE < o.length; i++) {
       const at = i * PACKED_TEXT_OBJECT_STRIDE;
-      objectMarks.push(Array.from(snapshot.objectMarks.subarray(o[at + 4], o[at + 4] + o[at + 5])));
-      const out: Glyph[] = [];
-      glyphs.push(out);
-      if (PACKED_TEXT_OBJECT_KINDS[o[at]] !== 'text' || !o[at + 3]) continue;
-      const fontName = fontNameOf(o[at + 1]);
+      const marks = Array.from(snapshot.objectMarks.subarray(o[at + 4], o[at + 4] + o[at + 5]));
+      const isText = PACKED_TEXT_OBJECT_KINDS[o[at]] === 'text';
       const num = i * PACKED_TEXT_OBJECT_NUMBERS;
-      const fontSize = n[num];
-      const matrix = [n[num + 1], n[num + 2], n[num + 3], n[num + 4]].map((v) => v * fontSize);
-      const advScale = Math.hypot(n[num + 1], n[num + 2]) || 1;
-      for (let g = o[at + 2], end = g + o[at + 3]; g < end; g++) {
-        const flags = snapshot.glyphFlags[g];
-        out.push({
-          ch: String.fromCodePoint(snapshot.glyphCodes[g]),
-          x: gn[g * 3],
-          y: gn[g * 3 + 1],
-          w: gn[g * 3 + 2],
-          matrix,
-          fs: fontSize,
-          advScale,
-          fontName,
-          isSpace: (flags & PACKED_GLYPH_SPACE) !== 0,
-          piled: (flags & PACKED_GLYPH_STACKED) !== 0,
-        });
-      }
+      run(marks, o[at + 2], isText ? o[at + 2] + o[at + 3] : o[at + 2], o[at + 1], n[num], n, num + 1);
     }
-    return { objectMarks, glyphs };
+    return { runs, codes: snapshot.glyphCodes, nums: snapshot.glyphNumbers, flags: snapshot.glyphFlags };
   }
+  let count = 0;
+  for (const o of snapshot.objects) if (o.kind === 'text') count += o.glyphs.length;
+  const codes = new Uint32Array(count);
+  const nums = new Float64Array(count * 3);
+  const flags = new Uint8Array(count);
+  let g = 0;
   for (const o of snapshot.objects) {
-    objectMarks.push(o.marks);
-    if (o.kind !== 'text' || !o.glyphs.length) {
-      glyphs.push([]);
-      continue;
+    const start = g;
+    if (o.kind === 'text') {
+      for (const glyph of o.glyphs) {
+        codes[g] = glyph.unicode.codePointAt(0) ?? 0;
+        nums[g * 3] = glyph.origin.x;
+        nums[g * 3 + 1] = glyph.origin.y;
+        nums[g * 3 + 2] = glyph.advance;
+        flags[g] = (/^\s$/.test(glyph.unicode) ? PACKED_GLYPH_SPACE : 0) | (glyph.stacked ? PACKED_GLYPH_STACKED : 0);
+        g++;
+      }
+      run(o.marks, start, g, o.font, o.fontSize, o.matrix, 0);
+    } else {
+      run(o.marks, start, start, -1, 0, [], 0);
     }
-    const fontName = fontNameOf(o.font);
-    const m = o.matrix;
-    const matrix = [m[0], m[1], m[2], m[3]].map((v) => v * o.fontSize);
-    const advScale = Math.hypot(m[0], m[1]) || 1;
-    glyphs.push(
-      o.glyphs.map((g) => ({
-        ch: g.unicode,
-        x: g.origin.x,
-        y: g.origin.y,
-        w: g.advance,
-        matrix,
-        fs: o.fontSize,
-        advScale,
-        fontName,
-        isSpace: /^\s$/.test(g.unicode),
-        piled: !!g.stacked,
-      })),
-    );
   }
-  return { objectMarks, glyphs };
+  return { runs, codes, nums, flags };
 }
 
 /**
@@ -174,7 +164,7 @@ export function buildTextContent(snapshot: PageTextObjectsSnapshot | PageTextObj
   const plain = !!opts.plain;
   const styles: Record<string, TextStyle> = Object.create(null);
   const fontNames = new Map<number, string>();
-  const { objectMarks, glyphs } = objectGlyphs(snapshot, (font) => {
+  const { runs, codes, nums, flags } = objectRuns(snapshot, (font) => {
     let fontName = fontNames.get(font);
     if (!fontName) {
       fontName = `g_d0_f${fontNames.size + 1}`;
@@ -393,39 +383,41 @@ export function buildTextContent(snapshot: PageTextObjectsSnapshot | PageTextObj
     open = marks;
   };
 
-  objectMarks.forEach((marks, oi) => {
-    syncMarks(marks);
-    for (const g of glyphs[oi]) {
+  for (const r of runs) {
+    syncMarks(r.marks);
+    if (r.end === r.start) continue;
+    const matrix = r.matrix;
+    const h = Math.hypot(matrix[0], matrix[1]) || 1;
+    for (let g = r.start; g < r.end; g++) {
       // setFont: a different font or size flushes (buildTextContentItem's check).
-      if (g.fontName !== loadedName || g.fs !== fontSize) {
+      if (r.fontName !== loadedName || r.fs !== fontSize) {
         if (loadedName) flushTextContentItem();
-        loadedName = g.fontName;
-        fontSize = g.fs;
+        loadedName = r.fontName;
+        fontSize = r.fs;
       }
-      curMatrix = g.matrix;
-      curAdvScale = g.advScale;
-      posX = g.x;
-      posY = g.y;
-      if (g.isSpace) {
+      curMatrix = matrix;
+      curAdvScale = r.advScale;
+      const x = (posX = nums[g * 3]);
+      const y = (posY = nums[g * 3 + 1]);
+      const w = nums[g * 3 + 2];
+      if (flags[g] & PACKED_GLYPH_SPACE) {
         saveLastChar(' ');
         continue;
       }
       // Each piled (zero-advance) glyph is its own item, as PDF.js gives them.
-      if (g.piled) {
+      if (flags[g] & PACKED_GLYPH_STACKED) {
         flushTextContentItem();
         resetLastChars();
       }
-      if (!compareWithLastPosition(g.w)) continue;
+      if (!compareWithLastPosition(w)) continue;
       const chunk = ensureTextContentItem();
-      chunk.width += g.w / g.advScale;
-      if (g.w) {
-        const h = Math.hypot(g.matrix[0], g.matrix[1]) || 1;
-        chunk.prevTransform = [...g.matrix, g.x + (g.matrix[0] / h) * g.w, g.y + (g.matrix[1] / h) * g.w];
-      }
-      if (saveLastChar(g.ch)) chunk.str.push(' ');
-      chunk.str.push(g.ch);
+      chunk.width += w / r.advScale;
+      if (w) chunk.prevTransform = [matrix[0], matrix[1], matrix[2], matrix[3], x + (matrix[0] / h) * w, y + (matrix[1] / h) * w];
+      const ch = String.fromCodePoint(codes[g]);
+      if (saveLastChar(ch)) chunk.str.push(' ');
+      chunk.str.push(ch);
     }
-  });
+  }
   syncMarks([]);
   flushTextContentItem();
   return textContent;
